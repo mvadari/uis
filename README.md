@@ -82,10 +82,14 @@ The workflow is defined in `.github/workflows/deploy.yml`.
 
 ## Privacy & Security
 
+There are likely no major security risks possible, given the simplicity of the apps.
+
 - All tools run entirely in your browser
 - No data is sent to external servers (except API calls to XRPL/GitHub)
 - Data is stored locally in your browser's localStorage
 - GitHub tokens are stored locally and never transmitted elsewhere
+
+**NOTE:** All the code in this repo is almost entirely vibe-coded.
 
 ## License
 
@@ -93,5 +97,5 @@ MIT License - feel free to use and modify as needed.
 
 ## Contributing
 
-Contributions are welcome! Feel free to open issues or submit pull requests.
+Contributions are welcome! Feel free to open issues or submit pull requests. Responses are not likely to be prioritized, however, as this is mostly just a personal project.
 
