@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XRPL Network UI</title>
+    <script src="https://cdn.jsdelivr.net/npm/xrpl@3.0.0/build/xrpl-latest-min.js"></script>
+
+    <!-- CodeMirror 5 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0f1419;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: #1a1f26;
+            border-radius: 8px;
+            border: 1px solid #2a3038;
+        }
+
+        .content-wrapper {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .main-content {
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .explorer-sidebar {
+            position: sticky;
+            top: 20px;
+            height: fit-content;
+            display: none;
+        }
+
+        .explorer-sidebar.visible {
+            display: block;
+        }
+
+        .explorer-sidebar .section {
+            height: calc(100vh - 40px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .explorer-sidebar .section h2 {
+            margin-bottom: 12px;
+            flex-shrink: 0;
+        }
+
+        .explorer-sidebar iframe {
+            flex: 1;
+            min-height: 0;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .header-right select {
+            min-width: 150px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: #0f1419;
+            border-radius: 6px;
+            border: 1px solid #2a3038;
+            white-space: nowrap;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ff6b6b;
+        }
+
+        .status-dot.connected {
+            background: #51cf66;
+        }
+
+        .section {
+            background: #1a1f26;
+            border: 1px solid #2a3038;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .section h2 {
+            font-size: 16px;
+            margin-bottom: 16px;
+            color: #fff;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: #b0b0b0;
+            text-transform: uppercase;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            background: #0f1419;
+            border: 1px solid #2a3038;
+            border-radius: 6px;
+            color: #e0e0e0;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #4a9eff;
+            box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.1);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 120px;
+            font-family: 'Monaco', 'Courier New', monospace;
+        }
+
+        /* CodeMirror styling */
+        .CodeMirror {
+            border: 1px solid #2a3038;
+            border-radius: 6px;
+            background: #1e1e1e;
+            height: auto;
+            min-height: 120px;
+            font-size: 13px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            color: #d4d4d4;
+        }
+
+        .CodeMirror-focused {
+            outline: none;
+            border-color: #4a9eff;
+            box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.1);
+        }
+
+        .CodeMirror-scroll {
+            min-height: 120px;
+        }
+
+        .CodeMirror-gutters {
+            background: #1e1e1e;
+            border-right: 1px solid #2a3038;
+        }
+
+        .CodeMirror-linenumber {
+            color: #858585;
+        }
+
+        .CodeMirror-cursor {
+            border-left: 1px solid #d4d4d4;
+        }
+
+        .CodeMirror-selected {
+            background: #264f78;
+        }
+
+        .CodeMirror-line::selection,
+        .CodeMirror-line > span::selection,
+        .CodeMirror-line > span > span::selection {
+            background: #264f78;
+        }
+
+        /* JSON syntax highlighting - dark theme */
+        .cm-s-default .cm-property {
+            color: #9cdcfe;
+        }
+
+        .cm-s-default .cm-string {
+            color: #ce9178;
+        }
+
+        .cm-s-default .cm-number {
+            color: #b5cea8;
+        }
+
+        .cm-s-default .cm-atom {
+            color: #569cd6;
+        }
+
+        .cm-s-default .cm-keyword {
+            color: #c586c0;
+        }
+
+        .cm-s-default .cm-variable {
+            color: #9cdcfe;
+        }
+
+        .cm-s-default .cm-bracket {
+            color: #ffd700;
+        }
+
+        .cm-s-default .cm-punctuation {
+            color: #d4d4d4;
+        }
+
+        .CodeMirror-matchingbracket {
+            color: #ffd700 !important;
+            background: rgba(255, 215, 0, 0.2);
+            font-weight: bold;
+        }
+
+        .CodeMirror-nonmatchingbracket {
+            color: #f44747 !important;
+        }
+
+        .CodeMirror-activeline-background {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #4a9eff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #3a8eef;
+        }
+
+        button:active {
+            background: #2a7edf;
+        }
+
+        .output {
+            background: #0f1419;
+            border: 1px solid #2a3038;
+            border-radius: 6px;
+            padding: 12px;
+            margin-top: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 11px;
+            color: #51cf66;
+            white-space: pre-wrap;
+            word-break: break-all;
+            display: none;
+        }
+
+        .output:not(:empty) {
+            display: block;
+        }
+
+        .output.error {
+            color: #ff6b6b;
+        }
+
+        iframe {
+            width: 100%;
+            border: 1px solid #2a3038;
+            border-radius: 6px;
+            background: white;
+        }
+
+        .network-config {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .network-config .form-group {
+            margin-bottom: 0;
+        }
+
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            background: #1a1f26;
+            border: 1px solid #2a3038;
+            border-radius: 6px;
+            padding: 16px 20px;
+            min-width: 300px;
+            max-width: 400px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .toast.success {
+            border-left: 4px solid #51cf66;
+        }
+
+        .toast.error {
+            border-left: 4px solid #ff6b6b;
+        }
+
+        .toast.info {
+            border-left: 4px solid #4a9eff;
+        }
+
+        .toast-icon {
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .toast-message {
+            flex: 1;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .toast-close {
+            background: none;
+            border: none;
+            color: #b0b0b0;
+            cursor: pointer;
+            padding: 0;
+            font-size: 20px;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+
+        .toast-close:hover {
+            color: #e0e0e0;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .account-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .account-item {
+            background: #1a1f26;
+            border: 1px solid #2a3038;
+            border-radius: 6px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .account-item:hover {
+            border-color: #4a9eff;
+            background: #1f2530;
+        }
+
+        .account-item.selected {
+            border-color: #4a9eff;
+            background: #1f2530;
+        }
+
+        .account-info {
+            flex: 1;
+        }
+
+        .account-address {
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            color: #e0e0e0;
+            margin-bottom: 4px;
+        }
+
+        .account-seed {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: #b0b0b0;
+            margin-bottom: 4px;
+        }
+
+        .account-balance {
+            font-size: 12px;
+            color: #888;
+        }
+
+        .account-delete {
+            background: none;
+            border: none;
+            color: #ff6b6b;
+            cursor: pointer;
+            padding: 4px 8px;
+            font-size: 18px;
+            line-height: 1;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+
+        .account-delete:hover {
+            opacity: 1;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+        }
+
+        .tab-button {
+            padding: 12px 24px;
+            background: #1a1f26;
+            color: #b0b0b0;
+            border: 1px solid #2a3038;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .tab-button:hover {
+            background: #252a32;
+            color: #e0e0e0;
+        }
+
+        .tab-button.active {
+            background: #4a9eff;
+            color: white;
+            border-color: #4a9eff;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @media (max-width: 1024px) {
+            .content-wrapper {
+                grid-template-columns: 1fr;
+            }
+            .explorer-sidebar {
+                position: relative;
+                top: 0;
+            }
+            .explorer-sidebar .section {
+                height: 600px;
+            }
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+            .header-right {
+                flex-wrap: wrap;
+                width: 100%;
+            }
+            .network-config {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="toast-container" id="toastContainer"></div>
+
+    <div class="container">
+        <div class="header">
+            <h1>XRPL Network UI</h1>
+            <div class="header-right">
+                <select id="networkSelect" aria-label="Select network" onchange="handleNetworkChange()">
+                    <option value="wss://xrplcluster.com">Mainnet</option>
+                    <option value="wss://s.altnet.rippletest.net:51233">Testnet</option>
+                    <option value="wss://s.devnet.rippletest.net:51233">Devnet</option>
+                    <option value="wss://wasm.devnet.rippletest.net:51233">WASM Devnet</option>
+                    <option value="ws://localhost:6006">Local Standalone</option>
+                    <option value="custom">Custom</option>
+                </select>
+                <input type="text" id="customNetworkUrl" placeholder="wss://..." aria-label="Custom network URL" style="display: none;">
+                <button onclick="connectNetwork()" aria-label="Connect to network">Connect</button>
+                <div class="status-indicator">
+                    <div class="status-dot" id="statusDot"></div>
+                    <span id="statusText">Disconnected</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="content-wrapper">
+            <div class="main-content">
+                <div class="section">
+                <h2>Account Management</h2>
+                <div class="form-group">
+                    <label>Saved Accounts (click to use)</label>
+                    <button onclick="createAccount()" aria-label="Generate new XRPL account">+ New Account</button>
+                </div>
+                <div class="account-list" id="accountList"></div>
+                </div>
+
+                <div class="tabs">
+                    <button class="tab-button active" onclick="switchTab('requests')" aria-label="Requests tab">Requests</button>
+                    <button class="tab-button" onclick="switchTab('transactions')" aria-label="Transactions tab">Transactions</button>
+                </div>
+
+                <div id="requestsTab" class="tab-content active">
+                    <div class="section">
+                <h2>Send Request</h2>
+                <div id="requestContent">
+                <div class="form-group">
+                    <label>Request Template</label>
+                    <select id="requestTemplate" onchange="loadTemplate()" aria-label="Select request template">
+                        <option value="">-- Select Template --</option>
+                        <option value="account_info">Account Info</option>
+                        <option value="account_objects">Account Objects</option>
+                        <option value="ledger">Ledger</option>
+                        <option value="ledger_data">Ledger Data</option>
+                        <option value="ledger_entry">Ledger Entry</option>
+                        <option value="tx">Transaction</option>
+                        <option value="simulate">Simulate</option>
+                        <option value="amm_info">AMM Info</option>
+                        <option value="fee">Fee</option>
+                        <option value="server_info">Server Info</option>
+                        <option value="server_definitions">Server Definitions</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>WebSocket Request</label>
+                    <div id="requestBody"></div>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <button onclick="sendRequest()" aria-label="Send WebSocket request">Send Request</button>
+                    <button onclick="document.getElementById('requestOutput').textContent = ''" aria-label="Clear request log">Clear Log</button>
+                </div>
+                <div class="output" id="requestOutput" role="log" aria-live="polite"></div>
+                </div>
+                    </div>
+                </div>
+
+                <div id="transactionsTab" class="tab-content">
+                    <div class="section">
+                <h2>Send Transaction</h2>
+                <div id="transactionContent">
+                <div class="form-group">
+                    <label>Account Secret</label>
+                    <input type="text" id="txSecret" placeholder="sXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" aria-label="Account secret key">
+                </div>
+                <div class="form-group">
+                    <label>Transaction Template</label>
+                    <select id="txTemplate" onchange="loadTxTemplate()" aria-label="Select transaction template">
+                        <option value="">-- Select Template --</option>
+                        <option value="payment">Payment</option>
+                        <option value="accountset">AccountSet</option>
+                        <option value="trustset">TrustSet</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Transaction JSON</label>
+                    <div id="txBody"></div>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <button onclick="sendTransaction()" aria-label="Submit and sign transaction">Send Transaction</button>
+                    <button onclick="document.getElementById('txOutput').textContent = ''" aria-label="Clear transaction log">Clear Log</button>
+                </div>
+                <div class="output" id="txOutput" role="log" aria-live="polite"></div>
+                </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="explorer-sidebar" id="explorerSidebar">
+                <div class="section">
+                    <h2>Network Explorer</h2>
+                    <iframe id="explorerFrame" src="" title="XRPL Network Explorer"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let client = null;
+        let selectedAccount = null;
+        let currentNetworkUrl = null;
+
+        // CodeMirror editors
+        let requestEditor = null;
+        let txEditor = null;
+
+        // Genesis account for standalone
+        const GENESIS_ACCOUNT = {
+            address: 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh',
+            seed: 'snoPBrXtMeMyMHUVTgbuqAfg1SUTb',
+            publicKey: 'aBQG8RQAzjs1eTKFEAQXr2gS4utcDiEC9wmi7pfUPTi27VCahwgw',
+            balance: '100000000000',
+            network: 'standalone'
+        };
+
+        function isStandalone(url) {
+            return url.includes('localhost') || url.includes('127.0.0.1');
+        }
+
+        // Account storage functions (network-specific)
+        function getStorageKey() {
+            return currentNetworkUrl ? `xrpl_accounts_${currentNetworkUrl}` : 'xrpl_accounts';
+        }
+
+        function getStoredAccounts() {
+            const accounts = localStorage.getItem(getStorageKey());
+            return accounts ? JSON.parse(accounts) : [];
+        }
+
+        function saveAccount(account) {
+            const accounts = getStoredAccounts();
+            accounts.push(account);
+            localStorage.setItem(getStorageKey(), JSON.stringify(accounts));
+            renderAccountList();
+        }
+
+        function deleteAccount(address) {
+            const accounts = getStoredAccounts().filter(acc => acc.address !== address);
+            localStorage.setItem(getStorageKey(), JSON.stringify(accounts));
+            if (selectedAccount && selectedAccount.address === address) {
+                selectedAccount = null;
+            }
+            renderAccountList();
+        }
+
+        async function selectAccount(account) {
+            selectedAccount = account;
+
+            // Populate secret in transaction form
+            document.getElementById('txSecret').value = account.seed;
+
+            // Copy address to clipboard
+            try {
+                await navigator.clipboard.writeText(account.address);
+                showToast('Address copied to clipboard!', 'success');
+            } catch (err) {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = account.address;
+                textArea.style.position = 'fixed';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showToast('Address copied to clipboard!', 'success');
+                } catch (e) {
+                    showToast('Failed to copy address', 'error');
+                }
+                document.body.removeChild(textArea);
+            }
+
+            renderAccountList();
+        }
+
+        function renderAccountList() {
+            const listEl = document.getElementById('accountList');
+
+            // Don't show accounts until connected to a network
+            if (!currentNetworkUrl) {
+                listEl.innerHTML = '<div style="color: #b0b0b0; font-size: 14px; padding: 12px;">Connect to a network to view accounts.</div>';
+                return;
+            }
+
+            const accounts = getStoredAccounts();
+
+            if (accounts.length === 0) {
+                listEl.innerHTML = '<div style="color: #b0b0b0; font-size: 14px; padding: 12px;">No saved accounts. Create one to get started.</div>';
+                return;
+            }
+
+            listEl.innerHTML = accounts.map(acc => `
+                <div class="account-item ${selectedAccount && selectedAccount.address === acc.address ? 'selected' : ''}"
+                     onclick="selectAccount(${JSON.stringify(acc).replace(/"/g, '&quot;')})">
+                    <div class="account-info">
+                        <div class="account-address">${acc.address}</div>
+                        <div class="account-seed">${acc.seed}</div>
+                        <div class="account-balance">${acc.balance || 'Unknown'} XRP</div>
+                    </div>
+                    <button class="account-delete" onclick="event.stopPropagation(); deleteAccount('${acc.address}')" aria-label="Delete account">×</button>
+                </div>
+            `).join('');
+        }
+
+        function updateTabsVisibility() {
+            const requestContent = document.getElementById('requestContent');
+            const transactionContent = document.getElementById('transactionContent');
+
+            if (!currentNetworkUrl) {
+                requestContent.innerHTML = '<div style="color: #b0b0b0; font-size: 14px; padding: 12px;">Connect to a network to send requests.</div>';
+                transactionContent.innerHTML = '<div style="color: #b0b0b0; font-size: 14px; padding: 12px;">Connect to a network to send transactions.</div>';
+
+                // Destroy editors when disconnected
+                if (requestEditor) {
+                    requestEditor.toTextArea();
+                    requestEditor = null;
+                }
+                if (txEditor) {
+                    txEditor.toTextArea();
+                    txEditor = null;
+                }
+            } else {
+                // Restore original content if it was replaced
+                if (requestContent.innerHTML.includes('Connect to a network')) {
+                    requestContent.innerHTML = `
+                <div class="form-group">
+                    <label>Request Template</label>
+                    <select id="requestTemplate" onchange="loadTemplate()" aria-label="Select request template">
+                        <option value="">-- Select Template --</option>
+                        <option value="account_info">Account Info</option>
+                        <option value="account_objects">Account Objects</option>
+                        <option value="ledger">Ledger</option>
+                        <option value="ledger_data">Ledger Data</option>
+                        <option value="ledger_entry">Ledger Entry</option>
+                        <option value="tx">Transaction</option>
+                        <option value="simulate">Simulate</option>
+                        <option value="amm_info">AMM Info</option>
+                        <option value="fee">Fee</option>
+                        <option value="server_info">Server Info</option>
+                        <option value="server_definitions">Server Definitions</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>WebSocket Request</label>
+                    <div id="requestBody"></div>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <button onclick="sendRequest()" aria-label="Send WebSocket request">Send Request</button>
+                    <button onclick="document.getElementById('requestOutput').textContent = ''" aria-label="Clear request log">Clear Log</button>
+                </div>
+                <div class="output" id="requestOutput" role="log" aria-live="polite"></div>
+                `;
+                    // Reinitialize request editor
+                    initializeEditors();
+                }
+                if (transactionContent.innerHTML.includes('Connect to a network')) {
+                    transactionContent.innerHTML = `
+                <div class="form-group">
+                    <label>Account Secret</label>
+                    <input type="text" id="txSecret" placeholder="sXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" aria-label="Account secret key">
+                </div>
+                <div class="form-group">
+                    <label>Transaction Template</label>
+                    <select id="txTemplate" onchange="loadTxTemplate()" aria-label="Select transaction template">
+                        <option value="">-- Select Template --</option>
+                        <option value="payment">Payment</option>
+                        <option value="accountset">AccountSet</option>
+                        <option value="trustset">TrustSet</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Transaction JSON</label>
+                    <div id="txBody"></div>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <button onclick="sendTransaction()" aria-label="Submit and sign transaction">Send Transaction</button>
+                    <button onclick="document.getElementById('txOutput').textContent = ''" aria-label="Clear transaction log">Clear Log</button>
+                </div>
+                <div class="output" id="txOutput" role="log" aria-live="polite"></div>
+                `;
+                    // Reinitialize transaction editor
+                    initializeEditors();
+                }
+            }
+        }
+
+        // Toast notification system
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+
+            const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
+
+            toast.innerHTML = `
+                <span class="toast-icon">${icon}</span>
+                <span class="toast-message">${message}</span>
+                <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+            `;
+
+            container.appendChild(toast);
+
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (toast.parentElement) {
+                    toast.remove();
+                }
+            }, 5000);
+        }
+
+        // Check if xrpl library is loaded
+        window.addEventListener('load', function() {
+            if (typeof xrpl === 'undefined') {
+                console.error('XRPL library failed to load');
+                showToast('Error: XRPL library failed to load. Please refresh the page.', 'error');
+            } else {
+                console.log('XRPL library loaded successfully');
+            }
+
+            // Load saved accounts
+            renderAccountList();
+        });
+
+        function switchTab(tabName) {
+            // Remove active class from all tabs and buttons
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Add active class to selected tab and button
+            if (tabName === 'requests') {
+                document.getElementById('requestsTab').classList.add('active');
+                document.querySelectorAll('.tab-button')[0].classList.add('active');
+            } else if (tabName === 'transactions') {
+                document.getElementById('transactionsTab').classList.add('active');
+                document.querySelectorAll('.tab-button')[1].classList.add('active');
+            }
+        }
+
+        function handleNetworkChange() {
+            const networkSelect = document.getElementById('networkSelect');
+            const customNetworkUrl = document.getElementById('customNetworkUrl');
+
+            if (networkSelect.value === 'custom') {
+                customNetworkUrl.style.display = 'block';
+            } else {
+                customNetworkUrl.style.display = 'none';
+            }
+        }
+
+        async function connectNetwork() {
+            if (typeof xrpl === 'undefined') {
+                showToast('XRPL library not loaded. Please refresh the page.', 'error');
+                return;
+            }
+
+            try {
+                const networkSelect = document.getElementById('networkSelect');
+                const url = networkSelect.value === 'custom'
+                    ? document.getElementById('customNetworkUrl').value
+                    : networkSelect.value;
+
+                if (!url) {
+                    showToast('Please enter a network URL', 'error');
+                    return;
+                }
+
+                if (client) {
+                    await client.disconnect();
+                }
+
+                // Set current network URL and clear selected account
+                currentNetworkUrl = url;
+                selectedAccount = null;
+
+                client = new xrpl.Client(url);
+                await client.connect();
+
+                updateStatus(true);
+                updateExplorer(url);
+
+                // Auto-add genesis account for standalone if not already present
+                if (isStandalone(url)) {
+                    const accounts = getStoredAccounts();
+                    const hasGenesis = accounts.some(acc => acc.address === GENESIS_ACCOUNT.address);
+                    if (!hasGenesis) {
+                        saveAccount(GENESIS_ACCOUNT);
+                    }
+                }
+
+                // Render accounts for this network and update tabs visibility
+                renderAccountList();
+                updateTabsVisibility();
+            } catch (error) {
+                updateStatus(false);
+                showToast('Connection failed: ' + error.message, 'error');
+            }
+        }
+
+        function updateStatus(connected) {
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+            if (connected) {
+                dot.classList.add('connected');
+                text.textContent = 'Connected';
+            } else {
+                dot.classList.remove('connected');
+                text.textContent = 'Disconnected';
+            }
+        }
+
+        function updateExplorer(url) {
+            const explorerMap = {
+                'wss://xrplcluster.com': 'https://livenet.xrpl.org/',
+                'wss://s.altnet.rippletest.net:51233': 'https://testnet.xrpl.org/',
+                'wss://s.devnet.rippletest.net:51233': 'https://devnet.xrpl.org/',
+            };
+
+            const strippedUrl = url.replace(/^wss?:\/\//, '');
+            const explorerUrl = explorerMap[url] ?? `https://custom.xrpl.org/${strippedUrl}`;
+            const sidebar = document.getElementById('explorerSidebar');
+            const iframe = document.getElementById('explorerFrame');
+
+            if (explorerUrl) {
+                sidebar.classList.add('visible');
+                iframe.src = explorerUrl;
+            } else {
+                sidebar.classList.remove('visible');
+                iframe.src = '';
+            }
+        }
+
+        async function createAccount() {
+            if (!client || !currentNetworkUrl) {
+                showToast('Not connected to network', 'error');
+                return;
+            }
+
+            try {
+                // Block account creation on mainnet
+                if (currentNetworkUrl === 'wss://xrplcluster.com') {
+                    showToast('Account creation is disabled on Mainnet for safety', 'error');
+                    return;
+                }
+
+                const wallet = xrpl.Wallet.generate();
+
+                // Check network type
+                const isStandaloneNet = isStandalone(currentNetworkUrl);
+                const isTestnet = currentNetworkUrl.includes('testnet') || currentNetworkUrl.includes('devnet');
+
+                if (isStandaloneNet) {
+                    // Use genesis account to fund new account
+                    showToast('Creating and funding account from genesis...', 'info');
+
+                    try {
+                        const genesisWallet = xrpl.Wallet.fromSeed(GENESIS_ACCOUNT.seed);
+
+                        // Send payment from genesis to new account
+                        const payment = {
+                            TransactionType: 'Payment',
+                            Account: GENESIS_ACCOUNT.address,
+                            Destination: wallet.address,
+                            Amount: '1000000000' // 1000 XRP
+                        };
+
+                        await client.submitAndWait(payment, { wallet: genesisWallet });
+
+                        // Call ledger_accept to validate the transaction
+                        await client.request({ command: 'ledger_accept' });
+
+                        const account = {
+                            address: wallet.address,
+                            seed: wallet.seed,
+                            publicKey: wallet.publicKey,
+                            balance: '1000',
+                            network: currentNetworkUrl
+                        };
+                        saveAccount(account);
+                        selectAccount(account);
+
+                        showToast('Account created and funded!', 'success');
+                    } catch (fundError) {
+                        showToast('Account creation failed: ' + fundError.message, 'error');
+                    }
+                } else if (isTestnet) {
+                    showToast('Creating and funding account...', 'info');
+
+                    try {
+                        const fundResult = await client.fundWallet(wallet);
+
+                        const account = {
+                            address: fundResult.wallet.address,
+                            seed: fundResult.wallet.seed,
+                            publicKey: fundResult.wallet.publicKey,
+                            balance: fundResult.balance,
+                            network: currentNetworkUrl
+                        };
+                        saveAccount(account);
+                        selectAccount(account);
+
+                        showToast('Account created and funded!', 'success');
+                    } catch (fundError) {
+                        const account = {
+                            address: wallet.address,
+                            seed: wallet.seed,
+                            publicKey: wallet.publicKey,
+                            balance: '0',
+                            network: currentNetworkUrl
+                        };
+                        saveAccount(account);
+                        selectAccount(account);
+
+                        showToast('Account created but funding failed', 'error');
+                    }
+                } else {
+                    // Custom network - just create without funding
+                    const account = {
+                        address: wallet.address,
+                        seed: wallet.seed,
+                        publicKey: wallet.publicKey,
+                        balance: '0',
+                        network: currentNetworkUrl
+                    };
+                    saveAccount(account);
+                    selectAccount(account);
+
+                    showToast('Account created (no auto-funding on custom network)', 'info');
+                }
+            } catch (error) {
+                showToast('Account creation failed: ' + error.message, 'error');
+            }
+        }
+
+        function loadTemplate() {
+            const template = document.getElementById('requestTemplate').value;
+            const accountAddress = selectedAccount ? selectedAccount.address : 'rN7n7otQDd6FczFgLdlqtyMVrn3Rqq...';
+
+            const templates = {
+                'account_info': `{\n  "command": "account_info",\n  "account": "${accountAddress}",\n  "ledger_index": "validated"\n}`,
+                'account_objects': `{\n  "command": "account_objects",\n  "account": "${accountAddress}",\n  "ledger_index": "validated"\n}`,
+                'ledger': '{\n  "command": "ledger",\n  "ledger_index": "validated",\n  "transactions": true,\n  "expand": true\n}',
+                'ledger_data': '{\n  "command": "ledger_data",\n  "ledger_index": "validated",\n  "limit": 10\n}',
+                'ledger_entry': `{\n  "command": "ledger_entry",\n  "account_root": "${accountAddress}",\n  "ledger_index": "validated"\n}`,
+                'tx': '{\n  "command": "tx",\n  "transaction": "TRANSACTION_HASH_HERE"\n}',
+                'simulate': `{\n  "command": "simulate",\n  "tx_json": {\n    "TransactionType": "Payment",\n    "Account": "${accountAddress}",\n    "Destination": "rLHzPsX6oXkzU9...",\n    "Amount": "1000000"\n  }\n}`,
+                'amm_info': '{\n  "command": "amm_info",\n  "asset": {\n    "currency": "XRP"\n  },\n  "asset2": {\n    "currency": "USD",\n    "issuer": "rLHzPsX6oXkzU9..."\n  }\n}',
+                'fee': '{\n  "command": "fee"\n}',
+                'server_info': '{\n  "command": "server_info"\n}',
+                'server_definitions': '{\n  "command": "server_definitions"\n}'
+            };
+            if (template && requestEditor) {
+                requestEditor.setValue(templates[template]);
+            }
+        }
+
+        function loadTxTemplate() {
+            const template = document.getElementById('txTemplate').value;
+            const accountAddress = selectedAccount ? selectedAccount.address : 'rN7n7otQDd6FczFgLdlqtyMVrn3Rqq...';
+
+            const templates = {
+                'payment': `{\n  "TransactionType": "Payment",\n  "Account": "${accountAddress}",\n  "Destination": "rLHzPsX6oXkzU9...",\n  "Amount": "1000000"\n}`,
+                'accountset': `{\n  "TransactionType": "AccountSet",\n  "Account": "${accountAddress}",\n  "SetFlag": 5\n}`,
+                'trustset': `{\n  "TransactionType": "TrustSet",\n  "Account": "${accountAddress}",\n  "LimitAmount": {\n    "currency": "USD",\n    "issuer": "rLHzPsX6oXkzU9...",\n    "value": "1000"\n  }\n}`
+            };
+            if (template && txEditor) {
+                txEditor.setValue(templates[template]);
+            }
+        }
+
+        async function sendRequest() {
+            if (!client) {
+                showToast('Not connected to network', 'error');
+                return;
+            }
+
+            const requestBody = requestEditor ? requestEditor.getValue() : '';
+
+            // Validate JSON syntax
+            try {
+                JSON.parse(requestBody);
+            } catch (error) {
+                const outputEl = document.getElementById('requestOutput');
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = `[${timestamp}] Invalid JSON: ${error.message}\n\n`;
+                outputEl.textContent = logEntry + outputEl.textContent;
+                outputEl.classList.add('error');
+                showToast('Invalid JSON: ' + error.message, 'error');
+                return;
+            }
+
+            try {
+                const request = JSON.parse(requestBody);
+                const response = await client.request(request);
+
+                const outputEl = document.getElementById('requestOutput');
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = `[${timestamp}] Request:\n${JSON.stringify(request, null, 2)}\n\nResponse:\n${JSON.stringify(response, null, 2)}\n\n${'='.repeat(80)}\n\n`;
+                outputEl.textContent = logEntry + outputEl.textContent;
+                outputEl.classList.remove('error');
+                showToast('Request successful', 'success');
+            } catch (error) {
+                const outputEl = document.getElementById('requestOutput');
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = `[${timestamp}] Error: ${error.message}\n\n${'='.repeat(80)}\n\n`;
+                outputEl.textContent = logEntry + outputEl.textContent;
+                showToast('Request failed: ' + error.message, 'error');
+            }
+        }
+
+        async function sendTransaction() {
+            if (!client) {
+                showToast('Not connected to network', 'error');
+                return;
+            }
+
+            const secret = document.getElementById('txSecret').value.trim();
+            const txBody = txEditor ? txEditor.getValue() : '';
+
+            if (!secret) {
+                showToast('Please enter account secret', 'error');
+                return;
+            }
+
+            // Validate JSON syntax
+            try {
+                JSON.parse(txBody);
+            } catch (error) {
+                const outputEl = document.getElementById('txOutput');
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = `[${timestamp}] Invalid JSON: ${error.message}\n\n`;
+                outputEl.textContent = logEntry + outputEl.textContent;
+                outputEl.classList.add('error');
+                showToast('Invalid JSON: ' + error.message, 'error');
+                return;
+            }
+
+            try {
+                const tx = JSON.parse(txBody);
+
+                let response;
+                // For standalone, submit and manually advance ledger
+                if (currentNetworkUrl && isStandalone(currentNetworkUrl)) {
+                    response = await client.request({
+                        command: "submit",
+                        tx_json: tx,
+                        secret: secret,
+                    });
+                    await client.request({ command: 'ledger_accept' });
+                } else {
+                    const wallet = xrpl.Wallet.fromSeed(secret);
+                    response = await client.submitAndWait(tx, { wallet });
+                }
+
+                const outputEl = document.getElementById('txOutput');
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = `[${timestamp}] Transaction:\n${JSON.stringify(tx, null, 2)}\n\nResponse:\n${JSON.stringify(response, null, 2)}\n\n${'='.repeat(80)}\n\n`;
+                outputEl.textContent = logEntry + outputEl.textContent;
+                outputEl.classList.remove('error');
+                showToast('Transaction submitted successfully!', 'success');
+            } catch (error) {
+                const outputEl = document.getElementById('txOutput');
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = `[${timestamp}] Error: ${error.message}\n\n${'='.repeat(80)}\n\n`;
+                outputEl.textContent = logEntry + outputEl.textContent;
+                showToast('Transaction failed: ' + error.message, 'error');
+            }
+        }
+
+        // Initialize CodeMirror editors
+        function initializeEditors() {
+            if (typeof CodeMirror === 'undefined') {
+                // CodeMirror not loaded yet, retry
+                setTimeout(initializeEditors, 100);
+                return;
+            }
+
+            const editorOptions = {
+                mode: { name: 'javascript', json: true },
+                theme: 'default',
+                lineNumbers: true,
+                lineWrapping: true,
+                autoCloseBrackets: true,
+                matchBrackets: true,
+                styleActiveLine: true,
+                indentUnit: 2,
+                tabSize: 2,
+                indentWithTabs: false,
+                smartIndent: true,
+                electricChars: true,
+                extraKeys: {
+                    'Enter': 'newlineAndIndent',
+                    'Tab': function(cm) {
+                        if (cm.somethingSelected()) {
+                            cm.indentSelection('add');
+                        } else {
+                            cm.replaceSelection('  ', 'end');
+                        }
+                    }
+                }
+            };
+
+            // Initialize request editor
+            const requestContainer = document.getElementById('requestBody');
+            if (requestContainer && !requestEditor) {
+                requestEditor = CodeMirror(requestContainer, {
+                    ...editorOptions,
+                    value: '{\n  "command": "server_info"\n}'
+                });
+            }
+
+            // Initialize transaction editor
+            const txContainer = document.getElementById('txBody');
+            if (txContainer && !txEditor) {
+                txEditor = CodeMirror(txContainer, {
+                    ...editorOptions,
+                    value: '{\n  "TransactionType": "Payment",\n  "Account": "rN7n...",\n  "Destination": "rLHz...",\n  "Amount": "1000000"\n}'
+                });
+            }
+        }
+
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            renderAccountList();
+            updateTabsVisibility();
+            initializeEditors();
+        });
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,2663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My GitHub Pull Requests</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+            background-color: #f6f8fa;
+            color: #24292f;
+            padding: 0;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            background-color: #ffffff;
+            border-bottom: 1px solid #d0d7de;
+            padding: 0;
+            flex-shrink: 0;
+        }
+
+        .header-top {
+            display: flex;
+            align-items: center;
+            padding: 16px;
+            gap: 16px;
+            border-bottom: 1px solid #d0d7de;
+        }
+
+        .header-logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #24292f;
+        }
+
+        .github-icon {
+            width: 32px;
+            height: 32px;
+            fill: #24292f;
+        }
+
+        .header-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #24292f;
+        }
+
+        .header-controls {
+            margin-left: auto;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .header-bottom {
+            background-color: #ffffff;
+            padding: 12px 16px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        #prList {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+
+        button {
+            background-color: #f6f8fa;
+            color: #24292f;
+            border: 1px solid #d0d7de;
+            padding: 5px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        button:hover {
+            background-color: #f3f4f6;
+            border-color: #1f2328;
+        }
+
+        button.active {
+            background-color: #0969da;
+            border-color: #0969da;
+            color: #ffffff;
+        }
+
+        .header-controls button {
+            background-color: #f6f8fa;
+            color: #24292f;
+            border: 1px solid #d0d7de;
+            padding: 5px 16px;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 6px;
+            height: 32px;
+            line-height: 20px;
+        }
+
+        .header-controls button:hover {
+            background-color: #f3f4f6;
+            border-color: #1f2328;
+        }
+
+
+
+        .kanban-view {
+            display: flex;
+            gap: 12px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 16px;
+            height: 100%;
+            position: relative;
+        }
+
+        .kanban-view::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 60px;
+            background: linear-gradient(to left, rgba(246, 248, 250, 0.9), transparent);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .kanban-view.has-scroll::after {
+            opacity: 1;
+        }
+
+        .kanban-view::-webkit-scrollbar {
+            height: 12px;
+        }
+
+        .kanban-view::-webkit-scrollbar-track {
+            background: #f6f8fa;
+        }
+
+        .kanban-view::-webkit-scrollbar-thumb {
+            background: #d0d7de;
+            border-radius: 6px;
+        }
+
+        .kanban-view::-webkit-scrollbar-thumb:hover {
+            background: #afb8c1;
+        }
+
+        .kanban-column {
+            flex: 0 0 300px;
+            background-color: #f6f8fa;
+            border-radius: 6px;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 160px);
+            transition: flex-basis 0.2s ease;
+        }
+
+        .kanban-column.minimized {
+            flex: 0 0 40px;
+            padding: 8px 4px;
+        }
+
+        .kanban-header {
+            font-size: 13px;
+            font-weight: 600;
+            color: #24292f;
+            margin-bottom: 8px;
+            padding: 6px 10px;
+            background-color: #ffffff;
+            border-radius: 6px;
+            border: 1px solid #d0d7de;
+            flex-shrink: 0;
+            user-select: none;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .kanban-header-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+        }
+
+        .kanban-header-top:hover {
+            opacity: 0.7;
+        }
+
+        .kanban-header .collapse-icon {
+            font-size: 10px;
+            color: #57606a;
+            transition: transform 0.2s ease;
+        }
+
+        .kanban-sort {
+            display: flex;
+            gap: 4px;
+            font-size: 10px;
+            font-weight: 400;
+        }
+
+        .kanban-sort button {
+            background: none;
+            border: 1px solid #d0d7de;
+            border-radius: 3px;
+            padding: 2px 6px;
+            cursor: pointer;
+            color: #57606a;
+            font-size: 10px;
+        }
+
+        .kanban-sort button:hover {
+            background-color: #f6f8fa;
+        }
+
+        .kanban-sort button.active {
+            background-color: #0969da;
+            color: #ffffff;
+            border-color: #0969da;
+        }
+
+        .kanban-column.minimized .kanban-header {
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            padding: 10px 6px;
+            margin-bottom: 0;
+        }
+
+        .kanban-column.minimized .kanban-header-top {
+            writing-mode: vertical-rl;
+        }
+
+        .kanban-column.minimized .kanban-sort {
+            display: none;
+        }
+
+        .kanban-column.minimized .kanban-header .collapse-icon {
+            transform: rotate(90deg);
+        }
+
+        .kanban-content {
+            flex: 1;
+            overflow-y: auto;
+            min-height: 200px;
+        }
+
+        .kanban-column.minimized .kanban-content {
+            display: none;
+        }
+
+        .kanban-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .kanban-content::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .kanban-content::-webkit-scrollbar-thumb {
+            background: #d0d7de;
+            border-radius: 4px;
+        }
+
+        .kanban-content::-webkit-scrollbar-thumb:hover {
+            background: #afb8c1;
+        }
+
+        .kanban-column .pr-item {
+            margin-bottom: 6px;
+            border-radius: 6px;
+            border: 1px solid #d0d7de;
+            background-color: #ffffff;
+            cursor: grab;
+        }
+
+        .kanban-column .pr-item:last-child {
+            margin-bottom: 6px;
+        }
+
+        .kanban-column .pr-item.dragging {
+            opacity: 0.5;
+            cursor: grabbing;
+        }
+
+        .kanban-column.drag-over {
+            background-color: #ddf4ff;
+        }
+
+        .empty-state {
+            padding: 20px;
+            text-align: center;
+            color: #57606a;
+            font-size: 12px;
+        }
+
+        .pr-item {
+            padding: 8px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .pr-item:hover {
+            background-color: #f6f8fa;
+        }
+
+        .pr-item.flagged {
+            background-color: #fff5f5;
+            border-left: 3px solid #e03131;
+        }
+
+        .pr-item.flagged:hover {
+            background-color: #ffe9e9;
+        }
+
+        .pr-icon {
+            color: #1a7f37;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .pr-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .pr-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #0969da;
+            text-decoration: none;
+            display: inline-block;
+            margin-bottom: 0;
+            line-height: 1.3;
+        }
+
+        .pr-title:hover {
+            text-decoration: underline;
+        }
+
+        .pr-meta {
+            font-size: 11px;
+            color: #57606a;
+            line-height: 1.4;
+            margin-top: 2px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .pr-meta-text {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .pr-status {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .ci-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            font-size: 11px;
+        }
+
+        .ci-icon {
+            width: 12px;
+            height: 12px;
+            flex-shrink: 0;
+        }
+
+        .ci-success {
+            color: #1a7f37;
+        }
+
+        .ci-failure {
+            color: #d1242f;
+        }
+
+        .ci-pending {
+            color: #bf8700;
+        }
+
+        .conflict-warning {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            background-color: #fff8c5;
+            border: 1px solid #d4a72c;
+            color: #7d4e00;
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 500;
+        }
+
+        .update-branch-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: linear-gradient(180deg, #fafbfc 0%, #f6f8fa 100%);
+            border: 1px solid rgba(27, 31, 36, 0.15);
+            color: #24292f;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            box-shadow: 0 1px 0 rgba(27, 31, 36, 0.04);
+        }
+
+        .update-branch-btn:hover {
+            background: linear-gradient(180deg, #f3f4f6 0%, #ebecef 100%);
+            border-color: rgba(27, 31, 36, 0.2);
+            box-shadow: 0 1px 0 rgba(27, 31, 36, 0.1);
+        }
+
+        .update-branch-btn:active {
+            background-color: #e9ebef;
+            border-color: rgba(27, 31, 36, 0.25);
+            box-shadow: inset 0 1px 0 rgba(27, 31, 36, 0.1);
+        }
+
+        .update-branch-btn.updating {
+            opacity: 0.6;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        .last-updated {
+            font-size: 11px;
+            color: #57606a;
+        }
+
+        .pr-repo {
+            color: #0969da;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .pr-repo:hover {
+            text-decoration: underline;
+        }
+
+        .label-selector {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            font-size: 12px;
+        }
+
+        .label-selector select {
+            background-color: #ffffff;
+            color: #24292f;
+            border: 1px solid #d0d7de;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .label-selector select:focus {
+            outline: none;
+            border-color: #0969da;
+        }
+
+        .label-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            background-color: #ddf4ff;
+            border: 1px solid #54aeff;
+            color: #0969da;
+        }
+
+
+        .loading {
+            text-align: center;
+            color: #57606a;
+        }
+
+        .error {
+            background-color: #d1242f;
+            color: #ffffff;
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+        }
+
+        input[type="text"] {
+            background-color: #ffffff;
+            color: #24292f;
+            border: 1px solid #d0d7de;
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            width: 300px;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #0969da;
+        }
+
+        #tokenContainer {
+            display: none;
+        }
+
+        #tokenContainer.visible {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .status-bar {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            font-size: 12px;
+            color: #57606a;
+            flex-wrap: wrap;
+        }
+
+        .last-updated {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .pr-count {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            color: #57606a;
+        }
+
+        .pr-count span:last-child {
+            font-weight: 600;
+            color: #24292f;
+        }
+
+        .repo-filter {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .repo-filter label {
+            font-size: 12px;
+            color: #57606a;
+        }
+
+        .repo-filter select {
+            background-color: #f6f8fa;
+            color: #24292f;
+            border: 1px solid #d0d7de;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .repo-filter select:focus {
+            outline: none;
+            border-color: #0969da;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #0969da;
+            color: #ffffff;
+            padding: 12px 16px;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+            max-width: 400px;
+        }
+
+        .notification.success {
+            background-color: #1a7f37;
+        }
+
+        .notification.info {
+            background-color: #0969da;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .auto-refresh-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+        }
+
+        .auto-refresh-toggle input[type="checkbox"] {
+            cursor: pointer;
+        }
+
+        .flagged-filter {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+        }
+
+        .flagged-filter input[type="checkbox"] {
+            cursor: pointer;
+        }
+
+        .flagged-filter label {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .sort-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .sort-controls label {
+            font-size: 14px;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid #d0d7de;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: #24292f;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 28px;
+            color: #57606a;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+        }
+
+        .modal-close:hover {
+            background-color: #f6f8fa;
+            color: #24292f;
+        }
+
+        .modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .label-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .label-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            background-color: #f6f8fa;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            cursor: move;
+        }
+
+        .label-item.locked {
+            cursor: default;
+            opacity: 0.7;
+        }
+
+        .label-item.dragging {
+            opacity: 0.4;
+            background-color: #ddf4ff;
+        }
+
+        .label-drag-handle {
+            color: #57606a;
+            font-size: 16px;
+            cursor: grab;
+        }
+
+        .label-item.locked .label-drag-handle {
+            cursor: default;
+            opacity: 0.3;
+        }
+
+        .drop-indicator {
+            height: 3px;
+            background-color: #0969da;
+            margin: -4px 0;
+            border-radius: 2px;
+            position: relative;
+            z-index: 10;
+            display: none;
+        }
+
+        .drop-indicator.show {
+            display: block;
+        }
+
+        .drop-indicator::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 8px;
+            height: 8px;
+            background-color: #0969da;
+            border-radius: 50%;
+        }
+
+        .label-name {
+            flex: 1;
+            font-size: 14px;
+            color: #24292f;
+        }
+
+        .label-name-input {
+            flex: 1;
+            font-size: 14px;
+            color: #24292f;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            padding: 5px 8px;
+            background-color: #ffffff;
+            outline: none;
+        }
+
+        .label-name-input:focus {
+            border-color: #0969da;
+            box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.1);
+        }
+
+        .label-name-input[readonly] {
+            border-color: transparent;
+            background-color: transparent;
+            cursor: default;
+        }
+
+        .label-delete {
+            background-color: transparent;
+            border: 1px solid #d0d7de;
+            color: #cf222e;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .label-delete:hover {
+            background-color: #cf222e;
+            color: #ffffff;
+            border-color: #cf222e;
+        }
+
+        .add-label-btn {
+            width: 100%;
+            padding: 8px 16px;
+            background-color: #f6f8fa;
+            border: 1px dashed #d0d7de;
+            color: #0969da;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .add-label-btn:hover {
+            background-color: #eaeef2;
+            border-color: #0969da;
+        }
+
+        .modal-note {
+            margin-top: 16px;
+            padding: 12px;
+            background-color: #ddf4ff;
+            border: 1px solid #54aeff;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #0969da;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            padding: 16px 20px;
+            border-top: 1px solid #d0d7de;
+        }
+
+        .btn-secondary, .btn-primary {
+            padding: 6px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .btn-secondary {
+            background-color: #f6f8fa;
+            border: 1px solid #d0d7de;
+            color: #24292f;
+        }
+
+        .btn-secondary:hover {
+            background-color: #eaeef2;
+        }
+
+        .btn-primary {
+            background-color: #0969da;
+            border: 1px solid #0969da;
+            color: #ffffff;
+        }
+
+        .btn-primary:hover {
+            background-color: #0860ca;
+            color: #57606a;
+        }
+
+        /* PR Note Styles */
+        .note-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            cursor: pointer;
+            margin-left: 6px;
+            transition: all 0.2s;
+            position: relative;
+            opacity: 0.7;
+        }
+
+        .note-badge.has-note {
+            opacity: 0.7;
+        }
+
+        .note-badge.no-note {
+            opacity: 0;
+        }
+
+        .pr-item:hover .note-badge.no-note {
+            opacity: 0.7;
+        }
+
+        .note-badge:hover {
+            transform: scale(1.2);
+            opacity: 1;
+        }
+
+        /* PR Flag Styles */
+        .flag-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            cursor: pointer;
+            margin-left: 6px;
+            transition: all 0.2s;
+            position: relative;
+            opacity: 0.7;
+        }
+
+        .flag-badge.flagged {
+            opacity: 1;
+        }
+
+        .flag-badge.unflagged {
+            opacity: 0;
+        }
+
+        .pr-item:hover .flag-badge.unflagged {
+            opacity: 0.7;
+        }
+
+        .flag-badge:hover {
+            transform: scale(1.2);
+            opacity: 1;
+        }
+
+        .note-tooltip {
+            position: fixed;
+            padding: 12px 14px;
+            background: linear-gradient(135deg, #fff9c4 0%, #fff59d 100%);
+            color: #3e2723;
+            border-radius: 4px;
+            border: 1px solid #f9a825;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
+            font-size: 13px;
+            font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-width: 280px;
+            min-width: 180px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 10000;
+            transform: translate(-50%, -100%);
+            margin-top: -12px;
+        }
+
+        .note-tooltip.show {
+            opacity: 1;
+        }
+
+        .note-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 8px solid transparent;
+            border-top-color: #f9a825;
+        }
+
+        .note-tooltip::before {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%) translateY(-1px);
+            border: 7px solid transparent;
+            border-top-color: #fff9c4;
+            z-index: 1;
+        }
+
+        .note-textarea {
+            width: 100%;
+            min-height: 150px;
+            padding: 12px;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            resize: vertical;
+            line-height: 1.5;
+        }
+
+        .note-textarea:focus {
+            outline: none;
+            border-color: #0969da;
+            box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.1);
+        }
+
+        .sort-controls select {
+            background-color: #ffffff;
+            color: #24292f;
+            border: 1px solid #d0d7de;
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .sort-controls select:focus {
+            outline: none;
+            border-color: #0969da;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-top">
+                <div class="header-logo">
+                    <svg class="github-icon" viewBox="0 0 16 16" version="1.1" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+                    </svg>
+                    <span class="header-title">Pull Requests</span>
+                </div>
+
+                <div class="header-controls">
+                    <button id="loadBtn">Reload PRs</button>
+                    <button id="toggleToken">Token</button>
+                    <button id="editLabelsBtn">Edit Labels</button>
+                </div>
+            </div>
+
+            <div class="header-bottom">
+                <div class="controls">
+                    <div id="tokenContainer">
+                        <input type="text" id="tokenInput" placeholder="GitHub Token (optional for private repos)">
+                    </div>
+                </div>
+
+                <div class="status-bar">
+                    <div class="last-updated">
+                        <span>Last updated:</span>
+                        <span id="lastUpdated">Never</span>
+                    </div>
+                    <div class="pr-count">
+                        <span>Total PRs:</span>
+                        <span id="totalPRCount">0</span>
+                    </div>
+                    <div class="auto-refresh-toggle">
+                        <input type="checkbox" id="autoRefresh" checked>
+                        <label for="autoRefresh">Auto-refresh every 5 minutes</label>
+                    </div>
+                    <div class="flagged-filter">
+                        <input type="checkbox" id="showOnlyFlagged">
+                        <label for="showOnlyFlagged">Show only flagged</label>
+                    </div>
+                    <div class="repo-filter">
+                        <label for="repoFilter">Filter by repo:</label>
+                        <select id="repoFilter">
+                            <option value="">All repositories</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="error"></div>
+            </div>
+        </div>
+
+        <div id="prList" class="loading">Click "Load PRs" to fetch your pull requests</div>
+    </div>
+
+    <!-- Label Editor Modal -->
+    <div id="labelEditorModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Manage Kanban Columns</h2>
+                <button class="modal-close" id="closeModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="labelList" class="label-list"></div>
+                <button id="addLabelBtn" class="add-label-btn">+ Add New Label</button>
+                <div class="modal-note">
+                    Note: "Unlabeled" cannot be deleted or reordered. PRs in deleted columns will move to "Unlabeled".
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelLabelsBtn" class="btn-secondary">Cancel</button>
+                <button id="saveLabelsBtn" class="btn-primary">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PR Note Editor Modal -->
+    <div id="noteEditorModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="noteModalTitle">PR Note</h2>
+                <button class="modal-close" id="closeNoteModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <textarea id="noteTextarea" class="note-textarea" placeholder="Add your notes here..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelNoteBtn" class="btn-secondary">Cancel</button>
+                <button id="saveNoteBtn" class="btn-primary">Save Note</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global tooltip for notes -->
+    <div id="globalNoteTooltip" class="note-tooltip"></div>
+
+    <script>
+        const DEFAULT_LABELS = [
+            { id: 'unlabeled', name: 'Unlabeled', locked: true },
+            { id: 'in-progress', name: 'In Progress', locked: false },
+            { id: 'to-review', name: 'To Review', locked: false },
+            { id: 'to-discuss', name: 'To Discuss', locked: false },
+            { id: 'waiting-review-pri', name: 'Waiting for Review (Pri)', locked: false },
+            { id: 'long-term', name: 'Long-Term', locked: false },
+            { id: 'waiting-review-low', name: 'Waiting for Review (Low)', locked: false },
+            { id: 'low-pri', name: 'Low Pri', locked: false },
+            { id: 'done', name: 'Done', locked: false },
+            { id: 'blocked', name: 'Blocked', locked: false },
+            { id: 'unimportant', name: 'Unimportant', locked: false }
+        ];
+        const STORAGE_KEY = 'github_pr_labels';
+        const LABELS_LIST_KEY = 'github_pr_labels_list';
+        const SORT_KEY = 'github_pr_sort';
+        const CUSTOM_ORDER_KEY = 'github_pr_custom_order';
+        const MINIMIZED_KEY = 'github_pr_minimized';
+        const CACHE_KEY = 'github_pr_cache';
+        const CACHE_TIMESTAMP_KEY = 'github_pr_cache_timestamp';
+        const NOTES_KEY = 'github_pr_notes';
+        const FLAGGED_KEY = 'github_pr_flagged';
+        const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+        let nextLabelId = 1000; // Start custom label IDs at 1000
+
+        // Load labels from localStorage or use defaults
+        function loadLabelsList() {
+            const stored = localStorage.getItem(LABELS_LIST_KEY);
+            if (stored) {
+                try {
+                    const parsed = JSON.parse(stored);
+                    // Check if it's the old format (array of strings)
+                    if (parsed.length > 0 && typeof parsed[0] === 'string') {
+                        // Migrate from old format to new format
+                        return migrateLabelsToNewFormat(parsed);
+                    }
+                    return parsed;
+                } catch (e) {
+                    return [...DEFAULT_LABELS];
+                }
+            }
+            return [...DEFAULT_LABELS];
+        }
+
+        // Migrate old string-based labels to new ID-based format
+        function migrateLabelsToNewFormat(oldLabels) {
+            const newLabels = [];
+            const nameToIdMap = {}; // Map old names to new IDs
+
+            oldLabels.forEach((labelName, index) => {
+                const defaultLabel = DEFAULT_LABELS.find(l => l.name === labelName);
+                if (defaultLabel) {
+                    newLabels.push({ ...defaultLabel });
+                    nameToIdMap[labelName] = defaultLabel.id;
+                } else {
+                    // Custom label - create new ID
+                    const newId = `custom-${nextLabelId++}`;
+                    newLabels.push({
+                        id: newId,
+                        name: labelName,
+                        locked: labelName === 'Unlabeled'
+                    });
+                    nameToIdMap[labelName] = newId;
+                }
+            });
+
+            // Migrate PR labels from names to IDs
+            const prLabels = getLabels();
+            let updated = false;
+            Object.keys(prLabels).forEach(prId => {
+                const oldLabelName = prLabels[prId];
+                if (oldLabelName && nameToIdMap[oldLabelName]) {
+                    prLabels[prId] = nameToIdMap[oldLabelName];
+                    updated = true;
+                }
+            });
+
+            if (updated) {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(prLabels));
+            }
+
+            // Save the migrated labels list
+            saveLabelsList(newLabels);
+
+            return newLabels;
+        }
+
+        // Save labels list to localStorage
+        function saveLabelsList(labels) {
+            localStorage.setItem(LABELS_LIST_KEY, JSON.stringify(labels));
+        }
+
+        let LABELS = loadLabelsList();
+
+        let allPRs = [];
+        let autoRefreshTimer = null;
+        let lastUpdateTime = null;
+        let columnSortModes = {}; // Track sort mode per column
+        let minimizedColumns = new Set(); // Track minimized columns
+        let currentRepoFilter = ''; // Track current repository filter
+
+        // Load labels from localStorage
+        function getLabels() {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            return stored ? JSON.parse(stored) : {};
+        }
+
+        // Save labels to localStorage
+        function saveLabel(prId, label) {
+            const labels = getLabels();
+            if (label === '') {
+                delete labels[prId];
+            } else {
+                labels[prId] = label;
+            }
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(labels));
+        }
+
+        // PR Notes functions
+        function getPRNotes() {
+            const stored = localStorage.getItem(NOTES_KEY);
+            return stored ? JSON.parse(stored) : {};
+        }
+
+        function getPRNote(prId) {
+            const notes = getPRNotes();
+            return notes[prId] || '';
+        }
+
+        function savePRNote(prId, note) {
+            const notes = getPRNotes();
+            if (note === '' || !note) {
+                delete notes[prId];
+            } else {
+                notes[prId] = note;
+            }
+            localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
+        }
+
+        // PR Flagged functions
+        function getFlaggedPRs() {
+            const stored = localStorage.getItem(FLAGGED_KEY);
+            return stored ? JSON.parse(stored) : {};
+        }
+
+        function isPRFlagged(prId) {
+            const flagged = getFlaggedPRs();
+            return flagged[prId] === true;
+        }
+
+        function togglePRFlag(prId) {
+            const flagged = getFlaggedPRs();
+            if (flagged[prId]) {
+                delete flagged[prId];
+            } else {
+                flagged[prId] = true;
+            }
+            localStorage.setItem(FLAGGED_KEY, JSON.stringify(flagged));
+            renderPRs();
+        }
+
+        // Update PR branch with latest from base
+        window.updatePRBranch = async function(prNumber, repoUrl) {
+            const token = document.getElementById('tokenInput').value;
+            if (!token) {
+                showNotification('GitHub token is required', 'error');
+                return;
+            }
+
+            // Extract owner and repo from repository URL
+            const urlParts = repoUrl.split('/');
+            const owner = urlParts[urlParts.length - 2];
+            const repo = urlParts[urlParts.length - 1];
+
+            // Find the button and mark it as updating
+            const button = document.querySelector(`[data-pr-number="${prNumber}"]`);
+            if (button) {
+                button.classList.add('updating');
+                button.textContent = 'Updating...';
+            }
+
+            try {
+                const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}/update-branch`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+
+                if (response.status === 202) {
+                    showNotification('Branch update started successfully', 'success');
+
+                    // Optimistically update the PR's mergeable_state in cache
+                    const prToUpdate = allPRs.find(pr => pr.number === prNumber);
+                    if (prToUpdate) {
+                        prToUpdate.mergeable_state = 'clean'; // Optimistically assume it's now clean
+                        // Update cache
+                        localStorage.setItem(CACHE_KEY, JSON.stringify(allPRs));
+                        // Re-render to hide the button immediately
+                        renderPRs();
+                    }
+
+                    // Don't auto-refresh - let the normal 5-minute refresh handle it
+                    // GitHub's mergeable_state can take 30+ seconds to update
+                } else {
+                    const errorData = await response.json();
+                    showNotification(`Failed to update branch: ${errorData.message || 'Unknown error'}`, 'error');
+                    // Reset button on error
+                    if (button) {
+                        button.classList.remove('updating');
+                        button.textContent = '🔄 Update';
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating PR branch:', error);
+                showNotification('Error updating branch', 'error');
+                // Reset button on error
+                if (button) {
+                    button.classList.remove('updating');
+                    button.textContent = '🔄 Update';
+                }
+            }
+        }
+
+        let currentNotePRId = null;
+        let currentNotePRTitle = '';
+
+        window.openNoteEditor = function(prId, prTitle) {
+            currentNotePRId = prId;
+            currentNotePRTitle = prTitle;
+
+            const note = getPRNote(prId);
+            document.getElementById('noteTextarea').value = note;
+            document.getElementById('noteModalTitle').textContent = `Note: ${prTitle}`;
+            document.getElementById('noteEditorModal').classList.add('show');
+        }
+
+        function closeNoteEditor() {
+            document.getElementById('noteEditorModal').classList.remove('show');
+            currentNotePRId = null;
+            currentNotePRTitle = '';
+        }
+
+        function saveNote() {
+            if (currentNotePRId !== null) {
+                const note = document.getElementById('noteTextarea').value.trim();
+                savePRNote(currentNotePRId, note);
+                closeNoteEditor();
+                renderPRs(); // Re-render to update the badge
+            }
+        }
+
+        // Save sort modes to localStorage
+        function saveSortModes() {
+            localStorage.setItem(SORT_KEY, JSON.stringify(columnSortModes));
+        }
+
+        // Get sort modes from localStorage
+        function getSortModes() {
+            const stored = localStorage.getItem(SORT_KEY);
+            return stored ? JSON.parse(stored) : {};
+        }
+
+        // Save custom order to localStorage
+        function saveCustomOrder(label, prIds) {
+            const customOrders = getCustomOrders();
+            customOrders[label] = prIds;
+            localStorage.setItem(CUSTOM_ORDER_KEY, JSON.stringify(customOrders));
+        }
+
+        // Get custom orders from localStorage
+        function getCustomOrders() {
+            const stored = localStorage.getItem(CUSTOM_ORDER_KEY);
+            return stored ? JSON.parse(stored) : {};
+        }
+
+        // Save minimized columns to localStorage
+        function saveMinimizedColumns() {
+            localStorage.setItem(MINIMIZED_KEY, JSON.stringify([...minimizedColumns]));
+        }
+
+        // Get minimized columns from localStorage
+        function getMinimizedColumns() {
+            const stored = localStorage.getItem(MINIMIZED_KEY);
+            return stored ? new Set(JSON.parse(stored)) : new Set();
+        }
+
+        // Sort PRs based on mode
+        function sortPRs(prs, mode, label) {
+            const sorted = [...prs];
+
+            if (mode === 'updated') {
+                sorted.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+            } else if (mode === 'created') {
+                sorted.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            } else if (mode === 'custom') {
+                const customOrders = getCustomOrders();
+                const order = customOrders[label] || [];
+                sorted.sort((a, b) => {
+                    const idA = String(a.id);
+                    const idB = String(b.id);
+                    const indexA = order.indexOf(idA);
+                    const indexB = order.indexOf(idB);
+                    if (indexA === -1 && indexB === -1) return 0;
+                    if (indexA === -1) return 1;
+                    if (indexB === -1) return -1;
+                    return indexA - indexB;
+                });
+            }
+
+            // Always put flagged PRs at the top
+            sorted.sort((a, b) => {
+                const aFlagged = isPRFlagged(a.id);
+                const bFlagged = isPRFlagged(b.id);
+                if (aFlagged && !bFlagged) return -1;
+                if (!aFlagged && bFlagged) return 1;
+                return 0;
+            });
+
+            return sorted;
+        }
+
+        // Show notification
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                setTimeout(() => notification.remove(), 300);
+            }, 4000);
+        }
+
+        // Update last updated time
+        function updateLastUpdatedTime() {
+            const now = new Date();
+            lastUpdateTime = now;
+            const timeString = now.toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+            });
+            document.getElementById('lastUpdated').textContent = timeString;
+        }
+
+        // Fetch PR details including CI status
+        async function fetchPRDetails(pr, headers) {
+            try {
+                // Extract owner and repo from pull_request.url
+                const prUrl = pr.pull_request.url;
+                const prResponse = await fetch(prUrl, { headers });
+                const prData = await prResponse.json();
+
+                let ciStatus = 'none';
+
+                // Get the head commit SHA
+                const headSha = prData.head.sha;
+                const repoUrl = prData.base.repo.url;
+
+                // Try to get check runs (GitHub Actions, etc.)
+                try {
+                    const checkRunsUrl = `${repoUrl}/commits/${headSha}/check-runs`;
+                    const checkRunsResponse = await fetch(checkRunsUrl, {
+                        headers: {
+                            ...headers,
+                            'Accept': 'application/vnd.github.v3+json'
+                        }
+                    });
+
+                    if (checkRunsResponse.ok) {
+                        const checkRunsData = await checkRunsResponse.json();
+
+                        if (checkRunsData.total_count > 0) {
+                            const runs = checkRunsData.check_runs;
+                            const hasFailure = runs.some(run => run.conclusion === 'failure' || run.conclusion === 'cancelled' || run.conclusion === 'timed_out');
+                            const hasPending = runs.some(run => run.status === 'queued' || run.status === 'in_progress');
+                            const allSuccess = runs.every(run => run.conclusion === 'success' || run.conclusion === 'skipped' || run.conclusion === 'neutral');
+
+                            if (hasFailure) {
+                                ciStatus = 'failure';
+                            } else if (hasPending) {
+                                ciStatus = 'pending';
+                            } else if (allSuccess && runs.length > 0) {
+                                ciStatus = 'success';
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.log('Check runs not available:', e);
+                }
+
+                // If no check runs, try commit status (legacy CI)
+                if (ciStatus === 'none') {
+                    try {
+                        const statusUrl = `${repoUrl}/commits/${headSha}/status`;
+                        const statusResponse = await fetch(statusUrl, { headers });
+
+                        if (statusResponse.ok) {
+                            const statusData = await statusResponse.json();
+
+                            if (statusData.state) {
+                                if (statusData.state === 'success') ciStatus = 'success';
+                                else if (statusData.state === 'failure' || statusData.state === 'error') ciStatus = 'failure';
+                                else if (statusData.state === 'pending') ciStatus = 'pending';
+                            }
+                        }
+                    } catch (e) {
+                        console.log('Commit status not available:', e);
+                    }
+                }
+
+                return {
+                    ...pr,
+                    ciStatus: ciStatus,
+                    mergeable_state: prData.mergeable_state,
+                    hasConflicts: prData.mergeable === false
+                };
+            } catch (error) {
+                console.error('Error fetching PR details:', error);
+                return {
+                    ...pr,
+                    ciStatus: 'none',
+                    mergeable_state: null,
+                    hasConflicts: false
+                };
+            }
+        }
+
+        // Helper function to fetch all pages of search results
+        async function fetchAllPages(query, headers) {
+            let allItems = [];
+            let page = 1;
+            const perPage = 100; // Max allowed by GitHub API
+
+            while (true) {
+                const response = await fetch(`https://api.github.com/search/issues?q=${query}&per_page=${perPage}&page=${page}`, { headers });
+                const data = await response.json();
+
+                if (data.message) {
+                    throw new Error(data.message);
+                }
+
+                if (!data.items || data.items.length === 0) {
+                    break;
+                }
+
+                allItems = allItems.concat(data.items);
+
+                // If we got fewer items than perPage, we've reached the last page
+                if (data.items.length < perPage) {
+                    break;
+                }
+
+                page++;
+            }
+
+            return allItems;
+        }
+
+        // Cache functions
+        function savePRsToCache(prs) {
+            try {
+                localStorage.setItem(CACHE_KEY, JSON.stringify(prs));
+                localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+            } catch (e) {
+                console.warn('Failed to cache PRs:', e);
+            }
+        }
+
+        function loadPRsFromCache() {
+            try {
+                const cached = localStorage.getItem(CACHE_KEY);
+                const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
+                if (cached && timestamp) {
+                    return {
+                        prs: JSON.parse(cached),
+                        timestamp: parseInt(timestamp)
+                    };
+                }
+            } catch (e) {
+                console.warn('Failed to load cached PRs:', e);
+            }
+            return null;
+        }
+
+        // Fetch PRs from GitHub
+        async function fetchPRs(isAutoRefresh = false) {
+            const token = document.getElementById('tokenInput').value.trim();
+            const headers = {
+                'Accept': 'application/vnd.github.v3+json'
+            };
+
+            if (token) {
+                headers['Authorization'] = `token ${token}`;
+            }
+
+            try {
+                // Load and display cached data immediately if not auto-refresh
+                if (!isAutoRefresh) {
+                    const cached = loadPRsFromCache();
+                    if (cached && cached.prs.length > 0) {
+                        allPRs = cached.prs;
+                        lastUpdateTime = cached.timestamp;
+                        updateLastUpdatedTime();
+                        populateRepoFilter();
+                        renderPRs();
+                        // Show loading indicator in header instead
+                        document.getElementById('error').innerHTML = '<div style="color: #0969da; font-size: 12px; margin-top: 4px;">Refreshing...</div>';
+                    } else {
+                        document.getElementById('error').innerHTML = '';
+                        document.getElementById('prList').innerHTML = '<div class="loading">Loading pull requests...</div>';
+                    }
+                }
+
+                // Fetch all three queries in parallel for speed
+                const [createdItems, assignedItems, reviewRequestedItems] = await Promise.all([
+                    fetchAllPages('is:pr+author:@me+state:open', headers),
+                    fetchAllPages('is:pr+assignee:@me+state:open', headers),
+                    fetchAllPages('is:pr+review-requested:@me+state:open', headers)
+                ]);
+
+                // Combine and deduplicate PRs
+                const prMap = new Map();
+                [...createdItems, ...assignedItems, ...reviewRequestedItems].forEach(pr => {
+                    prMap.set(pr.id, pr);
+                });
+
+                let newPRs = Array.from(prMap.values());
+
+                // Fetch detailed info for each PR (CI status, conflicts) in parallel
+                newPRs = await Promise.all(newPRs.map(pr => fetchPRDetails(pr, headers)));
+
+                // Detect changes if this is an auto-refresh
+                if (isAutoRefresh && allPRs.length > 0) {
+                    const oldPRIds = new Set(allPRs.map(pr => pr.id));
+                    const newPRIds = new Set(newPRs.map(pr => pr.id));
+
+                    // Find new PRs
+                    const addedPRs = newPRs.filter(pr => !oldPRIds.has(pr.id));
+
+                    // Find removed PRs (merged/closed)
+                    const removedPRs = allPRs.filter(pr => !newPRIds.has(pr.id));
+
+                    // Show notifications
+                    if (addedPRs.length > 0) {
+                        const message = addedPRs.length === 1
+                            ? `New PR: ${addedPRs[0].title}`
+                            : `${addedPRs.length} new PRs added`;
+                        showNotification(message, 'success');
+                    }
+
+                    if (removedPRs.length > 0) {
+                        const message = removedPRs.length === 1
+                            ? `PR closed/merged: ${removedPRs[0].title}`
+                            : `${removedPRs.length} PRs closed/merged`;
+                        showNotification(message, 'info');
+                    }
+                }
+
+                allPRs = newPRs;
+                savePRsToCache(newPRs);
+                updateLastUpdatedTime();
+                populateRepoFilter();
+                renderPRs();
+
+                // Clear the "Refreshing..." message
+                if (!isAutoRefresh) {
+                    document.getElementById('error').innerHTML = '';
+                }
+            } catch (error) {
+                document.getElementById('error').innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                if (!isAutoRefresh && allPRs.length === 0) {
+                    document.getElementById('prList').innerHTML = '';
+                }
+            }
+        }
+
+
+
+        // Generate PR HTML
+        function generatePRHTML(pr, labels) {
+            const repoName = pr.repository_url.split('/').slice(-2).join('/');
+            const createdDate = new Date(pr.created_at).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            });
+
+            const updatedDate = new Date(pr.updated_at);
+            const now = new Date();
+            const diffMs = now - updatedDate;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+
+            let updatedText;
+            if (diffMins < 1) updatedText = 'just now';
+            else if (diffMins < 60) updatedText = `${diffMins}m ago`;
+            else if (diffHours < 24) updatedText = `${diffHours}h ago`;
+            else if (diffDays < 30) updatedText = `${diffDays}d ago`;
+            else updatedText = updatedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+            // CI status icon
+            let ciIcon = '';
+            if (pr.ciStatus === 'success') {
+                ciIcon = `
+                    <div class="ci-status ci-success" title="CI passed">
+                        <svg class="ci-icon" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"></path>
+                        </svg>
+                    </div>
+                `;
+            } else if (pr.ciStatus === 'failure') {
+                ciIcon = `
+                    <div class="ci-status ci-failure" title="CI failed">
+                        <svg class="ci-icon" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z"></path>
+                        </svg>
+                    </div>
+                `;
+            } else if (pr.ciStatus === 'pending') {
+                ciIcon = `
+                    <div class="ci-status ci-pending" title="CI in progress">
+                        <svg class="ci-icon" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M8 9.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"></path>
+                            <path fill-rule="evenodd" d="M8 0a8 8 0 100 16A8 8 0 008 0zM1.5 8a6.5 6.5 0 1113 0 6.5 6.5 0 01-13 0z"></path>
+                        </svg>
+                    </div>
+                `;
+            }
+
+            // Conflict warning
+            const conflictWarning = pr.hasConflicts ? `
+                <div class="conflict-warning" title="This PR has merge conflicts">
+                    ⚠️ Conflicts
+                </div>
+            ` : '';
+
+            // Update branch button (show if PR is behind base branch and has no conflicts)
+            const canUpdate = !pr.hasConflicts && pr.mergeable_state === 'behind';
+            const updateBranchBtn = canUpdate ? `
+                <div class="update-branch-btn"
+                     data-pr-number="${pr.number}"
+                     data-repo-url="${pr.repository_url}"
+                     onclick="updatePRBranch(${pr.number}, '${pr.repository_url}')"
+                     title="Update branch with latest changes from base">
+                    🔄 Update
+                </div>
+            ` : '';
+
+            // Note badge
+            const note = getPRNote(pr.id);
+            const hasNote = note && note.trim().length > 0;
+            const notePreview = hasNote ? note.substring(0, 200) + (note.length > 200 ? '...' : '') : '';
+            const escapedPreview = notePreview.replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/\n/g, ' ');
+            const noteBadge = `
+                <span class="note-badge ${hasNote ? 'has-note' : 'no-note'}"
+                      data-pr-id="${pr.id}"
+                      data-note-preview="${escapedPreview}"
+                      onclick="openNoteEditor(${pr.id}, '${pr.title.replace(/'/g, "\\'")}')">
+                    ${hasNote ? '📝' : '✏️'}
+                </span>
+            `;
+
+            // Flag badge
+            const isFlagged = isPRFlagged(pr.id);
+            const flagBadge = `
+                <span class="flag-badge ${isFlagged ? 'flagged' : 'unflagged'}"
+                      data-pr-id="${pr.id}"
+                      onclick="togglePRFlag(${pr.id})">
+                    ${isFlagged ? '🚩' : '⚐'}
+                </span>
+            `;
+
+            return `
+                <div class="pr-item ${isFlagged ? 'flagged' : ''}" draggable="true" data-pr-id="${pr.id}">
+                    <div class="pr-icon">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M7.177 3.073L9.573.677A.25.25 0 0110 .854v4.792a.25.25 0 01-.427.177L7.177 3.427a.25.25 0 010-.354zM3.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm-2.25.75a2.25 2.25 0 113 2.122v5.256a2.251 2.251 0 11-1.5 0V5.372A2.25 2.25 0 011.5 3.25zM11 2.5h-1V4h1a1 1 0 011 1v5.628a2.251 2.251 0 101.5 0V5A2.5 2.5 0 0011 2.5zm1 10.25a.75.75 0 111.5 0 .75.75 0 01-1.5 0zM3.75 12a.75.75 0 100 1.5.75.75 0 000-1.5z"></path>
+                        </svg>
+                    </div>
+                    <div class="pr-content">
+                        <div>
+                            <a href="${pr.html_url}" target="_blank" class="pr-title">${pr.title}</a>
+                            ${noteBadge}
+                            ${flagBadge}
+                        </div>
+                        <div class="pr-meta">
+                            <span class="pr-meta-text">
+                                <a href="https://github.com/${repoName}" target="_blank" class="pr-repo">${repoName}</a>
+                                #${pr.number} • Updated ${updatedText}
+                            </span>
+                            <div class="pr-status">
+                                ${ciIcon}
+                                ${conflictWarning}
+                                ${updateBranchBtn}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Populate repository filter dropdown
+        function populateRepoFilter() {
+            const repos = new Set();
+            allPRs.forEach(pr => {
+                const repoName = pr.repository_url.split('/').slice(-2).join('/');
+                repos.add(repoName);
+            });
+
+            const repoFilter = document.getElementById('repoFilter');
+            const currentValue = repoFilter.value;
+
+            // Clear existing options except "All repositories"
+            repoFilter.innerHTML = '<option value="">All repositories</option>';
+
+            // Add sorted repository options
+            Array.from(repos).sort().forEach(repo => {
+                const option = document.createElement('option');
+                option.value = repo;
+                option.textContent = repo;
+                repoFilter.appendChild(option);
+            });
+
+            // Restore previous selection if it still exists
+            if (currentValue && Array.from(repos).includes(currentValue)) {
+                repoFilter.value = currentValue;
+            }
+        }
+
+        // Render PRs in Kanban view
+        function renderPRs() {
+            const prLabels = getLabels();
+
+            // Update total PR count
+            document.getElementById('totalPRCount').textContent = allPRs.length;
+
+            if (allPRs.length === 0) {
+                document.getElementById('prList').innerHTML = '<div class="loading">No pull requests found</div>';
+                return;
+            }
+
+            // Load sort modes and minimized state
+            columnSortModes = getSortModes();
+            minimizedColumns = getMinimizedColumns();
+
+            // Filter PRs by repository if a filter is active
+            let filteredPRs = allPRs;
+            if (currentRepoFilter) {
+                filteredPRs = allPRs.filter(pr => {
+                    const repoName = pr.repository_url.split('/').slice(-2).join('/');
+                    return repoName === currentRepoFilter;
+                });
+            }
+
+            // Filter PRs by flagged status if checkbox is checked
+            const showOnlyFlagged = document.getElementById('showOnlyFlagged').checked;
+            if (showOnlyFlagged) {
+                filteredPRs = filteredPRs.filter(pr => isPRFlagged(pr.id));
+            }
+
+            // Kanban view - always show all columns
+            const columns = {};
+
+            // Initialize all columns with label IDs as keys
+            LABELS.forEach(label => {
+                columns[label.id] = [];
+            });
+
+            // Group PRs by label ID
+            filteredPRs.forEach(pr => {
+                const labelId = prLabels[pr.id];
+                // Check if label is valid (exists in current LABELS array)
+                const labelExists = LABELS.find(l => l.id === labelId);
+                if (labelId && labelExists) {
+                    columns[labelId].push(pr);
+                } else {
+                    // If label is invalid or doesn't exist, move to Unlabeled
+                    if (labelId && !labelExists) {
+                        // Clean up invalid label from localStorage
+                        saveLabel(pr.id, '');
+                    }
+                    columns['unlabeled'].push(pr);
+                }
+            });
+
+            // Sort PRs in each column
+            LABELS.forEach(label => {
+                const mode = columnSortModes[label.id] || 'updated';
+                columns[label.id] = sortPRs(columns[label.id], mode, label.id);
+            });
+
+            // Generate Kanban HTML
+            const kanbanHTML = LABELS.map(label => {
+                const prs = columns[label.id];
+                const count = prs.length;
+
+                // Hide "Unlabeled" column if it's empty
+                if (label.id === 'unlabeled' && count === 0) {
+                    return '';
+                }
+
+                const sortMode = columnSortModes[label.id] || 'updated';
+                const isMinimized = minimizedColumns.has(label.id);
+
+                return `
+                    <div class="kanban-column ${isMinimized ? 'minimized' : ''}" data-label="${label.id}">
+                        <div class="kanban-header">
+                            <div class="kanban-header-top">
+                                <span>${label.name} (${count})</span>
+                                <span class="collapse-icon">◀</span>
+                            </div>
+                            <div class="kanban-sort">
+                                <button class="sort-btn ${sortMode === 'updated' ? 'active' : ''}" data-label="${label.id}" data-mode="updated">Updated</button>
+                                <button class="sort-btn ${sortMode === 'created' ? 'active' : ''}" data-label="${label.id}" data-mode="created">Created</button>
+                                <button class="sort-btn ${sortMode === 'custom' ? 'active' : ''}" data-label="${label.id}" data-mode="custom">Custom</button>
+                            </div>
+                        </div>
+                        <div class="kanban-content" data-label="${label.id}">
+                            ${prs.map(pr => generatePRHTML(pr, prLabels)).join('')}
+                            ${count === 0 ? '<div class="empty-state">No PRs</div>' : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('prList').innerHTML = `<div class="kanban-view" id="kanbanView">${kanbanHTML}</div>`;
+
+            // Setup column collapse/expand
+            setupColumnToggle();
+
+            // Setup drag and drop
+            setupDragAndDrop();
+
+            // Setup scroll indicator
+            setupScrollIndicator();
+        }
+
+        // Setup scroll indicator
+        function setupScrollIndicator() {
+            const kanbanView = document.getElementById('kanbanView');
+            if (!kanbanView) return;
+
+            function checkScroll() {
+                const hasScroll = kanbanView.scrollWidth > kanbanView.clientWidth;
+                const isScrolledToEnd = kanbanView.scrollLeft + kanbanView.clientWidth >= kanbanView.scrollWidth - 10;
+
+                if (hasScroll && !isScrolledToEnd) {
+                    kanbanView.classList.add('has-scroll');
+                } else {
+                    kanbanView.classList.remove('has-scroll');
+                }
+            }
+
+            checkScroll();
+            kanbanView.addEventListener('scroll', checkScroll);
+            window.addEventListener('resize', checkScroll);
+        }
+
+        // Setup column collapse/expand toggle
+        function setupColumnToggle() {
+            const headerTops = document.querySelectorAll('.kanban-header-top');
+
+            headerTops.forEach(headerTop => {
+                headerTop.addEventListener('click', (e) => {
+                    const column = headerTop.closest('.kanban-column');
+                    const label = column.dataset.label;
+
+                    if (column.classList.contains('minimized')) {
+                        column.classList.remove('minimized');
+                        minimizedColumns.delete(label);
+                    } else {
+                        column.classList.add('minimized');
+                        minimizedColumns.add(label);
+                    }
+
+                    saveMinimizedColumns();
+                });
+            });
+
+            // Setup sort buttons
+            const sortButtons = document.querySelectorAll('.sort-btn');
+            sortButtons.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const label = btn.dataset.label;
+                    const mode = btn.dataset.mode;
+
+                    // If switching to custom mode and no custom order exists, save current order
+                    if (mode === 'custom') {
+                        const customOrders = getCustomOrders();
+                        if (!customOrders[label]) {
+                            // Get current PRs in this column
+                            const contentElement = btn.closest('.kanban-column').querySelector('.kanban-content');
+                            if (contentElement) {
+                                const prItems = Array.from(contentElement.querySelectorAll('.pr-item'));
+                                const prIds = prItems.map(item => item.dataset.prId);
+                                saveCustomOrder(label, prIds);
+                            }
+                        }
+                    }
+
+                    columnSortModes[label] = mode;
+                    saveSortModes();
+                    renderPRs();
+                });
+            });
+        }
+
+        // Setup drag and drop
+        function setupDragAndDrop() {
+            const prItems = document.querySelectorAll('.pr-item');
+            const columns = document.querySelectorAll('.kanban-column');
+            const columnContents = document.querySelectorAll('.kanban-content');
+            const kanbanView = document.getElementById('kanbanView');
+
+            let autoScrollInterval = null;
+
+            prItems.forEach(item => {
+                item.addEventListener('dragstart', (e) => {
+                    item.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/html', item.innerHTML);
+                });
+
+                item.addEventListener('drag', (e) => {
+                    // Auto-scroll when dragging near edges
+                    if (!kanbanView) return;
+
+                    const rect = kanbanView.getBoundingClientRect();
+                    const scrollThreshold = 100; // pixels from edge to trigger scroll
+                    const scrollSpeed = 10;
+
+                    // Clear existing interval
+                    if (autoScrollInterval) {
+                        clearInterval(autoScrollInterval);
+                        autoScrollInterval = null;
+                    }
+
+                    // Check if near left edge
+                    if (e.clientX - rect.left < scrollThreshold && e.clientX > 0) {
+                        autoScrollInterval = setInterval(() => {
+                            kanbanView.scrollLeft -= scrollSpeed;
+                        }, 16);
+                    }
+                    // Check if near right edge
+                    else if (rect.right - e.clientX < scrollThreshold && e.clientX > 0) {
+                        autoScrollInterval = setInterval(() => {
+                            kanbanView.scrollLeft += scrollSpeed;
+                        }, 16);
+                    }
+                });
+
+                item.addEventListener('dragend', (e) => {
+                    item.classList.remove('dragging');
+                    // Remove drag-over from all columns
+                    columns.forEach(col => col.classList.remove('drag-over'));
+                    // Clear auto-scroll
+                    if (autoScrollInterval) {
+                        clearInterval(autoScrollInterval);
+                        autoScrollInterval = null;
+                    }
+                });
+            });
+
+            // Make both columns and column contents droppable
+            const droppableElements = [...columns, ...columnContents];
+
+            droppableElements.forEach(element => {
+                element.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+
+                    // Find the parent column
+                    const column = element.classList.contains('kanban-column')
+                        ? element
+                        : element.closest('.kanban-column');
+
+                    if (column) {
+                        column.classList.add('drag-over');
+                    }
+
+                    // For custom sort mode, handle reordering within column
+                    const draggingItem = document.querySelector('.dragging');
+                    if (draggingItem && element.classList.contains('kanban-content')) {
+                        const label = element.dataset.label;
+                        const sortMode = columnSortModes[label] || 'updated';
+
+                        if (sortMode === 'custom') {
+                            const afterElement = getDragAfterElement(element, e.clientY);
+                            const currentParent = draggingItem.parentElement;
+
+                            // Only move if we're in the same column or moving to a different column
+                            if (currentParent === element || currentParent.dataset.label !== label) {
+                                if (afterElement == null) {
+                                    element.appendChild(draggingItem);
+                                } else {
+                                    element.insertBefore(draggingItem, afterElement);
+                                }
+                            }
+                        }
+                    }
+                });
+
+                element.addEventListener('dragleave', (e) => {
+                    // Only remove if we're leaving the column entirely
+                    const column = element.classList.contains('kanban-column')
+                        ? element
+                        : element.closest('.kanban-column');
+
+                    if (column && !column.contains(e.relatedTarget)) {
+                        column.classList.remove('drag-over');
+                    }
+                });
+
+                element.addEventListener('drop', (e) => {
+                    e.preventDefault();
+
+                    // Find the parent column
+                    const column = element.classList.contains('kanban-column')
+                        ? element
+                        : element.closest('.kanban-column');
+
+                    if (column) {
+                        column.classList.remove('drag-over');
+
+                        const draggingItem = document.querySelector('.dragging');
+                        if (draggingItem) {
+                            const prId = draggingItem.dataset.prId;
+                            const oldLabel = getLabels()[prId] || '';
+                            const newLabel = column.dataset.label;
+                            const sortMode = columnSortModes[newLabel] || 'updated';
+
+                            // Get the content element
+                            const contentElement = element.classList.contains('kanban-content')
+                                ? element
+                                : column.querySelector('.kanban-content');
+
+                            // If custom sort mode and we have the content element, save the order
+                            if (sortMode === 'custom' && contentElement) {
+                                // Wait a tick for DOM to update
+                                setTimeout(() => {
+                                    const prItems = Array.from(contentElement.querySelectorAll('.pr-item'));
+                                    const prIds = prItems.map(item => item.dataset.prId);
+                                    saveCustomOrder(newLabel, prIds);
+                                }, 0);
+                            }
+
+                            // Save the new label if it changed
+                            const normalizedOldLabel = oldLabel === '' ? 'unlabeled' : oldLabel;
+                            if (normalizedOldLabel !== newLabel) {
+                                if (newLabel === 'unlabeled') {
+                                    saveLabel(prId, '');
+                                } else {
+                                    saveLabel(prId, newLabel);
+                                }
+
+                                // Re-render
+                                renderPRs();
+                            }
+                        }
+                    }
+                });
+            });
+        }
+
+        // Helper function to find the element to insert before when reordering
+        function getDragAfterElement(container, y) {
+            const draggableElements = [...container.querySelectorAll('.pr-item:not(.dragging)')];
+
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+
+                if (offset < 0 && offset > closest.offset) {
+                    return { offset: offset, element: child };
+                } else {
+                    return closest;
+                }
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+
+        // Setup auto-refresh
+        function setupAutoRefresh() {
+            const autoRefreshCheckbox = document.getElementById('autoRefresh');
+
+            if (autoRefreshCheckbox.checked) {
+                // Clear existing timer if any
+                if (autoRefreshTimer) {
+                    clearInterval(autoRefreshTimer);
+                }
+
+                // Set up new timer
+                autoRefreshTimer = setInterval(() => {
+                    fetchPRs(true);
+                }, AUTO_REFRESH_INTERVAL);
+            } else {
+                // Clear timer
+                if (autoRefreshTimer) {
+                    clearInterval(autoRefreshTimer);
+                    autoRefreshTimer = null;
+                }
+            }
+        }
+
+        // Label Editor Modal Functions
+        let tempLabels = [];
+        let draggedLabelIndex = null;
+        let labelScrollInterval = null;
+
+        function openLabelEditor() {
+            // Copy current labels to temp array
+            tempLabels = [...LABELS];
+            renderLabelEditor();
+            document.getElementById('labelEditorModal').classList.add('show');
+        }
+
+        function closeLabelEditor() {
+            document.getElementById('labelEditorModal').classList.remove('show');
+            if (labelScrollInterval) {
+                clearInterval(labelScrollInterval);
+                labelScrollInterval = null;
+            }
+        }
+
+        function renderLabelEditor() {
+            const labelList = document.getElementById('labelList');
+
+            // Build HTML with drop indicators between items
+            let html = '<div class="drop-indicator" data-position="0"></div>';
+            tempLabels.forEach((label, index) => {
+                const isLocked = label.locked;
+                html += `
+                    <div class="label-item ${isLocked ? 'locked' : ''}"
+                         draggable="${!isLocked}"
+                         data-index="${index}">
+                        <span class="label-drag-handle">☰</span>
+                        <input type="text"
+                               class="label-name-input"
+                               value="${label.name}"
+                               data-index="${index}"
+                               ${isLocked ? 'readonly' : ''}
+                               placeholder="Label name">
+                        ${!isLocked ? '<button class="label-delete" data-index="' + index + '">Delete</button>' : ''}
+                    </div>
+                    <div class="drop-indicator" data-position="${index + 1}"></div>
+                `;
+            });
+
+            labelList.innerHTML = html;
+
+            // Add drag event listeners to all items (for drop zones)
+            const allLabelItems = labelList.querySelectorAll('.label-item');
+            allLabelItems.forEach(item => {
+                item.addEventListener('dragover', handleLabelDragOver);
+                item.addEventListener('drop', handleLabelDrop);
+            });
+
+            // Add drag start/end only to draggable items
+            const draggableLabelItems = labelList.querySelectorAll('.label-item:not(.locked)');
+            draggableLabelItems.forEach(item => {
+                item.addEventListener('dragstart', handleLabelDragStart);
+                item.addEventListener('dragend', handleLabelDragEnd);
+            });
+
+            // Add delete button listeners
+            const deleteButtons = labelList.querySelectorAll('.label-delete');
+            deleteButtons.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const index = parseInt(e.target.dataset.index);
+                    tempLabels.splice(index, 1);
+                    renderLabelEditor();
+                });
+            });
+
+            // Add input field listeners for editing label names
+            const nameInputs = labelList.querySelectorAll('.label-name-input:not([readonly])');
+            nameInputs.forEach(input => {
+                input.addEventListener('input', (e) => {
+                    const index = parseInt(e.target.dataset.index);
+                    tempLabels[index].name = e.target.value;
+                });
+            });
+        }
+
+        function handleLabelDragStart(e) {
+            draggedLabelIndex = parseInt(e.target.dataset.index);
+            e.target.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function handleLabelDragEnd(e) {
+            e.target.classList.remove('dragging');
+            // Hide all drop indicators
+            document.querySelectorAll('.drop-indicator').forEach(indicator => {
+                indicator.classList.remove('show');
+            });
+            draggedLabelIndex = null;
+
+            // Clear scroll interval
+            if (labelScrollInterval) {
+                clearInterval(labelScrollInterval);
+                labelScrollInterval = null;
+            }
+        }
+
+        function handleLabelDragOver(e) {
+            e.preventDefault();
+
+            if (draggedLabelIndex === null) return;
+
+            const dropTarget = e.target.closest('.label-item');
+            if (!dropTarget) return;
+
+            const dropIndex = parseInt(dropTarget.dataset.index);
+
+            // Determine if we should show indicator above or below
+            const rect = dropTarget.getBoundingClientRect();
+            const midpoint = rect.top + rect.height / 2;
+            const mouseY = e.clientY;
+
+            // Hide all indicators first
+            document.querySelectorAll('.drop-indicator').forEach(indicator => {
+                indicator.classList.remove('show');
+            });
+
+            // Determine which drop indicator to show
+            let targetPosition;
+            if (mouseY < midpoint) {
+                // Show indicator above (before this item)
+                targetPosition = dropIndex;
+            } else {
+                // Show indicator below (after this item)
+                targetPosition = dropIndex + 1;
+            }
+
+            // Don't show indicator if it would be at the dragged item's current position
+            if (targetPosition === draggedLabelIndex || targetPosition === draggedLabelIndex + 1) {
+                // Don't show any indicator when hovering near the dragged item's original position
+            } else {
+                // Show the appropriate indicator
+                const indicator = document.querySelector(`.drop-indicator[data-position="${targetPosition}"]`);
+                if (indicator) {
+                    indicator.classList.add('show');
+                }
+            }
+
+            // Auto-scroll logic
+            const modalBody = document.querySelector('.modal-body');
+            const modalRect = modalBody.getBoundingClientRect();
+            const scrollThreshold = 50;
+
+            // Clear existing interval
+            if (labelScrollInterval) {
+                clearInterval(labelScrollInterval);
+                labelScrollInterval = null;
+            }
+
+            // Check if near top or bottom
+            if (mouseY - modalRect.top < scrollThreshold) {
+                // Near top - scroll up
+                labelScrollInterval = setInterval(() => {
+                    modalBody.scrollTop -= 5;
+                }, 20);
+            } else if (modalRect.bottom - mouseY < scrollThreshold) {
+                // Near bottom - scroll down
+                labelScrollInterval = setInterval(() => {
+                    modalBody.scrollTop += 5;
+                }, 20);
+            }
+        }
+
+        function handleLabelDrop(e) {
+            e.preventDefault();
+
+            const dropTarget = e.target.closest('.label-item');
+            if (!dropTarget) return;
+
+            const dropIndex = parseInt(dropTarget.dataset.index);
+
+            // Hide all indicators
+            document.querySelectorAll('.drop-indicator').forEach(indicator => {
+                indicator.classList.remove('show');
+            });
+
+            if (draggedLabelIndex !== null) {
+                // Determine target position (same logic as in dragover)
+                const rect = dropTarget.getBoundingClientRect();
+                const midpoint = rect.top + rect.height / 2;
+                const mouseY = e.clientY;
+
+                let targetPosition;
+                if (mouseY < midpoint) {
+                    // Dropping above this item
+                    targetPosition = dropIndex;
+                } else {
+                    // Dropping below this item
+                    targetPosition = dropIndex + 1;
+                }
+
+                // Don't do anything if dropping at the same position
+                if (targetPosition === draggedLabelIndex || targetPosition === draggedLabelIndex + 1) {
+                    return;
+                }
+
+                // Remove the dragged item
+                const draggedLabel = tempLabels[draggedLabelIndex];
+                tempLabels.splice(draggedLabelIndex, 1);
+
+                // Adjust target position if needed (because we removed an item)
+                let insertPosition = targetPosition;
+                if (draggedLabelIndex < targetPosition) {
+                    insertPosition--; // The removal shifted everything down
+                }
+
+                // Insert at the new position
+                tempLabels.splice(insertPosition, 0, draggedLabel);
+                renderLabelEditor();
+            }
+        }
+
+        function addNewLabel() {
+            const labelName = prompt('Enter new label name:');
+            if (labelName && labelName.trim()) {
+                const trimmedName = labelName.trim();
+                if (tempLabels.some(l => l.name === trimmedName)) {
+                    alert('A label with this name already exists!');
+                    return;
+                }
+                tempLabels.push({
+                    id: `custom-${nextLabelId++}`,
+                    name: trimmedName,
+                    locked: false
+                });
+                renderLabelEditor();
+            }
+        }
+
+        function saveLabels() {
+            // Find deleted labels by comparing IDs
+            const tempLabelIds = new Set(tempLabels.map(l => l.id));
+            const deletedLabels = LABELS.filter(label => !tempLabelIds.has(label.id) && !label.locked);
+
+            // Migrate PRs from deleted labels to Unlabeled
+            if (deletedLabels.length > 0) {
+                const prLabels = getLabels();
+                let updated = false;
+
+                Object.keys(prLabels).forEach(prId => {
+                    const deletedLabel = deletedLabels.find(l => l.id === prLabels[prId]);
+                    if (deletedLabel) {
+                        prLabels[prId] = '';
+                        updated = true;
+                    }
+                });
+
+                if (updated) {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(prLabels));
+                }
+            }
+
+            // Update LABELS array in place
+            LABELS.length = 0;
+            LABELS.push(...tempLabels);
+
+            // Save labels list to localStorage
+            saveLabelsList(LABELS);
+
+            closeLabelEditor();
+            renderPRs();
+        }
+
+        // Event listeners
+        document.getElementById('loadBtn').addEventListener('click', () => fetchPRs(false));
+
+        document.getElementById('toggleToken').addEventListener('click', () => {
+            const tokenContainer = document.getElementById('tokenContainer');
+            const toggleBtn = document.getElementById('toggleToken');
+
+            if (tokenContainer.classList.contains('visible')) {
+                tokenContainer.classList.remove('visible');
+                toggleBtn.textContent = 'View/Add GitHub Token';
+            } else {
+                tokenContainer.classList.add('visible');
+                toggleBtn.textContent = 'Hide Token';
+                document.getElementById('tokenInput').focus();
+            }
+        });
+
+        document.getElementById('autoRefresh').addEventListener('change', setupAutoRefresh);
+
+        // Repository filter event listener
+        document.getElementById('repoFilter').addEventListener('change', (e) => {
+            currentRepoFilter = e.target.value;
+            renderPRs();
+        });
+
+        // Flagged filter event listener
+        document.getElementById('showOnlyFlagged').addEventListener('change', () => {
+            renderPRs();
+        });
+
+        // Label editor modal event listeners
+        document.getElementById('editLabelsBtn').addEventListener('click', openLabelEditor);
+        document.getElementById('closeModal').addEventListener('click', closeLabelEditor);
+        document.getElementById('cancelLabelsBtn').addEventListener('click', closeLabelEditor);
+        document.getElementById('saveLabelsBtn').addEventListener('click', saveLabels);
+        document.getElementById('addLabelBtn').addEventListener('click', addNewLabel);
+
+        // Close modal when clicking outside
+        document.getElementById('labelEditorModal').addEventListener('click', (e) => {
+            if (e.target.id === 'labelEditorModal') {
+                closeLabelEditor();
+            }
+        });
+
+        // Note editor modal event listeners
+        document.getElementById('closeNoteModal').addEventListener('click', closeNoteEditor);
+        document.getElementById('cancelNoteBtn').addEventListener('click', closeNoteEditor);
+        document.getElementById('saveNoteBtn').addEventListener('click', saveNote);
+
+        // Close note modal when clicking outside
+        document.getElementById('noteEditorModal').addEventListener('click', (e) => {
+            if (e.target.id === 'noteEditorModal') {
+                closeNoteEditor();
+            }
+        });
+
+        // Load token from localStorage if available
+        const savedToken = localStorage.getItem('github_token');
+        if (savedToken) {
+            document.getElementById('tokenInput').value = savedToken;
+            // Don't show token by default even if saved
+            // document.getElementById('tokenContainer').classList.add('visible');
+            // document.getElementById('toggleToken').textContent = 'Hide Token';
+        }
+
+        // Save token to localStorage when changed
+        document.getElementById('tokenInput').addEventListener('change', (e) => {
+            const token = e.target.value.trim();
+            if (token) {
+                localStorage.setItem('github_token', token);
+            } else {
+                localStorage.removeItem('github_token');
+            }
+        });
+
+        // Global tooltip handling
+        function setupNoteTooltips() {
+            const tooltip = document.getElementById('globalNoteTooltip');
+
+            document.addEventListener('mouseover', (e) => {
+                const badge = e.target.closest('.note-badge.has-note');
+                if (badge) {
+                    const preview = badge.getAttribute('data-note-preview');
+                    if (preview) {
+                        const rect = badge.getBoundingClientRect();
+                        tooltip.textContent = preview;
+                        tooltip.style.left = `${rect.left + rect.width / 2}px`;
+                        tooltip.style.top = `${rect.top}px`;
+                        tooltip.classList.add('show');
+                    }
+                }
+            });
+
+            document.addEventListener('mouseout', (e) => {
+                const badge = e.target.closest('.note-badge.has-note');
+                if (badge) {
+                    tooltip.classList.remove('show');
+                }
+            });
+        }
+
+        // Auto-load PRs on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchPRs(false);
+            setupAutoRefresh();
+            setupNoteTooltips();
+        });
+    </script>
+</body>
+</html>

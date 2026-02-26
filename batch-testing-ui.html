@@ -1,0 +1,1821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XRPL Batch Transaction Testing UI</title>
+    <script src="https://unpkg.com/xrpl@4.4.1/build/xrpl-latest-min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .network-status {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #4ade80;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.disconnected {
+            background: #ef4444;
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .section-header {
+            background: #f9fafb;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section-header h2 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .section-content {
+            padding: 20px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #4b5563;
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-small {
+            padding: 4px 12px;
+            font-size: 12px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #007bff;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .wallet-item {
+            padding: 15px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .wallet-info {
+            flex: 1;
+        }
+
+        .wallet-address {
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: #4b5563;
+            cursor: pointer;
+        }
+
+        .wallet-address:hover {
+            color: #667eea;
+        }
+
+        .wallet-balance {
+            font-size: 14px;
+            color: #059669;
+            font-weight: 600;
+            margin-top: 5px;
+        }
+
+        .test-case-item {
+            padding: 15px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            background: #fafafa;
+        }
+
+        .test-case-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .test-case-name {
+            font-weight: 600;
+            font-size: 16px;
+            color: #1f2937;
+        }
+
+        .test-case-details {
+            font-size: 13px;
+            color: #6b7280;
+            margin-bottom: 10px;
+        }
+
+        .code-editor {
+            width: 100%;
+            min-height: 300px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            padding: 15px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            resize: vertical;
+        }
+
+        .code-editor:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            font-size: 14px;
+            color: #374151;
+        }
+
+        .select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        #walletSelectorModal {
+            z-index: 1100;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #1f2937;
+        }
+
+        .result-item {
+            padding: 15px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+
+        .result-success {
+            border-left: 4px solid #10b981;
+            background: #f0fdf4;
+        }
+
+        .result-failure {
+            border-left: 4px solid #ef4444;
+            background: #fef2f2;
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .result-status {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .result-details {
+            font-size: 13px;
+            color: #6b7280;
+            font-family: 'Courier New', monospace;
+        }
+
+        .template-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .template-btn {
+            padding: 15px;
+            border: 2px solid #e5e7eb;
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .template-btn:hover {
+            border-color: #667eea;
+            background: #f9fafb;
+        }
+
+        .template-btn-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .template-btn-desc {
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        .report-preview {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #9ca3af;
+        }
+
+        .clickable-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            margin-top: 10px;
+        }
+
+        .clickable-item {
+            padding: 10px;
+            border-bottom: 1px solid #e5e7eb;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .clickable-item:hover {
+            background: #f9fafb;
+        }
+
+        .clickable-item:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>XRPL Batch Transaction Testing UI</h1>
+            <div class="network-status">
+                <select id="networkSelect" class="select" style="width: auto;">
+                    <option value="wss://s.devnet.rippletest.net:51233">Devnet</option>
+                    <option value="custom">Custom</option>
+                </select>
+                <div class="status-indicator disconnected" id="statusIndicator"></div>
+                <span id="statusText">Disconnected</span>
+            </div>
+        </div>
+
+        <div class="content">
+            <!-- Wallets Section -->
+            <div class="section">
+                <div class="section-header">
+                    <h2>Wallets</h2>
+                    <div class="btn-group">
+                        <button class="btn btn-primary btn-small" onclick="app.createWallet()">+ New Wallet</button>
+                        <button class="btn btn-secondary btn-small" onclick="app.showImportWallet()">+ Import Seed</button>
+                    </div>
+                </div>
+                <div class="section-content">
+                    <div id="walletList" class="empty-state">No wallets yet. Create or import one to get started.</div>
+                </div>
+            </div>
+
+            <!-- Test Cases Section -->
+            <div class="section">
+                <div class="section-header">
+                    <h2>Test Cases</h2>
+                    <div class="btn-group">
+                        <button class="btn btn-primary btn-small" onclick="app.showNewTestCase()">+ New Test</button>
+                        <button class="btn btn-secondary btn-small" onclick="app.loadExamples()">Load Examples</button>
+                        <button class="btn btn-success btn-small" onclick="app.runAllTests()">Run All Tests</button>
+                        <button class="btn btn-danger btn-small" onclick="app.clearAllTests()">Clear All Tests</button>
+                    </div>
+                </div>
+                <div class="section-content">
+                    <div id="testCaseList" class="empty-state">No test cases yet. Create one or load examples.</div>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div class="section">
+                <div class="section-header">
+                    <h2>Test Report</h2>
+                    <div class="btn-group">
+                        <button class="btn btn-success btn-small" onclick="app.downloadReport()">Download Report</button>
+                        <button class="btn btn-secondary btn-small" onclick="app.removeLastResult()">Remove Last</button>
+                        <button class="btn btn-danger btn-small" onclick="app.clearReport()">Clear Report</button>
+                    </div>
+                </div>
+                <div class="section-content">
+                    <div id="reportPreview" class="report-preview">No test results yet.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Wallet Modal -->
+    <div id="importWalletModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Import Wallet</div>
+            <div class="form-group">
+                <label class="form-label">Select from stored seeds:</label>
+                <div id="storedSeedsList" class="clickable-list"></div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Or enter seed manually:</label>
+                <input type="text" id="importSeedInput" class="input" placeholder="sXXXXXXXXXXXXXXXXXXXXXXXXXXXXX">
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="app.importWallet()">Import</button>
+                <button class="btn btn-secondary" onclick="app.closeModal('importWalletModal')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Wallet Selector Modal -->
+    <div id="walletSelectorModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Select Wallet</div>
+            <div class="form-group">
+                <label class="form-label" id="walletSelectorLabel">Choose a wallet:</label>
+                <div id="walletSelectorList" class="clickable-list"></div>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-secondary" id="walletSelectorSkipBtn" onclick="app.skipWalletSelection()" style="display: none;">Skip</button>
+                <button class="btn btn-secondary" onclick="app.cancelWalletSelection()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- New/Edit Test Case Modal -->
+    <div id="testCaseModal" class="modal">
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="modal-header" id="testCaseModalTitle">New Test Case</div>
+
+            <div class="form-group">
+                <label class="form-label">Test Name:</label>
+                <input type="text" id="testNameInput" class="input" placeholder="My Test Case">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Expected Result:</label>
+                <select id="expectedResultInput" class="select">
+                    <option value="tesSUCCESS">tesSUCCESS</option>
+                    <option value="tecNO_DST">tecNO_DST</option>
+                    <option value="tecNO_PERMISSION">tecNO_PERMISSION</option>
+                    <option value="tecUNFUNDED_PAYMENT">tecUNFUNDED_PAYMENT</option>
+                    <option value="tecPATH_DRY">tecPATH_DRY</option>
+                    <option value="tecINSUF_RESERVE_LINE">tecINSUF_RESERVE_LINE</option>
+                    <option value="tecNO_LINE">tecNO_LINE</option>
+                    <option value="other">Other (specify in JSON)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Transaction Templates:</label>
+                <div class="template-grid">
+                    <div class="template-btn" onclick="app.loadTemplate('payment')">
+                        <div class="template-btn-title">Payment</div>
+                        <div class="template-btn-desc">Simple XRP payment</div>
+                    </div>
+                    <div class="template-btn" onclick="app.loadTemplate('batch-payment')">
+                        <div class="template-btn-title">Batch Payment</div>
+                        <div class="template-btn-desc">2 payments in batch</div>
+                    </div>
+                    <div class="template-btn" onclick="app.loadTemplate('platform-fee')">
+                        <div class="template-btn-title">Platform Fee</div>
+                        <div class="template-btn-desc">Payment + fee</div>
+                    </div>
+                    <div class="template-btn" onclick="app.loadTemplate('nft-mint-offer')">
+                        <div class="template-btn-title">NFT Mint+Offer</div>
+                        <div class="template-btn-desc">Mint NFT and create offer</div>
+                    </div>
+                    <div class="template-btn" onclick="app.loadTemplate('multi-offer')">
+                        <div class="template-btn-title">Multi-Offer</div>
+                        <div class="template-btn-desc">Multiple offers with slippage</div>
+                    </div>
+                    <div class="template-btn" onclick="app.loadTemplate('trustset-payment')">
+                        <div class="template-btn-title">TrustSet+Payment</div>
+                        <div class="template-btn-desc">Setup trust + token payment</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Transaction JSON:</label>
+                <div class="btn-group" style="margin-bottom: 10px;">
+                    <button class="btn btn-secondary btn-small" onclick="app.insertWalletAddress()">Insert Wallet Address</button>
+                    <button class="btn btn-secondary btn-small" onclick="app.replaceAllPlaceholders()">Replace All Placeholders</button>
+                </div>
+                <textarea id="testJsonInput" class="code-editor" placeholder='{"TransactionType": "Batch", "RawTransactions": [...]}'></textarea>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-success" onclick="app.saveTestCase()">Save Test Case</button>
+                <button class="btn btn-primary" onclick="app.runCurrentTest()">Save & Run</button>
+                <button class="btn btn-secondary" onclick="app.closeModal('testCaseModal')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Helper function for signing multi-account Batch transactions
+        // Copied from xrpl.js batchSigner.ts since it's not exported
+        function signMultiBatch(wallet, transaction, opts = {}) {
+            const batchAccount = opts.batchAccount ?? wallet.classicAddress;
+            let multisignAddress = false;
+            if (typeof opts.multisign === 'string') {
+                multisignAddress = opts.multisign;
+            } else if (opts.multisign) {
+                multisignAddress = wallet.classicAddress;
+            }
+
+            if (transaction.TransactionType !== 'Batch') {
+                throw new Error('Must be a Batch transaction.');
+            }
+
+            const involvedAccounts = new Set(
+                transaction.RawTransactions.map((raw) => raw.RawTransaction.Account)
+            );
+            if (!involvedAccounts.has(batchAccount)) {
+                throw new Error('Must be signing for an address submitting a transaction in the Batch.');
+            }
+
+            // Hash each inner transaction using xrpl.hashes.hashSignedTx
+            const txIDs = transaction.RawTransactions.map((rawTx) =>
+                xrpl.hashes.hashSignedTx(rawTx.RawTransaction)
+            );
+
+            const fieldsToSign = {
+                flags: transaction.Flags,
+                txIDs: txIDs
+            };
+
+            // Encode for signing using the batch-specific encoding
+            // This manually implements signingBatchData from ripple-binary-codec
+            const encodedForSigning = encodeForSigningBatch(fieldsToSign);
+
+            // Sign the encoded data using wallet's sign method
+            // The wallet.sign method expects hex string and returns signature
+            const signature = wallet.sign(encodedForSigning, true).toUpperCase();
+
+            // Construct BatchSigner object
+            let batchSigner;
+            if (multisignAddress) {
+                batchSigner = {
+                    BatchSigner: {
+                        Account: batchAccount,
+                        Signers: [{
+                            Signer: {
+                                Account: multisignAddress,
+                                SigningPubKey: wallet.publicKey,
+                                TxnSignature: signature
+                            }
+                        }]
+                    }
+                };
+            } else {
+                batchSigner = {
+                    BatchSigner: {
+                        Account: batchAccount,
+                        SigningPubKey: wallet.publicKey,
+                        TxnSignature: signature
+                    }
+                };
+            }
+
+            transaction.BatchSigners = [batchSigner];
+        }
+
+        // Manual implementation of encodeForSigningBatch
+        // Based on signingBatchData from ripple-binary-codec
+        function encodeForSigningBatch(batch) {
+            if (batch.flags == null) {
+                throw new Error("No field `flags`");
+            }
+            if (batch.txIDs == null) {
+                throw new Error('No field `txIDs`');
+            }
+
+            // HashPrefix.batch = 0x42415443 ("BATC" in ASCII)
+            const prefix = new Uint8Array([0x42, 0x41, 0x54, 0x43]);
+
+            // Encode flags as UInt32 (4 bytes, big-endian)
+            const flags = new Uint8Array(4);
+            const flagsView = new DataView(flags.buffer);
+            flagsView.setUint32(0, batch.flags, false); // false = big-endian
+
+            // Encode txIDs length as UInt32
+            const txIDsLength = new Uint8Array(4);
+            const lengthView = new DataView(txIDsLength.buffer);
+            lengthView.setUint32(0, batch.txIDs.length, false);
+
+            // Combine all parts
+            const parts = [prefix, flags, txIDsLength];
+
+            // Add each transaction ID (each is 32 bytes)
+            batch.txIDs.forEach(txID => {
+                // Convert hex string to bytes
+                const bytes = new Uint8Array(txID.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+                parts.push(bytes);
+            });
+
+            // Calculate total length
+            const totalLength = parts.reduce((sum, part) => sum + part.length, 0);
+
+            // Combine all parts into one Uint8Array
+            const result = new Uint8Array(totalLength);
+            let offset = 0;
+            parts.forEach(part => {
+                result.set(part, offset);
+                offset += part.length;
+            });
+
+            // Convert to hex string
+            return Array.from(result).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+        }
+
+        const app = {
+            client: null,
+            wallets: [],
+            testCases: [],
+            testResults: [],
+            currentEditingIndex: null,
+            runningTests: new Set(),
+
+            async init() {
+                this.loadFromStorage();
+                await this.connectToNetwork();
+                this.render();
+
+                // Setup network selector
+                document.getElementById('networkSelect').addEventListener('change', async (e) => {
+                    if (e.target.value === 'custom') {
+                        const url = prompt('Enter custom WebSocket URL:');
+                        if (url) {
+                            await this.connectToNetwork(url);
+                        } else {
+                            e.target.value = 'wss://s.devnet.rippletest.net:51233';
+                        }
+                    } else {
+                        await this.connectToNetwork(e.target.value);
+                    }
+                });
+            },
+
+            async connectToNetwork(url) {
+                const wsUrl = url || document.getElementById('networkSelect').value;
+
+                if (this.client) {
+                    await this.client.disconnect();
+                }
+
+                try {
+                    this.client = new xrpl.Client(wsUrl);
+                    await this.client.connect();
+
+                    document.getElementById('statusIndicator').classList.remove('disconnected');
+                    document.getElementById('statusText').textContent = 'Connected';
+
+                    // Refresh wallet balances
+                    await this.refreshWalletBalances();
+                } catch (error) {
+                    console.error('Connection error:', error);
+                    document.getElementById('statusIndicator').classList.add('disconnected');
+                    document.getElementById('statusText').textContent = 'Disconnected';
+                    alert('Failed to connect to network: ' + error.message);
+                }
+            },
+
+            loadFromStorage() {
+                const walletsData = localStorage.getItem('xrpl_batch_wallets');
+                const testCasesData = localStorage.getItem('xrpl_batch_testcases');
+                const resultsData = localStorage.getItem('xrpl_batch_results');
+
+                if (walletsData) {
+                    this.wallets = JSON.parse(walletsData);
+                }
+                if (testCasesData) {
+                    this.testCases = JSON.parse(testCasesData);
+                }
+                if (resultsData) {
+                    this.testResults = JSON.parse(resultsData);
+                }
+            },
+
+            saveToStorage() {
+                localStorage.setItem('xrpl_batch_wallets', JSON.stringify(this.wallets));
+                localStorage.setItem('xrpl_batch_testcases', JSON.stringify(this.testCases));
+                localStorage.setItem('xrpl_batch_results', JSON.stringify(this.testResults));
+            },
+
+            async createWallet() {
+                const wallet = xrpl.Wallet.generate();
+                this.wallets.push({
+                    address: wallet.address,
+                    seed: wallet.seed,
+                    balance: '0',
+                    sequence: 0
+                });
+                this.saveToStorage();
+                await this.refreshWalletBalances();
+                this.render();
+            },
+
+            showImportWallet() {
+                // Populate stored seeds list
+                const seedsList = document.getElementById('storedSeedsList');
+                if (this.wallets.length === 0) {
+                    seedsList.innerHTML = '<div class="empty-state" style="padding: 20px;">No stored wallets</div>';
+                } else {
+                    seedsList.innerHTML = this.wallets.map((w, i) => `
+                        <div class="clickable-item" onclick="app.selectSeed('${w.seed}')">
+                            ${w.address} (${w.balance} XRP)
+                        </div>
+                    `).join('');
+                }
+
+                document.getElementById('importSeedInput').value = '';
+                this.showModal('importWalletModal');
+            },
+
+            selectSeed(seed) {
+                document.getElementById('importSeedInput').value = seed;
+            },
+
+            async importWallet() {
+                const seed = document.getElementById('importSeedInput').value.trim();
+                if (!seed) {
+                    alert('Please enter a seed');
+                    return;
+                }
+
+                try {
+                    const wallet = xrpl.Wallet.fromSeed(seed);
+
+                    // Check if already exists
+                    if (this.wallets.find(w => w.address === wallet.address)) {
+                        alert('Wallet already exists');
+                        return;
+                    }
+
+                    this.wallets.push({
+                        address: wallet.address,
+                        seed: wallet.seed,
+                        balance: '0',
+                        sequence: 0
+                    });
+
+                    this.saveToStorage();
+                    await this.refreshWalletBalances();
+                    this.closeModal('importWalletModal');
+                    this.render();
+                } catch (error) {
+                    alert('Invalid seed: ' + error.message);
+                }
+            },
+
+            async deleteWallet(index) {
+                if (confirm('Are you sure you want to delete this wallet?')) {
+                    this.wallets.splice(index, 1);
+                    this.saveToStorage();
+                    this.render();
+                }
+            },
+
+            async fundWallet(address) {
+                if (!this.client || !this.client.isConnected()) {
+                    alert('Not connected to network');
+                    return;
+                }
+
+                // Find the button and add spinner
+                const buttons = document.querySelectorAll('.btn-small');
+                let fundButton = null;
+                for (let btn of buttons) {
+                    if (btn.textContent.includes('Fund') && btn.onclick && btn.onclick.toString().includes(address)) {
+                        fundButton = btn;
+                        break;
+                    }
+                }
+
+                const originalText = fundButton ? fundButton.innerHTML : '';
+                if (fundButton) {
+                    fundButton.disabled = true;
+                    fundButton.innerHTML = 'Funding...<span class="spinner"></span>';
+                }
+
+                try {
+                    await this.client.fundWallet(xrpl.Wallet.fromSeed(
+                        this.wallets.find(w => w.address === address).seed
+                    ));
+                    alert('Wallet funded successfully!');
+                    await this.refreshWalletBalances();
+                    this.render();
+                } catch (error) {
+                    alert('Failed to fund wallet: ' + error.message);
+                    if (fundButton) {
+                        fundButton.disabled = false;
+                        fundButton.innerHTML = originalText;
+                    }
+                }
+            },
+
+            async refreshWalletBalances() {
+                if (!this.client || !this.client.isConnected()) {
+                    return;
+                }
+
+                for (let wallet of this.wallets) {
+                    try {
+                        const response = await this.client.request({
+                            command: 'account_info',
+                            account: wallet.address,
+                            ledger_index: 'validated'
+                        });
+                        wallet.balance = xrpl.dropsToXrp(response.result.account_data.Balance);
+                        wallet.sequence = response.result.account_data.Sequence;
+                    } catch (error) {
+                        wallet.balance = '0';
+                        wallet.sequence = 0;
+                    }
+                }
+                this.saveToStorage();
+            },
+
+            copyToClipboard(text) {
+                navigator.clipboard.writeText(text);
+                alert('Copied to clipboard!');
+            },
+
+            showNewTestCase() {
+                this.currentEditingIndex = null;
+                document.getElementById('testCaseModalTitle').textContent = 'New Test Case';
+                document.getElementById('testNameInput').value = '';
+                document.getElementById('expectedResultInput').value = 'tesSUCCESS';
+                document.getElementById('testJsonInput').value = '';
+                this.showModal('testCaseModal');
+            },
+
+            editTestCase(index) {
+                this.currentEditingIndex = index;
+                const testCase = this.testCases[index];
+                document.getElementById('testCaseModalTitle').textContent = 'Edit Test Case';
+                document.getElementById('testNameInput').value = testCase.name;
+                document.getElementById('expectedResultInput').value = testCase.expectedResult;
+                document.getElementById('testJsonInput').value = JSON.stringify(testCase.transaction, null, 2);
+                this.showModal('testCaseModal');
+            },
+
+            saveTestCase() {
+                const name = document.getElementById('testNameInput').value.trim();
+                const expectedResult = document.getElementById('expectedResultInput').value;
+                const jsonText = document.getElementById('testJsonInput').value.trim();
+
+                if (!name) {
+                    alert('Please enter a test name');
+                    return;
+                }
+
+                if (!jsonText) {
+                    alert('Please enter transaction JSON');
+                    return;
+                }
+
+                let transaction;
+                try {
+                    transaction = JSON.parse(jsonText);
+                } catch (error) {
+                    alert('Invalid JSON: ' + error.message);
+                    return;
+                }
+
+                const testCase = {
+                    name,
+                    expectedResult,
+                    transaction,
+                    createdAt: new Date().toISOString()
+                };
+
+                if (this.currentEditingIndex !== null) {
+                    this.testCases[this.currentEditingIndex] = testCase;
+                } else {
+                    this.testCases.push(testCase);
+                }
+
+                this.saveToStorage();
+                this.closeModal('testCaseModal');
+                this.render();
+            },
+
+            async runCurrentTest() {
+                this.saveTestCase();
+                const index = this.currentEditingIndex !== null ? this.currentEditingIndex : this.testCases.length - 1;
+                await this.runTest(index);
+            },
+
+            deleteTestCase(index) {
+                if (confirm('Are you sure you want to delete this test case?')) {
+                    this.testCases.splice(index, 1);
+                    this.saveToStorage();
+                    this.render();
+                }
+            },
+
+            clearAllTests() {
+                if (this.testCases.length === 0) {
+                    alert('No test cases to clear');
+                    return;
+                }
+
+                if (confirm(`Are you sure you want to delete all ${this.testCases.length} test case(s)?`)) {
+                    this.testCases = [];
+                    this.saveToStorage();
+                    this.render();
+                }
+            },
+
+            async autofillBatchTransaction(tx) {
+                // Based on autofillBatchTxn from xrpl.js
+                const accountSequences = {};
+
+                // Autofill inner transactions
+                for (const rawTxn of tx.RawTransactions) {
+                    const txn = rawTxn.RawTransaction;
+
+                    // Sequence processing
+                    if (txn.Sequence == null && txn.TicketSequence == null) {
+                        if (txn.Account in accountSequences) {
+                            txn.Sequence = accountSequences[txn.Account];
+                            accountSequences[txn.Account] += 1;
+                        } else {
+                            // Fetch the next sequence number
+                            const request = {
+                                command: 'account_info',
+                                account: txn.Account,
+                                ledger_index: 'current',
+                            };
+                            const data = await this.client.request(request);
+                            const nextSequence = data.result.account_data.Sequence;
+                            const sequence = txn.Account === tx.Account ? nextSequence + 1 : nextSequence;
+                            accountSequences[txn.Account] = sequence + 1;
+                            txn.Sequence = sequence;
+                        }
+                    }
+
+                    // Inner transactions must have Fee = "0"
+                    if (txn.Fee == null) {
+                        txn.Fee = '0';
+                    } else if (txn.Fee !== '0') {
+                        throw new Error('Must have Fee of "0" in inner Batch transaction.');
+                    }
+
+                    // Inner transactions must have SigningPubKey = ""
+                    if (txn.SigningPubKey == null) {
+                        txn.SigningPubKey = '';
+                    } else if (txn.SigningPubKey !== '') {
+                        throw new Error('Must have SigningPubKey of "" in inner Batch transaction.');
+                    }
+
+                    // Inner transactions must not have TxnSignature
+                    if (txn.TxnSignature != null) {
+                        throw new Error('Must not have TxnSignature in inner Batch transaction.');
+                    }
+
+                    // Inner transactions must not have Signers
+                    if (txn.Signers != null) {
+                        throw new Error('Must not have Signers in inner Batch transaction.');
+                    }
+
+                    // Set NetworkID if needed
+                    if (txn.NetworkID == null && this.client.networkID != null && this.client.networkID > 1024) {
+                        txn.NetworkID = this.client.networkID;
+                    }
+                }
+
+                // Autofill outer Batch transaction
+                // Get sequence for the outer transaction
+                if (tx.Sequence == null) {
+                    const request = {
+                        command: 'account_info',
+                        account: tx.Account,
+                        ledger_index: 'current',
+                    };
+                    const data = await this.client.request(request);
+                    tx.Sequence = data.result.account_data.Sequence;
+                }
+
+                // Set Fee for outer transaction
+                if (tx.Fee == null) {
+                    const netFeeXRP = await this.client.request({ command: 'fee' });
+                    const baseFee = netFeeXRP.result.drops.open_ledger_fee;
+
+                    // Calculate total fee: baseFee * 2 + sum of inner transaction fees
+                    // For Batch, inner fees are 0, so it's just baseFee * 2
+                    const totalFee = parseInt(baseFee) * 2;
+                    tx.Fee = totalFee.toString();
+                }
+
+                // Set LastLedgerSequence
+                if (tx.LastLedgerSequence == null) {
+                    const ledgerSequence = await this.client.getLedgerIndex();
+                    tx.LastLedgerSequence = ledgerSequence + 20; // 20 ledger offset
+                }
+
+                // Set SigningPubKey to empty for multi-account batch
+                if (tx.SigningPubKey == null) {
+                    tx.SigningPubKey = '';
+                }
+
+                // Set NetworkID if needed
+                if (tx.NetworkID == null && this.client.networkID != null && this.client.networkID > 1024) {
+                    tx.NetworkID = this.client.networkID;
+                }
+
+                return tx;
+            },
+
+            async runTest(index) {
+                if (!this.client || !this.client.isConnected()) {
+                    alert('Not connected to network');
+                    return;
+                }
+
+                // Mark test as running and re-render to show spinner
+                this.runningTests.add(index);
+                this.render();
+
+                await this.runTestInternal(index);
+
+                // Mark test as no longer running
+                this.runningTests.delete(index);
+                this.render();
+
+                await this.refreshWalletBalances();
+                this.render();
+            },
+
+            async runTestInternal(index) {
+                const testCase = this.testCases[index];
+
+                const result = {
+                    testName: testCase.name,
+                    expectedResult: testCase.expectedResult,
+                    timestamp: new Date().toISOString(),
+                    success: false,
+                    actualResult: null,
+                    hash: null,
+                    error: null,
+                    ledgerIndex: null,
+                    fee: null
+                };
+
+                try {
+                    // Prepare the transaction
+                    const tx = JSON.parse(JSON.stringify(testCase.transaction)); // Deep copy
+
+                    // Check if this is a multi-account Batch transaction
+                    const isMultiAccountBatch = tx.TransactionType === 'Batch' &&
+                        tx.RawTransactions &&
+                        tx.RawTransactions.some(rawTx => rawTx.RawTransaction.Account !== tx.Account);
+
+                    if (isMultiAccountBatch) {
+                        // Multi-account Batch: need to autofill and sign manually
+                        // We need to manually autofill the Batch transaction
+                        const prepared = await this.autofillBatchTransaction(tx);
+
+                        // Get all unique accounts involved
+                        const accounts = new Set([tx.Account]);
+                        tx.RawTransactions.forEach(rawTx => {
+                            accounts.add(rawTx.RawTransaction.Account);
+                        });
+
+                        // Sign for each account and collect BatchSigners
+                        const allBatchSigners = [];
+                        for (const account of accounts) {
+                            const wallet = this.wallets.find(w => w.address === account);
+                            if (!wallet) {
+                                throw new Error(`Wallet not found for account: ${account}`);
+                            }
+                            const walletObj = xrpl.Wallet.fromSeed(wallet.seed);
+
+                            // Create a copy to sign
+                            const txCopy = JSON.parse(JSON.stringify(prepared));
+                            signMultiBatch(walletObj, txCopy, { batchAccount: account });
+
+                            // Collect the BatchSigner
+                            if (txCopy.BatchSigners && txCopy.BatchSigners.length > 0) {
+                                allBatchSigners.push(...txCopy.BatchSigners);
+                            }
+                        }
+
+                        // Add all BatchSigners to the transaction
+                        prepared.BatchSigners = allBatchSigners;
+
+                        // Submit the signed transaction
+                        const submitResult = await this.client.submitAndWait(prepared);
+                        console.log(submitResult);
+
+                        // Process result
+                        result.actualResult = submitResult.result.meta.TransactionResult;
+                        result.hash = submitResult.result.hash;
+                        result.ledgerIndex = submitResult.result.ledger_index;
+                        result.fee = xrpl.dropsToXrp(submitResult.result.tx_json?.Fee || submitResult.result.Fee || '0');
+                        result.success = result.actualResult === testCase.expectedResult;
+                    } else {
+                        // Single-account transaction or regular Batch: use submitAndWait with wallet
+                        const accountAddress = tx.Account;
+                        const wallet = this.wallets.find(w => w.address === accountAddress);
+
+                        if (!wallet) {
+                            throw new Error(`Wallet not found for account: ${accountAddress}`);
+                        }
+
+                        const walletObj = xrpl.Wallet.fromSeed(wallet.seed);
+
+                        // submitAndWait handles autofilling, signing, and submitting
+                        const submitResult = await this.client.submitAndWait(tx, { autofill: true, wallet: walletObj });
+                        console.log(submitResult);
+
+                        // Process result
+                        result.actualResult = submitResult.result.meta.TransactionResult;
+                        result.hash = submitResult.result.hash;
+                        result.ledgerIndex = submitResult.result.ledger_index;
+                        result.fee = xrpl.dropsToXrp(submitResult.result.tx_json?.Fee || submitResult.result.Fee || '0');
+                        result.success = result.actualResult === testCase.expectedResult;
+                    }
+                } catch (error) {
+                    console.log(error);
+                    result.error = error.message;
+                    result.actualResult = 'ERROR';
+                    result.success = false;
+                }
+
+                this.testResults.push(result);
+                this.saveToStorage();
+            },
+
+            async runAllTests() {
+                if (this.testCases.length === 0) {
+                    alert('No test cases to run');
+                    return;
+                }
+
+                if (!confirm(`Run all ${this.testCases.length} test cases?`)) {
+                    return;
+                }
+
+                // Mark all tests as running
+                for (let i = 0; i < this.testCases.length; i++) {
+                    this.runningTests.add(i);
+                }
+                this.render();
+
+                for (let i = 0; i < this.testCases.length; i++) {
+                    await this.runTestInternal(i);
+                    // Small delay between tests
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+
+                alert('All tests completed!');
+            },
+
+            loadTemplate(templateName) {
+                const templates = {
+                    'payment': {
+                        "TransactionType": "Payment",
+                        "Account": "rXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                        "Destination": "rYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY",
+                        "Amount": "1000000"
+                    },
+                    'batch-payment': {
+                        "TransactionType": "Batch",
+                        "Account": "rXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                        "Flags": 65536,
+                        "RawTransactions": [
+                            {
+                                "RawTransaction": {
+                                    "TransactionType": "Payment",
+                                    "Account": "rXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                                    "Destination": "rYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY",
+                                    "Amount": "1000000",
+                                    "Flags": 1073741824
+                                }
+                            },
+                            {
+                                "RawTransaction": {
+                                    "TransactionType": "Payment",
+                                    "Account": "rXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                                    "Destination": "rZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ",
+                                    "Amount": "500000",
+                                    "Flags": 1073741824
+                                }
+                            }
+                        ]
+                    },
+                    'platform-fee': {
+                        "TransactionType": "Batch",
+                        "Account": "rUserXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                        "Flags": 65536,
+                        "RawTransactions": [
+                            {
+                                "RawTransaction": {
+                                    "TransactionType": "Payment",
+                                    "Account": "rUserXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                                    "Destination": "rMerchantYYYYYYYYYYYYYYYYYYYYYYYYY",
+                                    "Amount": "10000000",
+                                    "Flags": 1073741824
+                                }
+                            },
+                            {
+                                "RawTransaction": {
+                                    "TransactionType": "Payment",
+                                    "Account": "rUserXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                                    "Destination": "rPlatformZZZZZZZZZZZZZZZZZZZZZZZZZ",
+                                    "Amount": "100000",
+                                    "Flags": 1073741824
+                                }
+                            }
+                        ]
+                    },
+                    'nft-mint-offer': {
+                        "TransactionType": "Batch",
+                        "Account": "rXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                        "Flags": 65536,
+                        "RawTransactions": [
+                            {
+                                "RawTransaction": {
+                                    "TransactionType": "NFTokenMint",
+                                    "Account": "rXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                                    "NFTokenTaxon": 0,
+                                    "TransferFee": 5000,
+                                    "Flags": 1073741832
+                                }
+                            },
+                            {
+                                "RawTransaction": {
+                                    "TransactionType": "NFTokenCreateOffer",
+                                    "Account": "rXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                                    "NFTokenID": "PLACEHOLDER_WILL_BE_GENERATED",
+                                    "Amount": "1000000",
+                                    "Flags": 1073741825
+                                }
+                            }
+                        ]
+                    },
+                    'multi-offer': {
+                        "TransactionType": "Batch",
+                        "Account": "rXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                        "Flags": 65536,
+                        "RawTransactions": [
+                            {
+                                "RawTransaction": {
+                                    "TransactionType": "OfferCreate",
+                                    "Account": "rXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                                    "TakerGets": "1000000",
+                                    "TakerPays": {
+                                        "currency": "USD",
+                                        "issuer": "rIssuerYYYYYYYYYYYYYYYYYYYYYYYYYY",
+                                        "value": "10"
+                                    },
+                                    "Flags": 1073741824
+                                }
+                            },
+                            {
+                                "RawTransaction": {
+                                    "TransactionType": "OfferCreate",
+                                    "Account": "rXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                                    "TakerGets": "1000000",
+                                    "TakerPays": {
+                                        "currency": "USD",
+                                        "issuer": "rIssuerYYYYYYYYYYYYYYYYYYYYYYYYYY",
+                                        "value": "9.5"
+                                    },
+                                    "Flags": 1073741824
+                                }
+                            }
+                        ]
+                    },
+                    'trustset-payment': {
+                        "TransactionType": "Batch",
+                        "Account": "rXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                        "Flags": 65536,
+                        "RawTransactions": [
+                            {
+                                "RawTransaction": {
+                                    "TransactionType": "TrustSet",
+                                    "Account": "rXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                                    "LimitAmount": {
+                                        "currency": "USD",
+                                        "issuer": "rIssuerYYYYYYYYYYYYYYYYYYYYYYYYYY",
+                                        "value": "1000"
+                                    },
+                                    "Flags": 1073741824
+                                }
+                            },
+                            {
+                                "RawTransaction": {
+                                    "TransactionType": "Payment",
+                                    "Account": "rIssuerYYYYYYYYYYYYYYYYYYYYYYYYYY",
+                                    "Destination": "rXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                                    "Amount": {
+                                        "currency": "USD",
+                                        "issuer": "rIssuerYYYYYYYYYYYYYYYYYYYYYYYYYY",
+                                        "value": "100"
+                                    },
+                                    "Flags": 1073741824
+                                }
+                            }
+                        ]
+                    }
+                };
+
+                const template = templates[templateName];
+                if (template) {
+                    document.getElementById('testJsonInput').value = JSON.stringify(template, null, 2);
+                }
+            },
+
+            loadExamples() {
+                if (this.testCases.length > 0) {
+                    if (!confirm('This will add example test cases. Continue?')) {
+                        return;
+                    }
+                }
+
+                const examples = [
+                    {
+                        name: "Simple Payment",
+                        expectedResult: "tesSUCCESS",
+                        transaction: {
+                            "TransactionType": "Payment",
+                            "Account": "REPLACE_WITH_YOUR_WALLET",
+                            "Destination": "rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY",
+                            "Amount": "1000000"
+                        }
+                    },
+                    {
+                        name: "Batch: Two Payments",
+                        expectedResult: "tesSUCCESS",
+                        transaction: {
+                            "TransactionType": "Batch",
+                            "Account": "REPLACE_WITH_YOUR_WALLET",
+                            "Flags": 65536,
+                            "RawTransactions": [
+                                {
+                                    "RawTransaction": {
+                                        "TransactionType": "Payment",
+                                        "Account": "REPLACE_WITH_YOUR_WALLET",
+                                        "Destination": "rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY",
+                                        "Amount": "1000000",
+                                        "Flags": 1073741824
+                                    }
+                                },
+                                {
+                                    "RawTransaction": {
+                                        "TransactionType": "Payment",
+                                        "Account": "REPLACE_WITH_YOUR_WALLET",
+                                        "Destination": "rN7n7otQDd6FczFgLdlqtyMVrn3HMfXxKN",
+                                        "Amount": "500000",
+                                        "Flags": 1073741824
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        name: "Platform Fee Example",
+                        expectedResult: "tesSUCCESS",
+                        transaction: {
+                            "TransactionType": "Batch",
+                            "Account": "REPLACE_WITH_YOUR_WALLET",
+                            "Flags": 65536,
+                            "RawTransactions": [
+                                {
+                                    "RawTransaction": {
+                                        "TransactionType": "Payment",
+                                        "Account": "REPLACE_WITH_YOUR_WALLET",
+                                        "Destination": "rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY",
+                                        "Amount": "10000000",
+                                        "Flags": 1073741824
+                                    }
+                                },
+                                {
+                                    "RawTransaction": {
+                                        "TransactionType": "Payment",
+                                        "Account": "REPLACE_WITH_YOUR_WALLET",
+                                        "Destination": "rN7n7otQDd6FczFgLdlqtyMVrn3HMfXxKN",
+                                        "Amount": "100000",
+                                        "Flags": 1073741824
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ];
+
+                this.testCases.push(...examples);
+                this.saveToStorage();
+                this.render();
+                alert(`${examples.length} example test cases loaded!`);
+            },
+
+            generateMarkdownReport() {
+                if (this.testResults.length === 0) {
+                    return 'No test results yet.';
+                }
+
+                const successCount = this.testResults.filter(r => r.success).length;
+                const failureCount = this.testResults.length - successCount;
+                const successRate = ((successCount / this.testResults.length) * 100).toFixed(2);
+                const totalFees = this.testResults.reduce((sum, r) => sum + parseFloat(r.fee || 0), 0).toFixed(6);
+
+                let markdown = `# XRPL Batch Transaction Test Report\n\n`;
+                markdown += `**Generated:** ${new Date().toISOString()}\n\n`;
+                markdown += `## Summary\n\n`;
+                markdown += `- **Total Tests:** ${this.testResults.length}\n`;
+                markdown += `- **Passed:** ${successCount}\n`;
+                markdown += `- **Failed:** ${failureCount}\n`;
+                markdown += `- **Success Rate:** ${successRate}%\n`;
+                markdown += `- **Total Fees:** ${totalFees} XRP\n\n`;
+                markdown += `---\n\n`;
+                markdown += `## Test Results\n\n`;
+
+                this.testResults.forEach((result, index) => {
+                    const status = result.success ? '✅ PASS' : '❌ FAIL';
+                    markdown += `### ${index + 1}. ${result.testName} ${status}\n\n`;
+                    markdown += `- **Timestamp:** ${result.timestamp}\n`;
+                    markdown += `- **Expected Result:** \`${result.expectedResult}\`\n`;
+                    markdown += `- **Actual Result:** \`${result.actualResult}\`\n`;
+
+                    if (result.hash) {
+                        markdown += `- **Transaction Hash:** \`${result.hash}\`\n`;
+                    }
+
+                    if (result.ledgerIndex) {
+                        markdown += `- **Ledger Index:** ${result.ledgerIndex}\n`;
+                    }
+
+                    if (result.fee) {
+                        markdown += `- **Fee:** ${result.fee} XRP\n`;
+                    }
+
+                    if (result.error) {
+                        markdown += `- **Error:** ${result.error}\n`;
+                    }
+
+                    markdown += `\n`;
+                });
+
+                return markdown;
+            },
+
+            downloadReport() {
+                const markdown = this.generateMarkdownReport();
+                const blob = new Blob([markdown], { type: 'text/markdown' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `xrpl-batch-test-report-${Date.now()}.md`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            },
+
+            clearReport() {
+                if (confirm('Are you sure you want to clear all test results?')) {
+                    this.testResults = [];
+                    this.saveToStorage();
+                    this.render();
+                }
+            },
+
+            removeLastResult() {
+                if (this.testResults.length === 0) {
+                    alert('No results to remove');
+                    return;
+                }
+
+                if (confirm('Remove the last test result?')) {
+                    this.testResults.pop();
+                    this.saveToStorage();
+                    this.render();
+                }
+            },
+
+            insertWalletAddress() {
+                if (this.wallets.length === 0) {
+                    alert('No wallets available. Create or import a wallet first.');
+                    return;
+                }
+
+                const textarea = document.getElementById('testJsonInput');
+                this.walletSelectorCursorPos = textarea.selectionStart;
+                this.walletSelectorMode = 'insert';
+
+                document.getElementById('walletSelectorLabel').textContent = 'Choose a wallet to insert:';
+                this.showWalletSelector((address) => {
+                    const currentValue = textarea.value;
+                    const newValue = currentValue.substring(0, this.walletSelectorCursorPos) +
+                                    address +
+                                    currentValue.substring(this.walletSelectorCursorPos);
+                    textarea.value = newValue;
+                    textarea.focus();
+                    textarea.setSelectionRange(
+                        this.walletSelectorCursorPos + address.length,
+                        this.walletSelectorCursorPos + address.length
+                    );
+                });
+            },
+
+            replaceAllPlaceholders() {
+                if (this.wallets.length === 0) {
+                    alert('No wallets available. Create or import a wallet first.');
+                    return;
+                }
+
+                const textarea = document.getElementById('testJsonInput');
+                let jsonText = textarea.value;
+
+                // Find all unique placeholder patterns
+                const placeholders = [];
+                const patterns = [
+                    { regex: /rXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX/g, name: 'rXXX...' },
+                    { regex: /rYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY/g, name: 'rYYY...' },
+                    { regex: /rZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ/g, name: 'rZZZ...' },
+                    { regex: /rUserXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX/g, name: 'rUserXXX...' },
+                    { regex: /rMerchantYYYYYYYYYYYYYYYYYYYYYYYYY/g, name: 'rMerchantYYY...' },
+                    { regex: /rPlatformZZZZZZZZZZZZZZZZZZZZZZZZZ/g, name: 'rPlatformZZZ...' },
+                    { regex: /rIssuerYYYYYYYYYYYYYYYYYYYYYYYYYY/g, name: 'rIssuerYYY...' },
+                    { regex: /REPLACE_WITH_YOUR_WALLET/g, name: 'REPLACE_WITH_YOUR_WALLET' }
+                ];
+
+                patterns.forEach(({ regex, name }) => {
+                    const matches = jsonText.match(regex);
+                    if (matches && !placeholders.find(p => p.name === name)) {
+                        placeholders.push({ pattern: matches[0], name });
+                    }
+                });
+
+                if (placeholders.length === 0) {
+                    alert('No placeholders found in the JSON');
+                    return;
+                }
+
+                // Process placeholders one by one
+                this.placeholderReplacements = {};
+                this.placeholdersToReplace = [...placeholders];
+                this.processNextPlaceholder();
+            },
+
+            processNextPlaceholder() {
+                if (this.placeholdersToReplace.length === 0) {
+                    // All done, apply replacements
+                    const textarea = document.getElementById('testJsonInput');
+                    let updatedJson = textarea.value;
+
+                    for (const [placeholder, address] of Object.entries(this.placeholderReplacements)) {
+                        updatedJson = updatedJson.replaceAll(placeholder, address);
+                    }
+
+                    textarea.value = updatedJson;
+
+                    const count = Object.keys(this.placeholderReplacements).length;
+                    if (count > 0) {
+                        alert(`Replaced ${count} placeholder(s)`);
+                    }
+                    return;
+                }
+
+                const placeholder = this.placeholdersToReplace.shift();
+                document.getElementById('walletSelectorLabel').textContent =
+                    `Replace "${placeholder.name}" with:`;
+
+                this.showWalletSelector((address) => {
+                    this.placeholderReplacements[placeholder.pattern] = address;
+                    this.processNextPlaceholder();
+                }, () => {
+                    // Skip this placeholder
+                    this.processNextPlaceholder();
+                });
+            },
+
+            showWalletSelector(onSelect, onSkip) {
+                const list = document.getElementById('walletSelectorList');
+                list.innerHTML = this.wallets.map((w, i) => `
+                    <div class="clickable-item" onclick="app.selectWalletFromList(${i})">
+                        <strong>${w.address}</strong><br>
+                        <span style="color: #059669; font-size: 12px;">${w.balance} XRP</span>
+                    </div>
+                `).join('');
+
+                this.walletSelectorCallback = onSelect;
+                this.walletSelectorSkipCallback = onSkip;
+
+                // Show/hide skip button based on whether skip callback exists
+                const skipBtn = document.getElementById('walletSelectorSkipBtn');
+                if (onSkip) {
+                    skipBtn.style.display = 'inline-block';
+                } else {
+                    skipBtn.style.display = 'none';
+                }
+
+                this.showModal('walletSelectorModal');
+            },
+
+            selectWalletFromList(index) {
+                const address = this.wallets[index].address;
+                this.closeModal('walletSelectorModal');
+                if (this.walletSelectorCallback) {
+                    this.walletSelectorCallback(address);
+                }
+            },
+
+            skipWalletSelection() {
+                this.closeModal('walletSelectorModal');
+                if (this.walletSelectorSkipCallback) {
+                    this.walletSelectorSkipCallback();
+                }
+            },
+
+            cancelWalletSelection() {
+                this.closeModal('walletSelectorModal');
+                // Reset the replacement process if it was in progress
+                this.placeholdersToReplace = [];
+                this.placeholderReplacements = {};
+            },
+
+            showModal(modalId) {
+                document.getElementById(modalId).classList.add('active');
+            },
+
+            closeModal(modalId) {
+                document.getElementById(modalId).classList.remove('active');
+            },
+
+            render() {
+                this.renderWallets();
+                this.renderTestCases();
+                this.renderReport();
+            },
+
+            renderWallets() {
+                const container = document.getElementById('walletList');
+
+                if (this.wallets.length === 0) {
+                    container.innerHTML = '<div class="empty-state">No wallets yet. Create or import one to get started.</div>';
+                    return;
+                }
+
+                container.innerHTML = this.wallets.map((wallet, index) => `
+                    <div class="wallet-item">
+                        <div class="wallet-info">
+                            <div class="wallet-address" onclick="app.copyToClipboard('${wallet.address}')" title="Click to copy">
+                                ${wallet.address}
+                            </div>
+                            <div class="wallet-balance">${wallet.balance} XRP (Seq: ${wallet.sequence})</div>
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn btn-success btn-small" onclick="app.fundWallet('${wallet.address}')">Fund</button>
+                            <button class="btn btn-primary btn-small" onclick="app.copyToClipboard('${wallet.address}')">Copy</button>
+                            <button class="btn btn-danger btn-small" onclick="app.deleteWallet(${index})">Delete</button>
+                        </div>
+                    </div>
+                `).join('');
+            },
+
+            renderTestCases() {
+                const container = document.getElementById('testCaseList');
+
+                if (this.testCases.length === 0) {
+                    container.innerHTML = '<div class="empty-state">No test cases yet. Create one or load examples.</div>';
+                    return;
+                }
+
+                container.innerHTML = this.testCases.map((testCase, index) => {
+                    const isRunning = this.runningTests.has(index);
+                    const runButtonContent = isRunning
+                        ? 'Running...<span class="spinner"></span>'
+                        : 'Run';
+                    const runButtonDisabled = isRunning ? 'disabled' : '';
+
+                    return `
+                        <div class="test-case-item">
+                            <div class="test-case-header">
+                                <div class="test-case-name">${testCase.name}</div>
+                                <div class="btn-group">
+                                    <button class="btn btn-success btn-small" onclick="app.runTest(${index})" ${runButtonDisabled}>${runButtonContent}</button>
+                                    <button class="btn btn-primary btn-small" onclick="app.editTestCase(${index})">Edit</button>
+                                    <button class="btn btn-danger btn-small" onclick="app.deleteTestCase(${index})">Delete</button>
+                                </div>
+                            </div>
+                            <div class="test-case-details">
+                                Expected: <code>${testCase.expectedResult}</code> |
+                                Type: <code>${testCase.transaction.TransactionType}</code>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            },
+
+            renderReport() {
+                const container = document.getElementById('reportPreview');
+                const markdown = this.generateMarkdownReport();
+                container.textContent = markdown;
+            }
+        };
+
+        // Initialize the app when the page loads
+        window.addEventListener('DOMContentLoaded', () => {
+            app.init();
+        });
+    </script>
+</body>
+</html>
