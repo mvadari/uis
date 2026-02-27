@@ -1133,7 +1133,7 @@
                             <option value="">All repositories</option>
                         </select>
                     </div>
-                    <button id="updateAllBtn">Update All Branches</button>
+                    <button id="updateAllBtn" style="display: none;">Update All Branches</button>
                 </div>
 
                 <div id="error"></div>
@@ -1283,6 +1283,7 @@
         let columnSortModes = {}; // Track sort mode per column
         let minimizedColumns = new Set(); // Track minimized columns
         let currentRepoFilter = ''; // Track current repository filter
+        let currentUser = null; // Cache current user login
 
         // Load labels from localStorage
         function getLabels() {
@@ -1408,6 +1409,48 @@
             }
         }
 
+        // Update button visibility based on whether there are branches to update
+        async function updateButtonVisibility() {
+            const button = document.getElementById('updateAllBtn');
+            if (!button) return;
+
+            const token = document.getElementById('tokenInput').value;
+            if (!token || allPRs.length === 0) {
+                button.style.display = 'none';
+                return;
+            }
+
+            // Get current user if not cached
+            if (!currentUser) {
+                try {
+                    const userResponse = await fetch('https://api.github.com/user', {
+                        headers: {
+                            'Authorization': `token ${token}`,
+                            'Accept': 'application/vnd.github.v3+json'
+                        }
+                    });
+                    const userData = await userResponse.json();
+                    currentUser = userData.login;
+                } catch (error) {
+                    button.style.display = 'none';
+                    return;
+                }
+            }
+
+            // Check if there are any PRs that need updating
+            const prsToUpdate = allPRs.filter(pr => {
+                const isAuthor = pr.user.login === currentUser;
+                const isAssignee = pr.assignees && pr.assignees.some(a => a.login === currentUser);
+                const isOwnedOrAssigned = isAuthor || isAssignee;
+
+                return pr.mergeable_state === 'behind' &&
+                       pr.mergeable !== false &&
+                       isOwnedOrAssigned;
+            });
+
+            button.style.display = prsToUpdate.length > 0 ? 'inline-block' : 'none';
+        }
+
         // Update all branches that need updating
         window.updateAllBranches = async function() {
             const token = document.getElementById('tokenInput').value;
@@ -1416,20 +1459,21 @@
                 return;
             }
 
-            // Get current user to filter PRs
-            let currentUser;
-            try {
-                const userResponse = await fetch('https://api.github.com/user', {
-                    headers: {
-                        'Authorization': `token ${token}`,
-                        'Accept': 'application/vnd.github.v3+json'
-                    }
-                });
-                const userData = await userResponse.json();
-                currentUser = userData.login;
-            } catch (error) {
-                showNotification('Failed to get current user', 'error');
-                return;
+            // Get current user if not cached
+            if (!currentUser) {
+                try {
+                    const userResponse = await fetch('https://api.github.com/user', {
+                        headers: {
+                            'Authorization': `token ${token}`,
+                            'Accept': 'application/vnd.github.v3+json'
+                        }
+                    });
+                    const userData = await userResponse.json();
+                    currentUser = userData.login;
+                } catch (error) {
+                    showNotification('Failed to get current user', 'error');
+                    return;
+                }
             }
 
             // Filter PRs that need updating:
@@ -2142,6 +2186,9 @@
 
             // Setup scroll indicator
             setupScrollIndicator();
+
+            // Update button visibility
+            updateButtonVisibility();
         }
 
         // Setup scroll indicator
@@ -2752,6 +2799,9 @@
             } else {
                 localStorage.removeItem('github_token');
             }
+            // Reset cached user when token changes
+            currentUser = null;
+            updateButtonVisibility();
         });
 
         // Global tooltip handling
