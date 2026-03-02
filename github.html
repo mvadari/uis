@@ -1083,6 +1083,97 @@
             outline: none;
             border-color: #0969da;
         }
+
+        /* Query Settings Modal Styles */
+        .query-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .query-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background-color: #f6f8fa;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+        }
+
+        .query-checkbox {
+            flex-shrink: 0;
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .query-inputs {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .query-name-input {
+            padding: 6px 8px;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            background-color: #ffffff;
+        }
+
+        .query-name-input:focus {
+            outline: none;
+            border-color: #0969da;
+            box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.1);
+        }
+
+        .query-input {
+            padding: 6px 8px;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            font-size: 13px;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+            background-color: #ffffff;
+        }
+
+        .query-input:focus {
+            outline: none;
+            border-color: #0969da;
+            box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.1);
+        }
+
+        .query-delete {
+            background-color: transparent;
+            border: 1px solid #d0d7de;
+            color: #cf222e;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .query-delete:hover {
+            background-color: #cf222e;
+            color: #ffffff;
+            border-color: #cf222e;
+        }
+
+        .modal-note code {
+            background-color: #f6f8fa;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+        }
+
+        .modal-note ul {
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
@@ -1100,6 +1191,7 @@
                     <button id="loadBtn">Reload PRs</button>
                     <button id="toggleToken">Token</button>
                     <button id="editLabelsBtn">Edit Labels</button>
+                    <button id="querySettingsBtn">Settings</button>
                 </div>
             </div>
 
@@ -1184,6 +1276,39 @@
     <!-- Global tooltip for notes -->
     <div id="globalNoteTooltip" class="note-tooltip"></div>
 
+    <!-- Query Settings Modal -->
+    <div id="querySettingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Manage Queries</h2>
+                <button class="modal-close" id="closeQuerySettingsModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="queryList" class="query-list"></div>
+                <button id="addQueryBtn" class="add-label-btn">+ Add New Query</button>
+                <div class="modal-note">
+                    <strong>Note:</strong> Use GitHub search syntax. Disabled queries will be skipped.
+                    Use <code>@me</code> for yourself, or specify usernames like <code>author:username</code>.
+                    You can also add additional filters like <code>org:myorg</code> or <code>repo:owner/repo</code>.
+                    <br><br>
+                    <strong>Examples:</strong>
+                    <ul style="margin: 8px 0 0 20px; padding: 0;">
+                        <li><code>author:@me</code> - PRs you authored</li>
+                        <li><code>assignee:@me</code> - PRs assigned to you</li>
+                        <li><code>review-requested:@me</code> - PRs requesting your review</li>
+                        <li><code>reviewed-by:@me</code> - PRs you've reviewed</li>
+                        <li><code>author:username org:myorg</code> - PRs by user in specific org</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="resetQuerySettingsBtn" class="btn-secondary">Reset to Defaults</button>
+                <button id="cancelQuerySettingsBtn" class="btn-secondary">Cancel</button>
+                <button id="saveQuerySettingsBtn" class="btn-primary">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const DEFAULT_LABELS = [
             { id: 'unlabeled', name: 'Unlabeled', locked: true },
@@ -1204,7 +1329,18 @@
         const CACHE_TIMESTAMP_KEY = 'github_pr_cache_timestamp';
         const NOTES_KEY = 'github_pr_notes';
         const FLAGGED_KEY = 'github_pr_flagged';
+        const QUERY_SETTINGS_KEY = 'github_pr_query_settings';
         const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+        // Default query settings - array of query objects
+        const DEFAULT_QUERY_SETTINGS = [
+            { id: 'q1', name: 'My PRs', query: 'author:@me', enabled: true },
+            { id: 'q2', name: 'Assigned to me', query: 'assignee:@me', enabled: true },
+            { id: 'q3', name: 'Review requested', query: 'review-requested:@me', enabled: true },
+            { id: 'q4', name: 'Reviewed by me', query: 'reviewed-by:@me', enabled: true }
+        ];
+
+        let nextQueryId = 1000; // Start custom query IDs at 1000
 
         let nextLabelId = 1000; // Start custom label IDs at 1000
 
@@ -1630,6 +1766,48 @@
             return stored ? new Set(JSON.parse(stored)) : new Set();
         }
 
+        // Load query settings from localStorage
+        function getQuerySettings() {
+            const stored = localStorage.getItem(QUERY_SETTINGS_KEY);
+            if (stored) {
+                try {
+                    const parsed = JSON.parse(stored);
+                    // Check if it's the old format (object) and migrate
+                    if (!Array.isArray(parsed)) {
+                        return migrateQuerySettings(parsed);
+                    }
+                    return parsed;
+                } catch (e) {
+                    return [...DEFAULT_QUERY_SETTINGS];
+                }
+            }
+            return [...DEFAULT_QUERY_SETTINGS];
+        }
+
+        // Migrate old query settings format to new array format
+        function migrateQuerySettings(oldSettings) {
+            const newSettings = [];
+            if (oldSettings.author) {
+                newSettings.push({ id: 'q1', name: 'My PRs', query: oldSettings.author, enabled: true });
+            }
+            if (oldSettings.assignee) {
+                newSettings.push({ id: 'q2', name: 'Assigned to me', query: oldSettings.assignee, enabled: true });
+            }
+            if (oldSettings.reviewRequested) {
+                newSettings.push({ id: 'q3', name: 'Review requested', query: oldSettings.reviewRequested, enabled: true });
+            }
+            if (oldSettings.reviewedBy) {
+                newSettings.push({ id: 'q4', name: 'Reviewed by me', query: oldSettings.reviewedBy, enabled: true });
+            }
+            saveQuerySettings(newSettings);
+            return newSettings;
+        }
+
+        // Save query settings to localStorage
+        function saveQuerySettings(settings) {
+            localStorage.setItem(QUERY_SETTINGS_KEY, JSON.stringify(settings));
+        }
+
         // Sort PRs based on mode
         function sortPRs(prs, mode, label) {
             const sorted = [...prs];
@@ -1863,18 +2041,28 @@
                     }
                 }
 
-                // Fetch all three queries in parallel for speed
-                const [createdItems, assignedItems, reviewRequestedItems, reviewedByItems] = await Promise.all([
-                    fetchAllPages('is:pr+author:@me+state:open', headers),
-                    fetchAllPages('is:pr+assignee:@me+state:open', headers),
-                    fetchAllPages('is:pr+review-requested:@me+state:open', headers),
-                    fetchAllPages('is:pr+reviewed-by:@me+state:open', headers)
-                ]);
+                // Get query settings
+                const querySettings = getQuerySettings();
+
+                // Build queries array from enabled queries with non-empty query strings
+                const queries = querySettings
+                    .filter(q => q.enabled && q.query.trim())
+                    .map(q => `is:pr+${q.query.trim()}+state:open`);
+
+                // If no queries are configured, show an error
+                if (queries.length === 0) {
+                    throw new Error('No enabled queries configured. Please configure at least one query in Settings.');
+                }
+
+                // Fetch all queries in parallel for speed
+                const results = await Promise.all(queries.map(query => fetchAllPages(query, headers)));
 
                 // Combine and deduplicate PRs
                 const prMap = new Map();
-                [...createdItems, ...assignedItems, ...reviewRequestedItems, ...reviewedByItems].forEach(pr => {
-                    prMap.set(pr.id, pr);
+                results.forEach(items => {
+                    items.forEach(pr => {
+                        prMap.set(pr.id, pr);
+                    });
                 });
 
                 let newPRs = Array.from(prMap.values());
@@ -2463,6 +2651,108 @@
         let tempLabels = [];
         let draggedLabelIndex = null;
         let labelScrollInterval = null;
+        let tempQueries = []; // Temporary array for editing queries
+
+        // Query Settings Modal Functions
+        function openQuerySettings() {
+            tempQueries = JSON.parse(JSON.stringify(getQuerySettings())); // Deep copy
+            renderQueryEditor();
+            document.getElementById('querySettingsModal').classList.add('show');
+        }
+
+        function closeQuerySettings() {
+            document.getElementById('querySettingsModal').classList.remove('show');
+        }
+
+        function renderQueryEditor() {
+            const queryList = document.getElementById('queryList');
+
+            let html = '';
+            tempQueries.forEach((query, index) => {
+                html += `
+                    <div class="query-item" data-index="${index}">
+                        <input type="checkbox"
+                               class="query-checkbox"
+                               ${query.enabled ? 'checked' : ''}
+                               data-index="${index}">
+                        <div class="query-inputs">
+                            <input type="text"
+                                   class="query-name-input"
+                                   value="${query.name}"
+                                   placeholder="Query name"
+                                   data-index="${index}"
+                                   data-field="name">
+                            <input type="text"
+                                   class="query-input"
+                                   value="${query.query}"
+                                   placeholder="e.g., author:@me"
+                                   data-index="${index}"
+                                   data-field="query">
+                        </div>
+                        <button class="query-delete" data-index="${index}">Delete</button>
+                    </div>
+                `;
+            });
+
+            queryList.innerHTML = html;
+
+            // Add event listeners
+            queryList.querySelectorAll('.query-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', (e) => {
+                    const index = parseInt(e.target.dataset.index);
+                    tempQueries[index].enabled = e.target.checked;
+                });
+            });
+
+            queryList.querySelectorAll('.query-name-input, .query-input').forEach(input => {
+                input.addEventListener('input', (e) => {
+                    const index = parseInt(e.target.dataset.index);
+                    const field = e.target.dataset.field;
+                    tempQueries[index][field] = e.target.value;
+                });
+            });
+
+            queryList.querySelectorAll('.query-delete').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const index = parseInt(e.target.dataset.index);
+                    deleteQuery(index);
+                });
+            });
+        }
+
+        function addNewQuery() {
+            const newQuery = {
+                id: `custom-${nextQueryId++}`,
+                name: 'New Query',
+                query: '',
+                enabled: true
+            };
+            tempQueries.push(newQuery);
+            renderQueryEditor();
+        }
+
+        function deleteQuery(index) {
+            tempQueries.splice(index, 1);
+            renderQueryEditor();
+        }
+
+        function saveQuerySettingsFromModal() {
+            // Validate that at least one query is enabled
+            const hasEnabledQuery = tempQueries.some(q => q.enabled && q.query.trim());
+            if (!hasEnabledQuery) {
+                showNotification('Please enable at least one query with a valid query string.', 'error');
+                return;
+            }
+
+            saveQuerySettings(tempQueries);
+            closeQuerySettings();
+            showNotification('Query settings saved! Reload PRs to apply changes.', 'success');
+        }
+
+        function resetQuerySettingsToDefaults() {
+            tempQueries = JSON.parse(JSON.stringify(DEFAULT_QUERY_SETTINGS));
+            renderQueryEditor();
+        }
 
         function openLabelEditor() {
             // Copy current labels to temp array
@@ -2755,6 +3045,21 @@
         // Flagged filter event listener
         document.getElementById('showOnlyFlagged').addEventListener('change', () => {
             renderPRs();
+        });
+
+        // Query settings modal event listeners
+        document.getElementById('querySettingsBtn').addEventListener('click', openQuerySettings);
+        document.getElementById('closeQuerySettingsModal').addEventListener('click', closeQuerySettings);
+        document.getElementById('cancelQuerySettingsBtn').addEventListener('click', closeQuerySettings);
+        document.getElementById('saveQuerySettingsBtn').addEventListener('click', saveQuerySettingsFromModal);
+        document.getElementById('resetQuerySettingsBtn').addEventListener('click', resetQuerySettingsToDefaults);
+        document.getElementById('addQueryBtn').addEventListener('click', addNewQuery);
+
+        // Close query settings modal when clicking outside
+        document.getElementById('querySettingsModal').addEventListener('click', (e) => {
+            if (e.target.id === 'querySettingsModal') {
+                closeQuerySettings();
+            }
         });
 
         // Label editor modal event listeners
