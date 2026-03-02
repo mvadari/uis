@@ -1867,7 +1867,8 @@
                 const [createdItems, assignedItems, reviewRequestedItems] = await Promise.all([
                     fetchAllPages('is:pr+author:@me+state:open', headers),
                     fetchAllPages('is:pr+assignee:@me+state:open', headers),
-                    fetchAllPages('is:pr+review-requested:@me+state:open', headers)
+                    fetchAllPages('is:pr+review-requested:@me+state:open', headers),
+                    fetchAllPages('is:pr+reviewed-by:@me+state:open', headers)
                 ]);
 
                 // Combine and deduplicate PRs
