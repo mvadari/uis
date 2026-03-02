@@ -1873,7 +1873,7 @@
 
                 // Combine and deduplicate PRs
                 const prMap = new Map();
-                [...createdItems, ...assignedItems, ...reviewRequestedItems].forEach(pr => {
+                [...createdItems, ...assignedItems, ...reviewRequestedItems, ...reviewedByItems].forEach(pr => {
                     prMap.set(pr.id, pr);
                 });
 
