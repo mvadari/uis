@@ -2291,6 +2291,10 @@
         function renderPRs() {
             const prLabels = getLabels();
 
+            // Save scroll position before re-rendering
+            const kanbanView = document.getElementById('kanbanView');
+            const savedScrollLeft = kanbanView ? kanbanView.scrollLeft : 0;
+
             // Update total PR count
             document.getElementById('totalPRCount').textContent = allPRs.length;
 
@@ -2384,6 +2388,12 @@
             }).join('');
 
             document.getElementById('prList').innerHTML = `<div class="kanban-view" id="kanbanView">${kanbanHTML}</div>`;
+
+            // Restore scroll position after re-rendering
+            const newKanbanView = document.getElementById('kanbanView');
+            if (newKanbanView && savedScrollLeft > 0) {
+                newKanbanView.scrollLeft = savedScrollLeft;
+            }
 
             // Setup column collapse/expand
             setupColumnToggle();
