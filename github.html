@@ -1355,6 +1355,15 @@
                         // Migrate from old format to new format
                         return migrateLabelsToNewFormat(parsed);
                     }
+                    // Update nextLabelId to be higher than any existing custom label IDs
+                    parsed.forEach(label => {
+                        if (label.id && label.id.startsWith('custom-')) {
+                            const idNum = parseInt(label.id.replace('custom-', ''), 10);
+                            if (!isNaN(idNum) && idNum >= nextLabelId) {
+                                nextLabelId = idNum + 1;
+                            }
+                        }
+                    });
                     return parsed;
                 } catch (e) {
                     return [...DEFAULT_LABELS];
@@ -1776,6 +1785,15 @@
                     if (!Array.isArray(parsed)) {
                         return migrateQuerySettings(parsed);
                     }
+                    // Update nextQueryId to be higher than any existing custom query IDs
+                    parsed.forEach(query => {
+                        if (query.id && query.id.startsWith('custom-')) {
+                            const idNum = parseInt(query.id.replace('custom-', ''), 10);
+                            if (!isNaN(idNum) && idNum >= nextQueryId) {
+                                nextQueryId = idNum + 1;
+                            }
+                        }
+                    });
                     return parsed;
                 } catch (e) {
                     return [...DEFAULT_QUERY_SETTINGS];
