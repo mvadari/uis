@@ -349,6 +349,10 @@
             margin-top: 2px;
         }
 
+        .pr-icon.draft {
+            color: #57606a;
+        }
+
         .pr-content {
             flex: 1;
             min-width: 0;
@@ -1960,7 +1964,8 @@
                     ...pr,
                     ciStatus: ciStatus,
                     mergeable_state: prData.mergeable_state,
-                    hasConflicts: prData.mergeable === false
+                    hasConflicts: prData.mergeable === false,
+                    draft: prData.draft
                 };
             } catch (error) {
                 console.error('Error fetching PR details:', error);
@@ -1968,7 +1973,8 @@
                     ...pr,
                     ciStatus: 'none',
                     mergeable_state: null,
-                    hasConflicts: false
+                    hasConflicts: false,
+                    draft: pr.draft || false
                 };
             }
         }
@@ -2230,12 +2236,19 @@
                 </span>
             `;
 
+            // PR icon - draft or regular
+            const prIcon = pr.draft
+                ? `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                       <path d="M3.25 1A2.25 2.25 0 0 1 4 5.372v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.251 2.251 0 0 1 3.25 1Zm9.5 14a2.25 2.25 0 1 1 0-4.5 2.25 2.25 0 0 1 0 4.5ZM2.5 3.25a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0ZM3.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm9.5 0a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5ZM14 7.5a1.25 1.25 0 1 1-2.5 0 1.25 1.25 0 0 1 2.5 0Zm0-4.25a1.25 1.25 0 1 1-2.5 0 1.25 1.25 0 0 1 2.5 0Z"></path>
+                   </svg>`
+                : `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                       <path d="M7.177 3.073L9.573.677A.25.25 0 0110 .854v4.792a.25.25 0 01-.427.177L7.177 3.427a.25.25 0 010-.354zM3.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm-2.25.75a2.25 2.25 0 113 2.122v5.256a2.251 2.251 0 11-1.5 0V5.372A2.25 2.25 0 011.5 3.25zM11 2.5h-1V4h1a1 1 0 011 1v5.628a2.251 2.251 0 101.5 0V5A2.5 2.5 0 0011 2.5zm1 10.25a.75.75 0 111.5 0 .75.75 0 01-1.5 0zM3.75 12a.75.75 0 100 1.5.75.75 0 000-1.5z"></path>
+                   </svg>`;
+
             return `
                 <div class="pr-item ${isFlagged ? 'flagged' : ''}" draggable="true" data-pr-id="${pr.id}">
-                    <div class="pr-icon">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M7.177 3.073L9.573.677A.25.25 0 0110 .854v4.792a.25.25 0 01-.427.177L7.177 3.427a.25.25 0 010-.354zM3.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm-2.25.75a2.25 2.25 0 113 2.122v5.256a2.251 2.251 0 11-1.5 0V5.372A2.25 2.25 0 011.5 3.25zM11 2.5h-1V4h1a1 1 0 011 1v5.628a2.251 2.251 0 101.5 0V5A2.5 2.5 0 0011 2.5zm1 10.25a.75.75 0 111.5 0 .75.75 0 01-1.5 0zM3.75 12a.75.75 0 100 1.5.75.75 0 000-1.5z"></path>
-                        </svg>
+                    <div class="pr-icon ${pr.draft ? 'draft' : ''}">
+                        ${prIcon}
                     </div>
                     <div class="pr-content">
                         <div>
