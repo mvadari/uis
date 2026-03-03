@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Escrow PR Tracker</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+            background-color: #f6f8fa;
+            color: #1f2328;
+            padding: 0;
+            margin: 0;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background-color: #ffffff;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .github-icon {
+            width: 28px;
+            height: 28px;
+            fill: #1f2328;
+        }
+
+        .header-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1f2328;
+        }
+
+        .header-subtitle {
+            font-size: 14px;
+            color: #656d76;
+            margin-left: 8px;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .btn {
+            background-color: #f6f8fa;
+            color: #1f2328;
+            border: 1px solid #d0d7de;
+            padding: 5px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .btn:hover {
+            background-color: #f3f4f6;
+            border-color: #1f2328;
+        }
+
+        .btn-primary {
+            background-color: #1f883d;
+            color: #ffffff;
+            border-color: #1f883d;
+        }
+
+        .btn-primary:hover {
+            background-color: #1a7f37;
+        }
+
+        .status-bar {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            font-size: 13px;
+            color: #656d76;
+            margin-bottom: 12px;
+            padding: 8px 14px;
+            background-color: #ffffff;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .status-item strong {
+            color: #1f2328;
+        }
+
+        .stack-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+
+        .pr-card {
+            background-color: #ffffff;
+            border: 1px solid #d0d7de;
+            padding: 14px 16px 14px 22px;
+            position: relative;
+            transition: box-shadow 0.2s;
+        }
+
+        /* Continuous connector line using pseudo-elements */
+        .pr-card::before {
+            content: '';
+            position: absolute;
+            left: 34px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #0969da;
+            z-index: 1;
+        }
+
+        .pr-card:first-child::before {
+            top: 27px;
+        }
+
+        .pr-card:last-child::before {
+            bottom: calc(100% - 27px);
+        }
+
+        .pr-card:first-child {
+            border-radius: 6px 6px 0 0;
+        }
+
+        .pr-card:last-child {
+            border-radius: 0 0 6px 6px;
+        }
+
+        .pr-card:not(:last-child) {
+            border-bottom: none;
+        }
+
+        .pr-card:hover {
+            box-shadow: 0 1px 3px rgba(31, 35, 40, 0.12);
+            z-index: 10;
+        }
+
+        .pr-card.has-conflicts {
+            background-color: #ffebe9;
+            border-color: #ff8182;
+        }
+
+        .pr-card.blocked {
+            background-color: #fff8c5;
+            border-color: #d4a72c;
+        }
+
+        .pr-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            position: relative;
+        }
+
+        .pr-update-btn-container {
+            position: absolute;
+            top: 0;
+            right: 0;
+        }
+
+        .stack-indicator {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 24px;
+            position: relative;
+        }
+
+        .stack-number {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background-color: #0969da;
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            z-index: 2;
+        }
+
+        .merge-arrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            font-size: 12px;
+            color: #656d76;
+            padding: 1px 6px;
+            background-color: #f6f8fa;
+            border-radius: 3px;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+            margin-left: 8px;
+        }
+
+        .merge-arrow .arrow-icon {
+            color: #1a7f37;
+            font-weight: bold;
+        }
+
+        .ci-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            text-decoration: none;
+        }
+
+        .ci-status.success {
+            background-color: #dafbe1;
+            color: #1a7f37;
+            border: 1px solid #aceebb;
+        }
+
+        .ci-status.failure {
+            background-color: #ffebe9;
+            color: #d1242f;
+            border: 1px solid #ff8182;
+            cursor: pointer;
+        }
+
+        .ci-status.failure:hover {
+            background-color: #ffd6d5;
+        }
+
+        .ci-status.pending {
+            background-color: #fff8c5;
+            color: #9a6700;
+            border: 1px solid #d4a72c;
+        }
+
+        .ci-status .ci-icon {
+            font-size: 12px;
+        }
+
+        .approvals {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background-color: #dafbe1;
+            color: #1a7f37;
+            border: 1px solid #aceebb;
+        }
+
+        .approvals.none {
+            background-color: #f6f8fa;
+            color: #656d76;
+            border: 1px solid #d0d7de;
+        }
+
+        .approvals .approval-icon {
+            font-size: 12px;
+        }
+
+        .approvers-list {
+            font-size: 11px;
+            color: #656d76;
+            margin-left: 2px;
+        }
+
+        .changes-requested {
+            background-color: #ffebe9;
+            color: #d1242f;
+            border: 1px solid #ff8182;
+        }
+
+        .pr-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .pr-title-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: nowrap;
+        }
+
+        .pr-icon {
+            color: #1a7f37;
+            flex-shrink: 0;
+            width: 14px;
+            height: 14px;
+        }
+
+        .pr-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #0969da;
+            text-decoration: none;
+        }
+
+        .pr-title:hover {
+            text-decoration: underline;
+        }
+
+        .pr-number {
+            font-size: 15px;
+            color: #656d76;
+        }
+
+        .pr-meta {
+            font-size: 13px;
+            color: #656d76;
+            margin-top: 6px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+
+        .pr-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .pr-badges {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-top: 6px;
+            align-items: center;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-success {
+            background-color: #dafbe1;
+            color: #1a7f37;
+        }
+
+        .badge-warning {
+            background-color: #fff8c5;
+            color: #9a6700;
+        }
+
+        .badge-danger {
+            background-color: #ffebe9;
+            color: #d1242f;
+        }
+
+        .badge-info {
+            background-color: #ddf4ff;
+            color: #0969da;
+        }
+
+        .badge-neutral {
+            background-color: #eaeef2;
+            color: #656d76;
+        }
+
+        .branch-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 6px;
+            padding: 6px 10px;
+            background-color: #f6f8fa;
+            border-radius: 4px;
+            font-size: 11px;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+        }
+
+        .branch-info code {
+            background-color: #eff2f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        .arrow {
+            color: #656d76;
+        }
+
+        .update-btn {
+            background-color: #f6f8fa;
+            color: #1f2328;
+            border: 1px solid #d0d7de;
+            padding: 5px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            margin-left: auto;
+        }
+
+        .update-btn:hover {
+            background-color: #eaeef2;
+            border-color: #1f2328;
+        }
+
+        .update-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-top: 8px;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: #656d76;
+        }
+
+        .stat-item .icon {
+            font-size: 15px;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            color: #656d76;
+        }
+
+        .error-banner {
+            background-color: #ffebe9;
+            border: 1px solid #ff8182;
+            color: #d1242f;
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+        }
+
+        .token-input-container {
+            display: none;
+            margin-bottom: 16px;
+            padding: 12px 16px;
+            background-color: #ffffff;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+        }
+
+        .token-input-container.visible {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .token-input-container input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .token-input-container input:focus {
+            outline: none;
+            border-color: #0969da;
+            box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.1);
+        }
+
+        .legend {
+            margin-bottom: 16px;
+            padding: 12px 16px;
+            background-color: #ffffff;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            font-size: 13px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        .legend-color.clean { background-color: #dafbe1; border: 1px solid #aceebb; }
+        .legend-color.blocked { background-color: #fff8c5; border: 1px solid #d4a72c; }
+        .legend-color.conflicts { background-color: #ffebe9; border: 1px solid #ff8182; }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 16px;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+            font-size: 14px;
+        }
+
+        .notification.success {
+            background-color: #1f883d;
+            color: #ffffff;
+        }
+
+        .notification.error {
+            background-color: #d1242f;
+            color: #ffffff;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .relative-time {
+            cursor: help;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-left">
+                <svg class="github-icon" viewBox="0 0 16 16" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+                </svg>
+                <span class="header-title">Smart Escrow PRs</span>
+                <span class="header-subtitle">Stacked PR Tracker</span>
+            </div>
+            <div class="header-controls">
+                <button class="btn" id="toggleToken">🔑 Token</button>
+                <button class="btn" id="updateAllBtn">🔄 Update All Branches</button>
+                <button class="btn btn-primary" id="refreshBtn">🔄 Refresh</button>
+            </div>
+        </div>
+
+        <div class="token-input-container" id="tokenContainer">
+            <input type="text" id="tokenInput" placeholder="GitHub Personal Access Token (for update branch functionality)">
+            <button class="btn" id="saveToken">Save</button>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-item">
+                <span>Last updated:</span>
+                <strong id="lastUpdated">Never</strong>
+            </div>
+            <div class="status-item">
+                <span>Auto-refresh:</span>
+                <input type="checkbox" id="autoRefresh" checked>
+                <label for="autoRefresh">every 5 min</label>
+            </div>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color clean"></div>
+                <span>Ready to merge</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color blocked"></div>
+                <span>Blocked / Waiting</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color conflicts"></div>
+                <span>Has conflicts</span>
+            </div>
+        </div>
+
+        <div id="error" class="error-banner" style="display: none;"></div>
+
+        <div id="prStack" class="stack-container">
+            <div class="loading">Loading PRs...</div>
+        </div>
+    </div>
+
+    <script>
+        const PR_NUMBERS = [5999, 6075, 5810, 6329, 5811];
+        const REPO_OWNER = 'XRPLF';
+        const REPO_NAME = 'rippled';
+        const CACHE_KEY = 'smart_escrow_prs_cache';
+        const TOKEN_KEY = 'github_token';
+        const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000;
+
+        let prs = [];
+        let autoRefreshTimer = null;
+
+        function getToken() {
+            return localStorage.getItem(TOKEN_KEY) || '';
+        }
+
+        function saveToken(token) {
+            localStorage.setItem(TOKEN_KEY, token);
+        }
+
+        function showNotification(message, type = 'success') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 3000);
+        }
+
+        function formatRelativeTime(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+
+            if (diffMins < 1) return 'just now';
+            if (diffMins < 60) return `${diffMins}m ago`;
+            if (diffHours < 24) return `${diffHours}h ago`;
+            if (diffDays < 30) return `${diffDays}d ago`;
+            return date.toLocaleDateString();
+        }
+
+        function getHeaders() {
+            const token = getToken();
+            const headers = { 'Accept': 'application/vnd.github.v3+json' };
+            if (token) headers['Authorization'] = `token ${token}`;
+            return headers;
+        }
+
+        async function fetchPR(number) {
+            const response = await fetch(
+                `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${number}`,
+                { headers: getHeaders() }
+            );
+            if (!response.ok) throw new Error(`Failed to fetch PR #${number}`);
+            return response.json();
+        }
+
+        async function fetchCIStatus(sha) {
+            try {
+                // Fetch check runs
+                const checksResponse = await fetch(
+                    `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits/${sha}/check-runs`,
+                    { headers: getHeaders() }
+                );
+                const checksData = await checksResponse.json();
+
+                // Fetch commit status (for older CI systems)
+                const statusResponse = await fetch(
+                    `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits/${sha}/status`,
+                    { headers: getHeaders() }
+                );
+                const statusData = await statusResponse.json();
+
+                // Combine results
+                let totalCount = (checksData.total_count || 0) + (statusData.statuses?.length || 0);
+                let successCount = 0;
+                let failureCount = 0;
+                let pendingCount = 0;
+                let failedChecks = [];
+
+                // Process check runs
+                checksData.check_runs?.forEach(check => {
+                    if (check.conclusion === 'success' || check.conclusion === 'skipped') {
+                        successCount++;
+                    } else if (check.conclusion === 'failure' || check.conclusion === 'cancelled') {
+                        failureCount++;
+                        failedChecks.push({ name: check.name, url: check.html_url });
+                    } else if (check.status === 'in_progress' || check.status === 'queued') {
+                        pendingCount++;
+                    }
+                });
+
+                // Process commit statuses
+                statusData.statuses?.forEach(status => {
+                    if (status.state === 'success') successCount++;
+                    else if (status.state === 'failure' || status.state === 'error') {
+                        failureCount++;
+                        failedChecks.push({ name: status.context, url: status.target_url });
+                    }
+                    else if (status.state === 'pending') pendingCount++;
+                });
+
+                return { totalCount, successCount, failureCount, pendingCount, failedChecks };
+            } catch (error) {
+                console.error('Error fetching CI status:', error);
+                return null;
+            }
+        }
+
+        async function fetchReviews(prNumber) {
+            try {
+                const response = await fetch(
+                    `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${prNumber}/reviews`,
+                    { headers: getHeaders() }
+                );
+                const reviews = await response.json();
+
+                // Get the latest review state per reviewer
+                const reviewerStates = {};
+                reviews.forEach(review => {
+                    if (review.state !== 'COMMENTED' && review.state !== 'PENDING') {
+                        reviewerStates[review.user.login] = {
+                            state: review.state,
+                            user: review.user.login
+                        };
+                    }
+                });
+
+                const approvals = [];
+                const changesRequested = [];
+
+                Object.values(reviewerStates).forEach(review => {
+                    if (review.state === 'APPROVED') {
+                        approvals.push(review.user);
+                    } else if (review.state === 'CHANGES_REQUESTED') {
+                        changesRequested.push(review.user);
+                    }
+                });
+
+                return { approvals, changesRequested };
+            } catch (error) {
+                console.error('Error fetching reviews:', error);
+                return { approvals: [], changesRequested: [] };
+            }
+        }
+
+        async function fetchAllPRs() {
+            document.getElementById('prStack').innerHTML = '<div class="loading">Loading PRs...</div>';
+            document.getElementById('error').style.display = 'none';
+
+            try {
+                // Fetch all PRs first
+                const prPromises = PR_NUMBERS.map(num => fetchPR(num));
+                prs = await Promise.all(prPromises);
+
+                // Then fetch CI status and reviews in parallel for each PR
+                const enrichPromises = prs.map(async (pr) => {
+                    const [ciStatus, reviews] = await Promise.all([
+                        fetchCIStatus(pr.head.sha),
+                        fetchReviews(pr.number)
+                    ]);
+                    pr.ciStatus = ciStatus;
+                    pr.reviews = reviews;
+                    return pr;
+                });
+
+                prs = await Promise.all(enrichPromises);
+                localStorage.setItem(CACHE_KEY, JSON.stringify(prs));
+                document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+                renderPRs();
+            } catch (error) {
+                console.error('Error fetching PRs:', error);
+                document.getElementById('error').textContent = error.message;
+                document.getElementById('error').style.display = 'block';
+
+                // Try to load from cache
+                const cached = localStorage.getItem(CACHE_KEY);
+                if (cached) {
+                    prs = JSON.parse(cached);
+                    renderPRs();
+                } else {
+                    document.getElementById('prStack').innerHTML = '<div class="loading">Failed to load PRs</div>';
+                }
+            }
+        }
+
+        function getMergeableStatus(pr) {
+            if (pr.merged) return { status: 'merged', label: 'Merged', class: 'badge-info' };
+            if (pr.mergeable === false || pr.mergeable_state === 'dirty') {
+                return { status: 'conflicts', label: 'Has conflicts', class: 'badge-danger' };
+            }
+            if (pr.mergeable_state === 'blocked') {
+                return { status: 'blocked', label: 'Blocked', class: 'badge-warning' };
+            }
+            if (pr.mergeable_state === 'behind') {
+                return { status: 'behind', label: 'Behind base', class: 'badge-warning' };
+            }
+            if (pr.mergeable_state === 'clean') {
+                return { status: 'clean', label: 'Ready', class: 'badge-success' };
+            }
+            return { status: 'unknown', label: pr.mergeable_state || 'Unknown', class: 'badge-neutral' };
+        }
+
+        function renderCIStatus(pr) {
+            const ci = pr.ciStatus;
+            if (!ci) return '<span class="ci-status pending"><span class="ci-icon">⏳</span> Loading...</span>';
+
+            if (ci.failureCount > 0) {
+                const failedUrl = ci.failedChecks[0]?.url || pr.html_url + '/checks';
+                const failedNames = ci.failedChecks.map(c => c.name).slice(0, 3).join(', ');
+                const moreText = ci.failedChecks.length > 3 ? ` +${ci.failedChecks.length - 3} more` : '';
+                return `<a href="${failedUrl}" target="_blank" class="ci-status failure" title="Failed: ${failedNames}${moreText}">
+                    <span class="ci-icon">❌</span> ${ci.failureCount} failed
+                </a>`;
+            }
+            if (ci.pendingCount > 0) {
+                return `<span class="ci-status pending"><span class="ci-icon">🟡</span> ${ci.pendingCount} pending</span>`;
+            }
+            if (ci.successCount > 0) {
+                return `<span class="ci-status success"><span class="ci-icon">✅</span> ${ci.successCount} passed</span>`;
+            }
+            return '<span class="ci-status pending"><span class="ci-icon">⚪</span> No checks</span>';
+        }
+
+        function renderApprovals(pr) {
+            const reviews = pr.reviews;
+            if (!reviews) return '';
+
+            if (reviews.changesRequested?.length > 0) {
+                return `<span class="approvals changes-requested" title="Changes requested by: ${reviews.changesRequested.join(', ')}">
+                    <span class="approval-icon">🔴</span> Changes requested (${reviews.changesRequested.join(', ')})
+                </span>`;
+            }
+            if (reviews.approvals?.length > 0) {
+                return `<span class="approvals" title="Approved by: ${reviews.approvals.join(', ')}">
+                    <span class="approval-icon">✅</span> ${reviews.approvals.length} approval${reviews.approvals.length > 1 ? 's' : ''}
+                    <span class="approvers-list">(${reviews.approvals.join(', ')})</span>
+                </span>`;
+            }
+            return '<span class="approvals none"><span class="approval-icon">⚪</span> No approvals</span>';
+        }
+
+        function renderMergeTarget(pr, index) {
+            const isFirst = index === 0;
+            const baseBranch = pr.base.ref;
+            const headBranch = pr.head.ref;
+
+            if (isFirst) {
+                return `<div class="merge-arrow">
+                    <code>${headBranch}</code>
+                    <span class="arrow-icon">→</span>
+                    <code>${baseBranch}</code>
+                    <span style="color: #1a7f37; margin-left: 8px;">📦 Base branch</span>
+                </div>`;
+            } else {
+                const prevPr = prs[index - 1];
+                return `<div class="merge-arrow">
+                    <code>${headBranch}</code>
+                    <span class="arrow-icon">→</span>
+                    <code>${baseBranch}</code>
+                    <span style="color: #0969da; margin-left: 8px;">⬆️ Merges into PR #${prevPr.number}</span>
+                </div>`;
+            }
+        }
+
+        function renderPRs() {
+            const container = document.getElementById('prStack');
+            container.innerHTML = '';
+
+            prs.forEach((pr, index) => {
+                const status = getMergeableStatus(pr);
+                const cardClass = status.status === 'conflicts' ? 'has-conflicts' :
+                                  status.status === 'blocked' ? 'blocked' : '';
+
+                const card = document.createElement('div');
+                card.className = `pr-card ${cardClass}`;
+
+                card.innerHTML = `
+                    <div class="pr-header">
+                        <div class="stack-indicator">
+                            <div class="stack-number">${index + 1}</div>
+                        </div>
+                        <div class="pr-content">
+                            <div class="pr-title-row">
+                                <svg class="pr-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M7.177 3.073L9.573.677A.25.25 0 0110 .854v4.792a.25.25 0 01-.427.177L7.177 3.427a.25.25 0 010-.354zM3.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm-2.25.75a2.25 2.25 0 113 2.122v5.256a2.251 2.251 0 11-1.5 0V5.372A2.25 2.25 0 011.5 3.25zM11 2.5h-1V4h1a1 1 0 011 1v5.628a2.251 2.251 0 101.5 0V5A2.5 2.5 0 0011 2.5zm1 10.25a.75.75 0 111.5 0 .75.75 0 01-1.5 0zM3.75 12a.75.75 0 100 1.5.75.75 0 000-1.5z"></path>
+                                </svg>
+                                <a href="${pr.html_url}" target="_blank" class="pr-title">${pr.title}</a>
+                                <span class="pr-number">#${pr.number}</span>
+                            </div>
+                            <div class="pr-meta">
+                                <span class="pr-meta-item">
+                                    <span class="relative-time" title="${new Date(pr.updated_at).toLocaleString()}">
+                                        Updated ${formatRelativeTime(pr.updated_at)}
+                                    </span>
+                                </span>
+                                <span class="pr-meta-item">by ${pr.user.login}</span>
+                            </div>
+                            ${renderMergeTarget(pr, index)}
+                            <div class="pr-badges">
+                                <span class="badge ${status.class}">${status.label}</span>
+                                ${renderCIStatus(pr)}
+                                ${renderApprovals(pr)}
+                                ${pr.draft ? '<span class="badge badge-neutral">Draft</span>' : ''}
+                                ${pr.requested_reviewers?.length > 0 ? `<span class="badge badge-info">👀 ${pr.requested_reviewers.length} awaiting review</span>` : ''}
+                                ${pr.labels?.map(l => `<span class="badge badge-neutral">${l.name}</span>`).join('') || ''}
+                            </div>
+                            <div class="branch-info">
+                                ${status.status === 'conflicts' ? `
+                                    <span class="badge badge-danger">
+                                        ⚠️ Needs rebase from ${pr.base.ref}
+                                    </span>
+                                ` : ''}
+                                <span style="margin-left: auto; font-size: 12px; color: #656d76;">
+                                    📝 ${pr.changed_files} files |
+                                    <span style="color: #1a7f37;">+${pr.additions}</span>
+                                    <span style="color: #d1242f;">-${pr.deletions}</span> |
+                                    💬 ${(pr.comments || 0) + (pr.review_comments || 0)} |
+                                    📦 ${pr.commits} commits
+                                </span>
+                            </div>
+                        </div>
+                        ${status.status === 'behind' && getToken() ? `
+                            <div class="pr-update-btn-container">
+                                <button class="update-btn" onclick="updateBranch(${pr.number})">🔄 Update</button>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        async function updateBranch(prNumber, silent = false) {
+            const token = getToken();
+            if (!token) {
+                if (!silent) showNotification('GitHub token required for this action', 'error');
+                return false;
+            }
+
+            try {
+                const response = await fetch(
+                    `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${prNumber}/update-branch`,
+                    {
+                        method: 'PUT',
+                        headers: {
+                            'Authorization': `token ${token}`,
+                            'Accept': 'application/vnd.github.v3+json'
+                        }
+                    }
+                );
+
+                if (response.status === 202) {
+                    if (!silent) showNotification('Branch update started!', 'success');
+                    if (!silent) setTimeout(fetchAllPRs, 5000);
+                    return true;
+                } else {
+                    const data = await response.json();
+                    if (!silent) showNotification(data.message || 'Failed to update branch', 'error');
+                    return false;
+                }
+            } catch (error) {
+                if (!silent) showNotification('Error updating branch', 'error');
+                return false;
+            }
+        }
+
+        async function updateAllBranches() {
+            const token = getToken();
+            if (!token) {
+                showNotification('GitHub token required for this action', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('updateAllBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Updating...';
+
+            let updatedCount = 0;
+            let errorCount = 0;
+
+            // Process PRs in order (first to last in the stack)
+            for (let i = 0; i < prs.length; i++) {
+                const pr = prs[i];
+                const status = getMergeableStatus(pr);
+
+                if (status.status === 'behind') {
+                    showNotification(`Updating PR #${pr.number}...`, 'success');
+
+                    const success = await updateBranch(pr.number, true);
+                    if (success) {
+                        updatedCount++;
+                        // Wait for GitHub to process the update before moving to next PR
+                        // This ensures the base branch is updated before updating dependent PRs
+                        await new Promise(resolve => setTimeout(resolve, 8000));
+                        // Refresh PR data to get new status
+                        await fetchAllPRs();
+                    } else {
+                        errorCount++;
+                        showNotification(`Failed to update PR #${pr.number}`, 'error');
+                    }
+                }
+            }
+
+            btn.disabled = false;
+            btn.textContent = '🔄 Update All Branches';
+
+            if (updatedCount > 0) {
+                showNotification(`Updated ${updatedCount} branch${updatedCount > 1 ? 'es' : ''}!`, 'success');
+            } else if (errorCount === 0) {
+                showNotification('All branches are up to date', 'success');
+            }
+
+            // Final refresh
+            await fetchAllPRs();
+        }
+
+        function setupAutoRefresh() {
+            const checkbox = document.getElementById('autoRefresh');
+            if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+
+            if (checkbox.checked) {
+                autoRefreshTimer = setInterval(fetchAllPRs, AUTO_REFRESH_INTERVAL);
+            }
+        }
+
+        // Event listeners
+        document.getElementById('refreshBtn').addEventListener('click', fetchAllPRs);
+        document.getElementById('updateAllBtn').addEventListener('click', updateAllBranches);
+
+        document.getElementById('toggleToken').addEventListener('click', () => {
+            const container = document.getElementById('tokenContainer');
+            container.classList.toggle('visible');
+            document.getElementById('tokenInput').value = getToken();
+        });
+
+        document.getElementById('saveToken').addEventListener('click', () => {
+            saveToken(document.getElementById('tokenInput').value);
+            document.getElementById('tokenContainer').classList.remove('visible');
+            showNotification('Token saved!');
+            renderPRs();
+        });
+
+        document.getElementById('autoRefresh').addEventListener('change', setupAutoRefresh);
+
+        // Initial load
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+            prs = JSON.parse(cached);
+            renderPRs();
+        }
+        fetchAllPRs();
+        setupAutoRefresh();
+    </script>
+</body>
+</html>
