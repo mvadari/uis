@@ -49,6 +49,21 @@ Kanban-style dashboard for managing GitHub pull requests.
 
 ---
 
+### 🔀 Smart Escrow PR Tracker
+Track the stacked PRs for the XRPL Smart Escrow feature.
+
+**Features:**
+- Visual stack showing PR dependencies with connecting lines
+- CI status with links to failed checks
+- Approval counts with reviewer names
+- Update individual PR branches or all at once (in stack order)
+- Auto-refresh every 5 minutes
+- Shares GitHub token with PR Dashboard
+
+[**Launch Smart Escrow PR Tracker →**](https://mvadari.github.io/uis/smart-escrow-prs.html)
+
+---
+
 ### 🔍 XRPL Server Changes
 Explore proposed changes to the XRP Ledger server (rippled) in a non-technical friendly interface.
 
@@ -81,6 +96,7 @@ All tools are self-contained HTML files. To run locally:
    open ui.html
    open batch-testing-ui.html
    open github.html
+   open smart-escrow-prs.html
    open xrpld.html
    ```
 

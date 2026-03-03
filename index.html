@@ -44,7 +44,7 @@
 
         .cards {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
             gap: 24px;
         }
 
@@ -130,6 +130,15 @@
                 <p class="card-description">
                     Manage your GitHub pull requests with a Kanban board. Track CI status,
                     add notes, organize with custom labels, and stay on top of your PRs.
+                </p>
+            </a>
+
+            <a href="smart-escrow-prs.html" class="card">
+                <div class="card-icon">🔀</div>
+                <h2 class="card-title">Smart Escrow PR Tracker</h2>
+                <p class="card-description">
+                    Track the stacked PRs for the XRPL Smart Escrow feature. View CI status,
+                    approvals, and update branches in stack order.
                 </p>
             </a>
 
