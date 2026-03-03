@@ -49,6 +49,21 @@ Kanban-style dashboard for managing GitHub pull requests.
 
 ---
 
+### 🔍 XRPL Server Changes
+Explore proposed changes to the XRP Ledger server (rippled) in a non-technical friendly interface.
+
+**Features:**
+- Browse all open, completed, and rejected proposals
+- Filter by category labels (Amendment, API Change)
+- Search across all proposals using GitHub's search
+- View full proposal details with rendered Markdown descriptions
+- See proposal timelines and discussion activity
+- GitHub dark mode theming
+
+[**Launch XRPL Server Changes →**](https://mvadari.github.io/uis/xrpld.html)
+
+---
+
 ## Local Development
 
 All tools are self-contained HTML files. To run locally:
@@ -66,6 +81,7 @@ All tools are self-contained HTML files. To run locally:
    open ui.html
    open batch-testing-ui.html
    open github.html
+   open xrpld.html
    ```
 
 Alternatively, use a local server:
