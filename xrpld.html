@@ -1343,6 +1343,9 @@
                 currentState = btn.dataset.state;
                 currentPage = 1;
 
+                // Clear search bar when switching tabs
+                document.getElementById('searchInput').value = '';
+
                 // If a label filter is active, re-apply it with new state
                 if (currentLabel) {
                     performLabelFilter(currentLabel);
