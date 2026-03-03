@@ -777,6 +777,26 @@
             }
         }
 
+        async function checkIfBehind(pr) {
+            try {
+                // Compare base branch to head branch to see if head is behind
+                const response = await fetch(
+                    `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/compare/${pr.head.sha}...${pr.base.ref}`,
+                    { headers: getHeaders() }
+                );
+                if (!response.ok) return { behind: false, behindBy: 0 };
+                const data = await response.json();
+                // If base has commits ahead of head's base, the PR is behind
+                return {
+                    behind: data.ahead_by > 0,
+                    behindBy: data.ahead_by
+                };
+            } catch (error) {
+                console.error('Error checking if behind:', error);
+                return { behind: false, behindBy: 0 };
+            }
+        }
+
         async function fetchAllPRs() {
             document.getElementById('prStack').innerHTML = '<div class="loading">Loading PRs...</div>';
             document.getElementById('error').style.display = 'none';
@@ -786,14 +806,16 @@
                 const prPromises = PR_NUMBERS.map(num => fetchPR(num));
                 prs = await Promise.all(prPromises);
 
-                // Then fetch CI status and reviews in parallel for each PR
+                // Then fetch CI status, reviews, and behind status in parallel for each PR
                 const enrichPromises = prs.map(async (pr) => {
-                    const [ciStatus, reviews] = await Promise.all([
+                    const [ciStatus, reviews, behindStatus] = await Promise.all([
                         fetchCIStatus(pr.head.sha),
-                        fetchReviews(pr.number)
+                        fetchReviews(pr.number),
+                        checkIfBehind(pr)
                     ]);
                     pr.ciStatus = ciStatus;
                     pr.reviews = reviews;
+                    pr.behindStatus = behindStatus;
                     return pr;
                 });
 
@@ -825,8 +847,11 @@
             if (pr.mergeable_state === 'blocked') {
                 return { status: 'blocked', label: 'Blocked', class: 'badge-warning' };
             }
-            if (pr.mergeable_state === 'behind') {
-                return { status: 'behind', label: 'Behind base', class: 'badge-warning' };
+            // Check our custom behind status first (more reliable), then fall back to mergeable_state
+            if (pr.behindStatus?.behind || pr.mergeable_state === 'behind') {
+                const behindBy = pr.behindStatus?.behindBy;
+                const label = behindBy ? `Behind by ${behindBy}` : 'Behind base';
+                return { status: 'behind', label, class: 'badge-warning' };
             }
             if (pr.mergeable_state === 'clean') {
                 return { status: 'clean', label: 'Ready', class: 'badge-success' };
