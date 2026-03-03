@@ -1,0 +1,1470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XRP Ledger Server - Proposed Changes</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        :root {
+            --color-canvas-default: #0d1117;
+            --color-canvas-subtle: #161b22;
+            --color-canvas-inset: #010409;
+            --color-border-default: #30363d;
+            --color-border-muted: #21262d;
+            --color-fg-default: #e6edf3;
+            --color-fg-muted: #8b949e;
+            --color-fg-subtle: #6e7681;
+            --color-accent-fg: #58a6ff;
+            --color-accent-emphasis: #1f6feb;
+            --color-success-fg: #3fb950;
+            --color-success-emphasis: #238636;
+            --color-attention-fg: #d29922;
+            --color-danger-fg: #f85149;
+            --color-done-fg: #a371f7;
+            --color-open-fg: #3fb950;
+            --color-closed-fg: #f85149;
+            --color-merged-fg: #a371f7;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+            background-color: var(--color-canvas-default);
+            color: var(--color-fg-default);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .hero {
+            background: linear-gradient(135deg, #161b22 0%, #0d1117 100%);
+            border-bottom: 1px solid var(--color-border-default);
+            padding: 48px 24px;
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            background: linear-gradient(90deg, #e6edf3, #58a6ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero p {
+            color: var(--color-fg-muted);
+            font-size: 18px;
+            max-width: 600px;
+            margin: 0 auto 24px;
+        }
+
+        .hero-stats {
+            display: flex;
+            justify-content: center;
+            gap: 32px;
+            flex-wrap: wrap;
+        }
+
+        .hero-stat {
+            text-align: center;
+        }
+
+        .hero-stat-number {
+            font-size: 36px;
+            font-weight: 700;
+            display: block;
+        }
+
+        .hero-stat-label {
+            font-size: 14px;
+            color: var(--color-fg-muted);
+        }
+
+        .stat-in-review { color: var(--color-open-fg); }
+        .stat-approved { color: var(--color-merged-fg); }
+        .stat-declined { color: var(--color-closed-fg); }
+
+        .hero-stat-with-tooltip {
+            position: relative;
+            cursor: help;
+        }
+        .hero-stat-with-tooltip .tooltip-icon {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            background: var(--color-fg-muted);
+            color: var(--color-canvas-default);
+            border-radius: 50%;
+            font-size: 11px;
+            font-weight: bold;
+            text-align: center;
+            line-height: 16px;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+        .hero-stat-with-tooltip .tooltip-text {
+            visibility: hidden;
+            opacity: 0;
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--color-canvas-subtle);
+            border: 1px solid var(--color-border-default);
+            color: var(--color-fg-default);
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.5;
+            width: 280px;
+            text-align: left;
+            z-index: 100;
+            margin-bottom: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            transition: opacity 0.2s, visibility 0.2s;
+        }
+        .hero-stat-with-tooltip .tooltip-text::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 8px solid transparent;
+            border-top-color: var(--color-border-default);
+        }
+        .hero-stat-with-tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 32px 24px;
+        }
+
+        .search-section {
+            margin-bottom: 32px;
+        }
+
+        .search-box {
+            position: relative;
+            max-width: 600px;
+            margin: 20px auto 0;
+            display: flex;
+            gap: 8px;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 14px 16px 14px 48px;
+            background-color: var(--color-canvas-subtle);
+            border: 2px solid var(--color-border-default);
+            border-radius: 12px;
+            color: var(--color-fg-default);
+            font-size: 16px;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--color-accent-fg);
+            box-shadow: 0 0 0 4px rgba(88, 166, 255, 0.15);
+        }
+
+        .search-box input::placeholder { color: var(--color-fg-muted); }
+
+        .search-box svg {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            fill: var(--color-fg-muted);
+            width: 20px;
+            height: 20px;
+        }
+
+        .search-btn {
+            padding: 14px 24px;
+            background: var(--color-accent-emphasis);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .search-btn:hover {
+            background: var(--color-accent-fg);
+        }
+
+        .filter-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .filter-tab {
+            padding: 10px 24px;
+            background-color: transparent;
+            border: 2px solid var(--color-border-default);
+            border-radius: 24px;
+            color: var(--color-fg-muted);
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .filter-tab:hover {
+            border-color: var(--color-fg-muted);
+            color: var(--color-fg-default);
+        }
+
+        .filter-tab.active {
+            background-color: var(--color-accent-emphasis);
+            border-color: var(--color-accent-emphasis);
+            color: white;
+        }
+
+        .label-filters {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+
+        .label-filter {
+            padding: 6px 14px;
+            background-color: transparent;
+            border: 1px solid var(--color-border-default);
+            border-radius: 16px;
+            color: var(--color-fg-muted);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .label-filter:hover {
+            border-color: var(--color-fg-muted);
+            color: var(--color-fg-default);
+        }
+
+        .label-filter.active {
+            background-color: var(--color-success-fg);
+            border-color: var(--color-success-fg);
+            color: white;
+        }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--color-fg-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 20px;
+        }
+
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 20px;
+        }
+        
+        .card {
+            background-color: var(--color-canvas-subtle);
+            border: 1px solid var(--color-border-default);
+            border-radius: 16px;
+            padding: 24px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .card:hover {
+            border-color: var(--color-border-muted);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+
+        .card-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            width: fit-content;
+        }
+
+        .card-status.in-review {
+            background-color: rgba(63, 185, 80, 0.15);
+            color: var(--color-open-fg);
+        }
+
+        .card-status.approved {
+            background-color: rgba(163, 113, 247, 0.15);
+            color: var(--color-merged-fg);
+        }
+
+        .card-status.declined {
+            background-color: rgba(248, 81, 73, 0.15);
+            color: var(--color-closed-fg);
+        }
+
+        .card-status svg { width: 14px; height: 14px; }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--color-fg-default);
+            margin-bottom: 12px;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .card-description {
+            font-size: 14px;
+            color: var(--color-fg-muted);
+            margin-bottom: 16px;
+            flex: 1;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .card-labels {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 16px;
+        }
+
+        .label {
+            display: inline-block;
+            padding: 4px 10px;
+            font-size: 12px;
+            font-weight: 500;
+            border-radius: 16px;
+        }
+
+        .card-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-top: 16px;
+            border-top: 1px solid var(--color-border-muted);
+            margin-top: auto;
+        }
+
+        .card-author {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+        }
+
+        .avatar-small {
+            width: 24px;
+            height: 24px;
+        }
+
+        .author-info {
+            font-size: 13px;
+        }
+
+        .author-name {
+            color: var(--color-fg-default);
+            font-weight: 500;
+        }
+
+        .author-date {
+            color: var(--color-fg-muted);
+        }
+
+        .card-number {
+            font-size: 13px;
+            color: var(--color-fg-muted);
+            background: var(--color-canvas-inset);
+            padding: 4px 10px;
+            border-radius: 12px;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(1, 4, 9, 0.85);
+            z-index: 200;
+            overflow-y: auto;
+            padding: 40px 20px;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-content {
+            max-width: 700px;
+            margin: 0 auto;
+            background-color: var(--color-canvas-subtle);
+            border: 1px solid var(--color-border-default);
+            border-radius: 20px;
+            overflow: hidden;
+        }
+
+        .modal-header {
+            padding: 24px 28px;
+            border-bottom: 1px solid var(--color-border-default);
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: var(--color-canvas-inset);
+            border: 1px solid var(--color-border-default);
+            color: var(--color-fg-muted);
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 8px;
+            transition: all 0.15s ease;
+        }
+
+        .modal-close:hover {
+            background-color: var(--color-border-muted);
+            color: var(--color-fg-default);
+        }
+
+        .modal-body { padding: 28px; }
+
+        .info-card {
+            background: var(--color-canvas-inset);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .info-card h3 {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--color-fg-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        .info-item label {
+            display: block;
+            font-size: 12px;
+            color: var(--color-fg-muted);
+            margin-bottom: 4px;
+        }
+
+        .info-item span {
+            font-size: 15px;
+            color: var(--color-fg-default);
+        }
+
+        .description-box {
+            background-color: var(--color-canvas-inset);
+            padding: 20px;
+            border-radius: 12px;
+            font-size: 15px;
+            line-height: 1.7;
+            word-wrap: break-word;
+            max-height: 500px;
+            overflow-y: auto;
+            color: var(--color-fg-default);
+        }
+        .description-box h1, .description-box h2, .description-box h3 {
+            margin: 16px 0 8px 0;
+            color: var(--color-fg-default);
+        }
+        .description-box h1 { font-size: 1.5em; border-bottom: 1px solid var(--color-border-default); padding-bottom: 8px; }
+        .description-box h2 { font-size: 1.3em; border-bottom: 1px solid var(--color-border-default); padding-bottom: 6px; }
+        .description-box h3 { font-size: 1.1em; }
+        .description-box p { margin: 12px 0; }
+        .description-box ul, .description-box ol { margin: 12px 0; padding-left: 24px; }
+        .description-box li { margin: 6px 0; }
+        .description-box code {
+            background: var(--color-canvas-subtle);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+        .description-box pre {
+            background: var(--color-canvas-subtle);
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 12px 0;
+        }
+        .description-box pre code {
+            background: none;
+            padding: 0;
+        }
+        .description-box blockquote {
+            border-left: 4px solid var(--color-border-default);
+            margin: 12px 0;
+            padding-left: 16px;
+            color: var(--color-fg-muted);
+        }
+        .description-box a {
+            color: var(--color-accent-fg);
+        }
+        .description-box hr {
+            border: none;
+            border-top: 1px solid var(--color-border-default);
+            margin: 16px 0;
+        }
+        .description-box img {
+            max-width: 100%;
+            border-radius: 8px;
+        }
+
+        .comment-item {
+            background: var(--color-canvas-inset);
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+        }
+
+        .comment-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .comment-body {
+            font-size: 14px;
+            color: var(--color-fg-muted);
+            line-height: 1.6;
+        }
+
+        .view-github-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 28px;
+            background: var(--color-accent-emphasis);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-size: 15px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.15s ease;
+        }
+
+        .view-github-btn:hover {
+            background: #1a7cdb;
+            transform: translateY(-1px);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 80px 20px;
+            color: var(--color-fg-muted);
+        }
+
+        .empty-state-icon {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 20px;
+            fill: var(--color-fg-subtle);
+        }
+
+        .loading-spinner {
+            text-align: center;
+            padding: 60px;
+            color: var(--color-fg-muted);
+        }
+
+        .load-more-btn {
+            display: block;
+            width: 100%;
+            max-width: 300px;
+            margin: 32px auto 0;
+            padding: 14px 28px;
+            background: var(--color-canvas-subtle);
+            border: 2px solid var(--color-border-default);
+            border-radius: 12px;
+            color: var(--color-fg-default);
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .load-more-btn:hover {
+            border-color: var(--color-accent-fg);
+            color: var(--color-accent-fg);
+        }
+
+        .settings-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: var(--color-canvas-subtle);
+            border: 1px solid var(--color-border-default);
+            color: var(--color-fg-muted);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+        }
+        .settings-btn:hover {
+            border-color: var(--color-accent-fg);
+            color: var(--color-fg-default);
+        }
+        .settings-btn.configured {
+            border-color: var(--color-success-fg);
+            color: var(--color-success-fg);
+        }
+        .settings-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+        .settings-content {
+            background: var(--color-canvas-default);
+            border: 1px solid var(--color-border-default);
+            border-radius: 12px;
+            max-width: 500px;
+            width: 100%;
+            padding: 24px;
+        }
+        .settings-content h2 {
+            margin-bottom: 16px;
+            font-size: 20px;
+        }
+        .settings-content p {
+            color: var(--color-fg-muted);
+            font-size: 14px;
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+        .settings-input {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--color-canvas-inset);
+            border: 1px solid var(--color-border-default);
+            border-radius: 6px;
+            color: var(--color-fg-default);
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+        .settings-input:focus {
+            outline: none;
+            border-color: var(--color-accent-fg);
+        }
+        .settings-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        .settings-buttons button {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn-save {
+            background: var(--color-success-emphasis);
+            border: none;
+            color: white;
+        }
+        .btn-save:hover { opacity: 0.9; }
+        .btn-cancel {
+            background: transparent;
+            border: 1px solid var(--color-border-default);
+            color: var(--color-fg-default);
+        }
+        .btn-cancel:hover { border-color: var(--color-fg-muted); }
+        .btn-clear {
+            background: transparent;
+            border: 1px solid var(--color-danger-fg);
+            color: var(--color-danger-fg);
+        }
+        .btn-clear:hover { background: rgba(248, 81, 73, 0.1); }
+
+        @media (max-width: 768px) {
+            .hero { padding: 32px 16px; }
+            .hero h1 { font-size: 24px; }
+            .hero p { font-size: 16px; }
+            .hero-stats { gap: 24px; }
+            .hero-stat-number { font-size: 28px; }
+            .cards-grid { grid-template-columns: 1fr; }
+            .info-grid { grid-template-columns: 1fr; }
+            .modal { padding: 20px 12px; }
+            .settings-btn { top: 12px; right: 12px; padding: 6px 12px; font-size: 12px; }
+            .search-box { flex-direction: column; }
+            .search-btn { padding: 12px 20px; }
+        }
+</style>
+</head>
+<body>
+    <div class="hero" style="position: relative;">
+        <button class="settings-btn" id="settingsBtn" onclick="openSettings()">
+            ⚙️ <span id="settingsLabel">Settings</span>
+        </button>
+        <h1>🔧 XRP Ledger Server Updates</h1>
+        <p>See what developers are working on to improve the XRP Ledger. Each card below represents a proposed change to the software.</p>
+        <div class="hero-stats">
+            <div class="hero-stat">
+                <span class="hero-stat-number stat-in-review" id="openCount">—</span>
+                <span class="hero-stat-label">Being Reviewed</span>
+            </div>
+            <div class="hero-stat">
+                <span class="hero-stat-number stat-approved" id="mergedCount">—</span>
+                <span class="hero-stat-label">Completed</span>
+            </div>
+            <div class="hero-stat hero-stat-with-tooltip">
+                <span class="hero-stat-number stat-declined" id="closedCount">—</span>
+                <span class="hero-stat-label">
+                    Rejected
+                    <span class="tooltip-icon">?</span>
+                </span>
+                <div class="tooltip-text">
+                    <strong>Note:</strong> The XRP Ledger project historically used a different workflow where PRs were closed and commits were added separately, rather than using GitHub's merge feature. This count includes PRs closed under both the old and new processes.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="search-section">
+            <div class="filter-tabs">
+                <button class="filter-tab active" data-state="open">🔍 Under Review</button>
+                <button class="filter-tab" data-state="closed">✅ Completed</button>
+                <button class="filter-tab" data-state="all">📋 All Changes</button>
+            </div>
+            <div class="search-box">
+                <svg viewBox="0 0 16 16"><path fill="currentColor" d="M10.68 11.74a6 6 0 0 1-7.922-8.982 6 6 0 0 1 8.982 7.922l3.04 3.04a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215ZM11.5 7a4.499 4.499 0 1 0-8.997 0A4.499 4.499 0 0 0 11.5 7Z"></path></svg>
+                <input type="text" id="searchInput" placeholder="Search within this category... (press Enter)">
+                <button id="searchBtn" class="search-btn">Search</button>
+            </div>
+            <div class="label-filters">
+                <span style="color: var(--color-fg-muted); font-size: 13px; margin-right: 4px;">Filter by label:</span>
+                <button class="label-filter" data-label="Amendment">🔧 Amendment</button>
+                <button class="label-filter" data-label="API Change">⚡ API Change</button>
+            </div>
+        </div>
+
+        <div id="loading" class="loading-spinner">
+            <p style="font-size: 18px; margin-bottom: 8px;">Loading proposed changes...</p>
+            <p style="font-size: 14px;">Fetching the latest updates from GitHub</p>
+        </div>
+
+        <div id="prList" class="cards-grid"></div>
+
+        <button id="loadMoreBtn" class="load-more-btn" style="display: none;">
+            Load More Changes
+        </button>
+    </div>
+
+    <div id="prModal" class="modal" style="display: none;"></div>
+    <div id="settingsModal" class="settings-modal" style="display: none;">
+        <div class="settings-content">
+            <h2>⚙️ Settings</h2>
+            <p>
+                <strong>GitHub Personal Access Token</strong><br>
+                Adding a token increases the API rate limit from 60 to 5,000 requests per hour.
+                Your token is stored locally in your browser and never sent anywhere except GitHub's API.
+            </p>
+            <input type="password" class="settings-input" id="tokenInput" placeholder="ghp_xxxxxxxxxxxx">
+            <p style="font-size: 12px; margin-top: -8px;">
+                <a href="https://github.com/settings/tokens/new?description=XRPL%20PR%20Explorer&scopes=public_repo" target="_blank" style="color: var(--color-accent-fg);">
+                    Create a token on GitHub →
+                </a>
+                (only needs "public_repo" scope)
+            </p>
+            <div class="settings-buttons">
+                <button class="btn-clear" id="clearTokenBtn" onclick="clearToken()" style="display: none;">Clear Token</button>
+                <button class="btn-cancel" onclick="closeSettings()">Cancel</button>
+                <button class="btn-save" onclick="saveToken()">Save</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        const REPO = 'XRPLF/rippled';
+        const API_BASE = 'https://api.github.com';
+        let allPRs = [];
+        let currentState = 'open';
+        let currentPage = 1;
+        let searchQuery = '';
+        let currentLabel = '';
+        let isLoading = false;
+        let hasMore = true;
+
+        // Friendly status info
+        const statusInfo = {
+            open: { label: 'Under Review', emoji: '🔍', class: 'in-review' },
+            merged: { label: 'Completed', emoji: '✅', class: 'approved' },
+            closed: { label: 'Rejected', emoji: '❌', class: 'declined' }
+        };
+
+        // GitHub token from localStorage
+        function getAuthHeaders() {
+            const token = localStorage.getItem('github_token');
+            if (token) {
+                return { 'Authorization': `token ${token}` };
+            }
+            return {};
+        }
+
+        function apiFetch(url) {
+            return fetch(url, { headers: getAuthHeaders() });
+        }
+
+        // Settings functions
+        function updateSettingsUI() {
+            const token = localStorage.getItem('github_token');
+            const btn = document.getElementById('settingsBtn');
+            const label = document.getElementById('settingsLabel');
+            const clearBtn = document.getElementById('clearTokenBtn');
+
+            if (token) {
+                btn.classList.add('configured');
+                label.textContent = 'Token Set ✓';
+                if (clearBtn) clearBtn.style.display = 'block';
+            } else {
+                btn.classList.remove('configured');
+                label.textContent = 'Settings';
+                if (clearBtn) clearBtn.style.display = 'none';
+            }
+        }
+
+        function openSettings() {
+            const modal = document.getElementById('settingsModal');
+            const input = document.getElementById('tokenInput');
+            const token = localStorage.getItem('github_token');
+            input.value = token || '';
+            document.getElementById('clearTokenBtn').style.display = token ? 'block' : 'none';
+            modal.style.display = 'flex';
+        }
+
+        function closeSettings() {
+            document.getElementById('settingsModal').style.display = 'none';
+        }
+
+        function saveToken() {
+            const token = document.getElementById('tokenInput').value.trim();
+            if (token) {
+                localStorage.setItem('github_token', token);
+            } else {
+                localStorage.removeItem('github_token');
+            }
+            updateSettingsUI();
+            closeSettings();
+            // Refresh data with new token
+            allPRs = [];
+            currentPage = 1;
+            fetchPRs(currentState, 1, false);
+            updateStats();
+        }
+
+        function clearToken() {
+            localStorage.removeItem('github_token');
+            document.getElementById('tokenInput').value = '';
+            updateSettingsUI();
+            closeSettings();
+        }
+
+        // Initialize settings UI on load
+        document.addEventListener('DOMContentLoaded', updateSettingsUI);
+
+        // Close settings on escape or click outside
+        document.getElementById('settingsModal').addEventListener('click', (e) => {
+            if (e.target.id === 'settingsModal') closeSettings();
+        });
+
+        function timeAgo(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const seconds = Math.floor((now - date) / 1000);
+            const intervals = [
+                { label: 'year', seconds: 31536000 },
+                { label: 'month', seconds: 2592000 },
+                { label: 'week', seconds: 604800 },
+                { label: 'day', seconds: 86400 },
+                { label: 'hour', seconds: 3600 },
+                { label: 'minute', seconds: 60 }
+            ];
+            for (const interval of intervals) {
+                const count = Math.floor(seconds / interval.seconds);
+                if (count >= 1) {
+                    return `${count} ${interval.label}${count > 1 ? 's' : ''} ago`;
+                }
+            }
+            return 'just now';
+        }
+
+        function getContrastColor(hexcolor) {
+            const r = parseInt(hexcolor.substr(0, 2), 16);
+            const g = parseInt(hexcolor.substr(2, 2), 16);
+            const b = parseInt(hexcolor.substr(4, 2), 16);
+            const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+            return yiq >= 128 ? '#000000' : '#ffffff';
+        }
+
+        function getPRStatus(pr) {
+            if (pr.merged_at) return 'merged';
+            if (pr.state === 'closed') return 'closed';
+            return 'open';
+        }
+
+        // Markdown to HTML renderer using marked.js
+        function renderMarkdown(text) {
+            if (!text) return '<p>No description provided.</p>';
+
+            // Remove HTML comments
+            text = text.replace(/<!--[\s\S]*?-->/g, '');
+
+            // Configure marked for safety and GitHub-style rendering
+            marked.setOptions({
+                breaks: true,
+                gfm: true
+            });
+
+            return marked.parse(text);
+        }
+
+        function getShortDescription(body) {
+            if (!body) return 'Click to learn more about this proposed change.';
+            let cleaned = body
+                // Remove HTML comments
+                .replace(/<!--[\s\S]*?-->/g, '')
+                // Remove code blocks
+                .replace(/```[\s\S]*?```/g, ' ')
+                // Remove inline code
+                .replace(/`[^`]+`/g, ' ')
+                // Remove checkboxes
+                .replace(/\[[\sx]\]/gi, '')
+                // Remove headers
+                .replace(/^#{1,6}\s+/gm, '')
+                // Remove bold/italic markers
+                .replace(/\*\*\*(.+?)\*\*\*/g, '$1')
+                .replace(/\*\*(.+?)\*\*/g, '$1')
+                .replace(/\*(.+?)\*/g, '$1')
+                .replace(/___(.+?)___/g, '$1')
+                .replace(/__(.+?)__/g, '$1')
+                .replace(/_(.+?)_/g, '$1')
+                // Remove links but keep text
+                .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+                // Remove images
+                .replace(/!\[([^\]]*)\]\([^)]+\)/g, '')
+                // Remove blockquotes
+                .replace(/^>\s*/gm, '')
+                // Remove horizontal rules
+                .replace(/^[-*]{3,}$/gm, '')
+                // Remove list markers
+                .replace(/^[\*\-]\s+/gm, '')
+                // Collapse whitespace
+                .replace(/\s+/g, ' ')
+                .trim();
+            return cleaned.substring(0, 150) + (cleaned.length > 150 ? '...' : '') || 'Click to learn more about this proposed change.';
+        }
+
+        function createPRCard(pr) {
+            const status = getPRStatus(pr);
+            const info = statusInfo[status];
+            const labelsHtml = pr.labels.slice(0, 3).map(label =>
+                `<span class="label" style="background-color: #${label.color}; color: ${getContrastColor(label.color)}">${label.name}</span>`
+            ).join('');
+
+            return `
+                <div class="card" onclick="showPRDetail(${pr.number})">
+                    <div class="card-status ${info.class}">
+                        <span>${info.emoji}</span>
+                        <span>${info.label}</span>
+                    </div>
+                    <div class="card-title">${escapeHtml(pr.title)}</div>
+                    <div class="card-description">${escapeHtml(getShortDescription(pr.body))}</div>
+                    ${labelsHtml ? `<div class="card-labels">${labelsHtml}</div>` : ''}
+                    <div class="card-footer">
+                        <div class="card-author">
+                            <img class="avatar" src="${pr.user.avatar_url}" alt="${pr.user.login}">
+                            <div class="author-info">
+                                <div class="author-name">${pr.user.login}</div>
+                                <div class="author-date">${timeAgo(pr.created_at)}</div>
+                            </div>
+                        </div>
+                        <span class="card-number">#${pr.number}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function fetchPRs(state = 'open', page = 1, append = false) {
+            if (isLoading) return;
+            isLoading = true;
+
+            const loadingEl = document.getElementById('loading');
+            const prListEl = document.getElementById('prList');
+            const loadMoreBtn = document.getElementById('loadMoreBtn');
+
+            if (!append) {
+                loadingEl.style.display = 'block';
+                prListEl.innerHTML = '';
+            }
+            loadMoreBtn.style.display = 'none';
+
+            try {
+                const stateParam = state === 'all' ? 'all' : state;
+                const response = await apiFetch(`${API_BASE}/repos/${REPO}/pulls?state=${stateParam}&per_page=24&page=${page}&sort=updated&direction=desc`);
+
+                if (!response.ok) throw new Error('API request failed');
+
+                const prs = await response.json();
+                // Filter out draft PRs
+                const nonDraftPRs = prs.filter(pr => !pr.draft);
+                hasMore = prs.length === 24;
+
+                if (append) {
+                    allPRs = [...allPRs, ...nonDraftPRs];
+                } else {
+                    allPRs = nonDraftPRs;
+                }
+
+                renderPRs();
+                loadingEl.style.display = 'none';
+                loadMoreBtn.style.display = hasMore ? 'block' : 'none';
+            } catch (error) {
+                console.error('Error fetching PRs:', error);
+                loadingEl.innerHTML = `
+                    <div class="empty-state">
+                        <div style="font-size: 48px; margin-bottom: 16px;">😕</div>
+                        <p style="font-size: 18px; margin-bottom: 8px;">Couldn't load the changes</p>
+                        <p>GitHub might be busy. Please refresh the page to try again.</p>
+                    </div>`;
+            }
+
+            isLoading = false;
+        }
+
+        function renderPRs(prs = allPRs) {
+            const prListEl = document.getElementById('prList');
+
+            if (prs.length === 0) {
+                prListEl.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1 / -1;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">🔍</div>
+                        <p style="font-size: 18px; margin-bottom: 8px;">No changes found</p>
+                        <p>Try a different search term or filter</p>
+                    </div>`;
+            } else {
+                prListEl.innerHTML = prs.map(createPRCard).join('');
+            }
+        }
+
+        // Search using GitHub Search API
+        let isSearching = false;
+        async function performSearch(query) {
+            if (!query.trim()) {
+                // Empty search - go back to normal PR list
+                searchQuery = '';
+                fetchPRs(currentState, 1, false);
+                return;
+            }
+
+            searchQuery = query;
+            isSearching = true;
+            const loadingEl = document.getElementById('loading');
+            const loadMoreBtn = document.getElementById('loadMoreBtn');
+            const prListEl = document.getElementById('prList');
+
+            loadingEl.style.display = 'block';
+            loadingEl.innerHTML = `
+                <p style="font-size: 18px; margin-bottom: 8px;">🔍 Searching...</p>
+                <p style="font-size: 14px;">Looking for "${escapeHtml(query)}"</p>`;
+            prListEl.innerHTML = '';
+            loadMoreBtn.style.display = 'none';
+
+            try {
+                // Build search query - search in title and body
+                const stateFilter = currentState === 'all' ? '' : `+state:${currentState}`;
+                const searchUrl = `${API_BASE}/search/issues?q=${encodeURIComponent(query)}+repo:${REPO}+type:pr${stateFilter}&per_page=30&sort=updated&order=desc`;
+
+                const response = await apiFetch(searchUrl);
+
+                if (!response.ok) {
+                    throw new Error('Search API request failed');
+                }
+
+                const data = await response.json();
+                // Filter out draft PRs from search results
+                const searchResults = (data.items || []).filter(item => !item.draft);
+
+                loadingEl.style.display = 'none';
+
+                if (searchResults.length === 0) {
+                    prListEl.innerHTML = `
+                        <div class="empty-state" style="grid-column: 1 / -1;">
+                            <div style="font-size: 48px; margin-bottom: 16px;">🔍</div>
+                            <p style="font-size: 18px; margin-bottom: 8px;">No results for "${escapeHtml(query)}"</p>
+                            <p>Try different keywords or check your spelling</p>
+                        </div>`;
+                } else {
+                    // Search results include issue-style data, need to map it
+                    const mappedResults = searchResults.map(item => ({
+                        ...item,
+                        // Search API returns pull_request object if it's a PR
+                        merged_at: item.pull_request?.merged_at,
+                    }));
+                    renderPRs(mappedResults);
+                }
+            } catch (error) {
+                console.error('Search error:', error);
+                loadingEl.style.display = 'none';
+                prListEl.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1 / -1;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">😕</div>
+                        <p style="font-size: 18px; margin-bottom: 8px;">Search failed</p>
+                        <p>Please try again</p>
+                    </div>`;
+            }
+
+            isSearching = false;
+        }
+
+        async function updateStats() {
+            try {
+                const [openResp, closedResp, mergedResp] = await Promise.all([
+                    apiFetch(`${API_BASE}/search/issues?q=repo:${REPO}+type:pr+state:open&per_page=1`),
+                    apiFetch(`${API_BASE}/search/issues?q=repo:${REPO}+type:pr+state:closed+is:unmerged&per_page=1`),
+                    apiFetch(`${API_BASE}/search/issues?q=repo:${REPO}+type:pr+is:merged&per_page=1`)
+                ]);
+
+                if (openResp.ok) {
+                    const openData = await openResp.json();
+                    document.getElementById('openCount').textContent = openData.total_count.toLocaleString();
+                }
+                if (closedResp.ok) {
+                    const closedData = await closedResp.json();
+                    document.getElementById('closedCount').textContent = closedData.total_count.toLocaleString();
+                }
+                if (mergedResp.ok) {
+                    const mergedData = await mergedResp.json();
+                    document.getElementById('mergedCount').textContent = mergedData.total_count.toLocaleString();
+                }
+            } catch (e) {
+                console.error('Error fetching stats:', e);
+            }
+        }
+
+        async function showPRDetail(prNumber) {
+            const modal = document.getElementById('prModal');
+            modal.style.display = 'block';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <div class="modal-body" style="text-align: center; padding: 60px;">
+                        <div style="font-size: 32px; margin-bottom: 16px;">⏳</div>
+                        <p>Loading details...</p>
+                    </div>
+                </div>`;
+            document.body.style.overflow = 'hidden';
+
+            try {
+                const [prResp, commentsResp] = await Promise.all([
+                    apiFetch(`${API_BASE}/repos/${REPO}/pulls/${prNumber}`),
+                    apiFetch(`${API_BASE}/repos/${REPO}/issues/${prNumber}/comments?per_page=5`)
+                ]);
+
+                const pr = await prResp.json();
+                const comments = await commentsResp.json();
+                const status = getPRStatus(pr);
+                const info = statusInfo[status];
+
+                const formatDate = (dateStr) => new Date(dateStr).toLocaleDateString('en-US', {
+                    year: 'numeric', month: 'long', day: 'numeric'
+                });
+
+                modal.innerHTML = `
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <div style="padding-right: 40px;">
+                                <div class="card-status ${info.class}" style="margin-bottom: 16px;">
+                                    <span>${info.emoji}</span>
+                                    <span>${info.label}</span>
+                                </div>
+                                <h2 style="font-size: 22px; font-weight: 600; margin-bottom: 12px; line-height: 1.4;">${escapeHtml(pr.title)}</h2>
+                                <div style="display: flex; align-items: center; gap: 12px; color: var(--color-fg-muted);">
+                                    <img class="avatar" src="${pr.user.avatar_url}" alt="${pr.user.login}">
+                                    <span>Proposed by <strong style="color: var(--color-fg-default);">${pr.user.login}</strong></span>
+                                </div>
+                            </div>
+                            <button class="modal-close" onclick="closeModal()">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M5.72 5.72a.75.75 0 0 1 1.06 0L12 10.94l5.22-5.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L13.06 12l5.22 5.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L12 13.06l-5.22 5.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L10.94 12 5.72 6.78a.75.75 0 0 1 0-1.06Z"></path></svg>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="info-card">
+                                <h3>📅 Timeline</h3>
+                                <div class="info-grid">
+                                    <div class="info-item">
+                                        <label>Proposed On</label>
+                                        <span>${formatDate(pr.created_at)}</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <label>Last Activity</label>
+                                        <span>${timeAgo(pr.updated_at)}</span>
+                                    </div>
+                                    ${status !== 'open' ? `
+                                    <div class="info-item">
+                                        <label>${status === 'merged' ? 'Completed On' : 'Closed On'}</label>
+                                        <span>${formatDate(pr.merged_at || pr.closed_at)}</span>
+                                    </div>
+                                    ` : ''}
+                                    <div class="info-item">
+                                        <label>Discussion</label>
+                                        <span>${pr.comments + pr.review_comments} comments</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            ${pr.labels.length > 0 ? `
+                            <div class="info-card">
+                                <h3>🏷️ Categories</h3>
+                                <div class="card-labels">
+                                    ${pr.labels.map(label => `<span class="label" style="background-color: #${label.color}; color: ${getContrastColor(label.color)}">${label.name}</span>`).join('')}
+                                </div>
+                            </div>
+                            ` : ''}
+
+                            <div class="info-card">
+                                <h3>📝 What This Change Does</h3>
+                                <div class="description-box">${renderMarkdown(pr.body)}</div>
+                            </div>
+
+                            ${comments.length > 0 ? `
+                            <div class="info-card">
+                                <h3>💬 Recent Discussion</h3>
+                                ${comments.slice(0, 3).map(comment => `
+                                    <div class="comment-item">
+                                        <div class="comment-header">
+                                            <img class="avatar avatar-small" src="${comment.user.avatar_url}" alt="${comment.user.login}">
+                                            <strong style="font-size: 14px;">${comment.user.login}</strong>
+                                            <span style="font-size: 12px; color: var(--color-fg-muted);">• ${timeAgo(comment.created_at)}</span>
+                                        </div>
+                                        <div class="comment-body">${escapeHtml(comment.body.substring(0, 250))}${comment.body.length > 250 ? '...' : ''}</div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            ` : ''}
+
+                            <div style="text-align: center; margin-top: 8px;">
+                                <a href="${pr.html_url}" target="_blank" class="view-github-btn">
+                                    View Full Details on GitHub
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M3.75 2h3.5a.75.75 0 0 1 0 1.5h-3.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25v-3.5a.75.75 0 0 1 1.5 0v3.5A1.75 1.75 0 0 1 12.25 14h-8.5A1.75 1.75 0 0 1 2 12.25v-8.5C2 2.784 2.784 2 3.75 2Zm6.854-1h4.146a.25.25 0 0 1 .25.25v4.146a.25.25 0 0 1-.427.177L13.03 4.03 9.28 7.78a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042l3.75-3.75-1.543-1.543A.25.25 0 0 1 10.604 1Z"></path></svg>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error fetching PR details:', error);
+                modal.innerHTML = `
+                    <div class="modal-content">
+                        <div class="modal-body">
+                            <div class="empty-state">
+                                <div style="font-size: 48px; margin-bottom: 16px;">😕</div>
+                                <p style="font-size: 18px;">Couldn't load the details</p>
+                                <p>Please try again later</p>
+                            </div>
+                        </div>
+                    </div>`;
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('prModal').style.display = 'none';
+            document.body.style.overflow = '';
+        }
+
+        // Event listeners
+        document.querySelectorAll('.filter-tab[data-state]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.filter-tab[data-state]').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentState = btn.dataset.state;
+                currentPage = 1;
+
+                // If a label filter is active, re-apply it with new state
+                if (currentLabel) {
+                    performLabelFilter(currentLabel);
+                } else {
+                    fetchPRs(currentState, 1, false);
+                }
+            });
+        });
+
+        document.getElementById('searchInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                performSearch(e.target.value);
+            }
+        });
+
+        document.getElementById('searchBtn').addEventListener('click', () => {
+            const query = document.getElementById('searchInput').value;
+            performSearch(query);
+        });
+
+        // Label filter buttons
+        document.querySelectorAll('.label-filter[data-label]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const label = btn.dataset.label;
+
+                // Toggle - if clicking same label, clear filter
+                if (currentLabel === label) {
+                    currentLabel = '';
+                    btn.classList.remove('active');
+                } else {
+                    // Remove active from all label buttons, add to clicked one
+                    document.querySelectorAll('.label-filter[data-label]').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentLabel = label;
+                }
+
+                // Clear search when filtering by label
+                document.getElementById('searchInput').value = '';
+                searchQuery = '';
+
+                // Perform label search
+                performLabelFilter(currentLabel);
+            });
+        });
+
+        // Label filter function using GitHub Search API
+        async function performLabelFilter(label) {
+            if (!label) {
+                // No label filter - go back to normal PR list
+                fetchPRs(currentState, 1, false);
+                return;
+            }
+
+            const loadingEl = document.getElementById('loading');
+            const loadMoreBtn = document.getElementById('loadMoreBtn');
+            const prListEl = document.getElementById('prList');
+
+            loadingEl.style.display = 'block';
+            loadingEl.innerHTML = `
+                <p style="font-size: 18px; margin-bottom: 8px;">🏷️ Filtering...</p>
+                <p style="font-size: 14px;">Finding PRs labeled "${escapeHtml(label)}"</p>`;
+            prListEl.innerHTML = '';
+            loadMoreBtn.style.display = 'none';
+
+            try {
+                const stateFilter = currentState === 'all' ? '' : `+state:${currentState}`;
+                const searchUrl = `${API_BASE}/search/issues?q=repo:${REPO}+type:pr+label:"${encodeURIComponent(label)}"${stateFilter}&per_page=30&sort=updated&order=desc`;
+
+                const response = await apiFetch(searchUrl);
+
+                if (!response.ok) {
+                    throw new Error('Search API request failed');
+                }
+
+                const data = await response.json();
+                // Filter out draft PRs
+                const searchResults = (data.items || []).filter(item => !item.draft);
+
+                loadingEl.style.display = 'none';
+
+                if (searchResults.length === 0) {
+                    prListEl.innerHTML = `
+                        <div class="empty-state" style="grid-column: 1 / -1;">
+                            <div style="font-size: 48px; margin-bottom: 16px;">🏷️</div>
+                            <p style="font-size: 18px; margin-bottom: 8px;">No PRs with label "${escapeHtml(label)}"</p>
+                            <p>Try selecting a different category above</p>
+                        </div>`;
+                } else {
+                    const mappedResults = searchResults.map(item => ({
+                        ...item,
+                        merged_at: item.pull_request?.merged_at,
+                    }));
+                    renderPRs(mappedResults);
+                }
+            } catch (error) {
+                console.error('Label filter error:', error);
+                loadingEl.style.display = 'none';
+                prListEl.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1 / -1;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">😕</div>
+                        <p style="font-size: 18px; margin-bottom: 8px;">Filter failed</p>
+                        <p>Please try again</p>
+                    </div>`;
+            }
+        }
+
+        document.getElementById('loadMoreBtn').addEventListener('click', () => {
+            currentPage++;
+            fetchPRs(currentState, currentPage, true);
+        });
+
+        document.getElementById('prModal').addEventListener('click', (e) => {
+            if (e.target.id === 'prModal') closeModal();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
+
+        // Initial load
+        fetchPRs('open', 1);
+        updateStats();
+    </script>
+</body>
+</html>
+
