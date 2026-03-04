@@ -625,6 +625,22 @@
             text-decoration: underline;
         }
 
+        .preference-section {
+            margin-bottom: 24px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid #d0d7de;
+        }
+
+        .preference-section:last-child {
+            border-bottom: none;
+        }
+
+        .preference-section h3 {
+            margin: 0 0 12px 0;
+            font-size: 16px;
+            color: #24292f;
+        }
+
         input[type="text"] {
             background-color: #ffffff;
             color: #24292f;
@@ -1802,9 +1818,32 @@
 
                 <!-- Preferences Tab -->
                 <div id="preferencesTab" class="settings-tab-content">
-                    <div class="auto-refresh-toggle" style="padding: 12px; background-color: #f6f8fa; border-radius: 6px;">
-                        <input type="checkbox" id="autoRefreshSetting" checked>
-                        <label for="autoRefreshSetting">Auto-refresh every 5 minutes</label>
+                    <div class="preference-section">
+                        <h3>⚙️ General</h3>
+                        <div class="auto-refresh-toggle" style="padding: 12px; background-color: #f6f8fa; border-radius: 6px;">
+                            <input type="checkbox" id="autoRefreshSetting" checked>
+                            <label for="autoRefreshSetting">Auto-refresh every 5 minutes</label>
+                        </div>
+                    </div>
+
+                    <div class="preference-section">
+                        <h3>💾 Backup & Restore</h3>
+                        <p style="color: #57606a; font-size: 14px; margin-bottom: 12px;">
+                            Export your settings to a JSON file for backup or to transfer to another browser.
+                        </p>
+                        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                            <button id="exportSettingsBtn" class="btn-secondary">
+                                📥 Export Settings
+                            </button>
+                            <button id="importSettingsBtn" class="btn-secondary">
+                                📤 Import Settings
+                            </button>
+                            <input type="file" id="importSettingsFile" accept=".json" style="display: none;">
+                        </div>
+                        <p style="color: #6e7781; font-size: 12px; margin-top: 8px;">
+                            <strong>Note:</strong> Exported settings include your token, queries, columns, and preferences.
+                            Keep the file secure as it contains your GitHub token.
+                        </p>
                     </div>
                 </div>
 
@@ -3521,6 +3560,108 @@
             document.getElementById('settingsModal').classList.remove('show');
         }
 
+        // Export/Import Settings Functions
+        function exportSettings() {
+            const settings = {
+                version: '1.0',
+                exportDate: new Date().toISOString(),
+                token: getStoredToken(),
+                queries: getQuerySettings(),
+                labels: LABELS,
+                autoRefreshEnabled: localStorage.getItem('autoRefreshEnabled') !== 'false',
+                prLabels: JSON.parse(localStorage.getItem('pr_labels') || '{}'),
+                prNotes: JSON.parse(localStorage.getItem('pr_notes') || '{}'),
+                prFlags: JSON.parse(localStorage.getItem('pr_flags') || '{}'),
+                columnSortModes: JSON.parse(localStorage.getItem('column_sort_modes') || '{}'),
+                customOrders: JSON.parse(localStorage.getItem('custom_orders') || '{}')
+            };
+
+            const dataStr = JSON.stringify(settings, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `github-pr-dashboard-settings-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            showNotification('Settings exported successfully!', 'success');
+        }
+
+        function importSettings() {
+            document.getElementById('importSettingsFile').click();
+        }
+
+        function handleImportFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const settings = JSON.parse(e.target.result);
+
+                    // Validate the settings file
+                    if (!settings.version) {
+                        showNotification('Invalid settings file format', 'error');
+                        return;
+                    }
+
+                    // Confirm import
+                    if (!confirm('This will replace all your current settings. Are you sure you want to continue?')) {
+                        return;
+                    }
+
+                    // Import settings
+                    if (settings.token) {
+                        saveToken(settings.token);
+                    }
+                    if (settings.queries) {
+                        saveQuerySettings(settings.queries);
+                    }
+                    if (settings.labels) {
+                        LABELS = settings.labels;
+                        saveLabelsList(LABELS);
+                    }
+                    if (settings.autoRefreshEnabled !== undefined) {
+                        localStorage.setItem('autoRefreshEnabled', settings.autoRefreshEnabled);
+                    }
+                    if (settings.prLabels) {
+                        localStorage.setItem('pr_labels', JSON.stringify(settings.prLabels));
+                    }
+                    if (settings.prNotes) {
+                        localStorage.setItem('pr_notes', JSON.stringify(settings.prNotes));
+                    }
+                    if (settings.prFlags) {
+                        localStorage.setItem('pr_flags', JSON.stringify(settings.prFlags));
+                    }
+                    if (settings.columnSortModes) {
+                        localStorage.setItem('column_sort_modes', JSON.stringify(settings.columnSortModes));
+                    }
+                    if (settings.customOrders) {
+                        localStorage.setItem('custom_orders', JSON.stringify(settings.customOrders));
+                    }
+
+                    showNotification('Settings imported successfully! Reloading page...', 'success');
+
+                    // Reload the page to apply all settings
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+
+                } catch (error) {
+                    showNotification('Failed to import settings: ' + error.message, 'error');
+                }
+            };
+            reader.readAsText(file);
+
+            // Reset the file input so the same file can be imported again
+            event.target.value = '';
+        }
+
         function switchSettingsTab(tabName) {
             currentSettingsTab = tabName;
 
@@ -4039,6 +4180,11 @@
                 closeNoteEditor();
             }
         });
+
+        // Export/Import settings event listeners
+        document.getElementById('exportSettingsBtn').addEventListener('click', exportSettings);
+        document.getElementById('importSettingsBtn').addEventListener('click', importSettings);
+        document.getElementById('importSettingsFile').addEventListener('change', handleImportFile);
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
