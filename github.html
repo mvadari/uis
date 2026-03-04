@@ -521,11 +521,26 @@
         }
 
         .error {
-            background-color: #d1242f;
-            color: #ffffff;
+            background-color: #ffebe9;
+            color: #cf222e;
+            border: 1px solid #ff8182;
             padding: 12px 16px;
             border-radius: 6px;
             margin-bottom: 16px;
+            line-height: 1.6;
+        }
+
+        .error strong {
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .error code {
+            background-color: #ffffff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
         }
 
         input[type="text"] {
@@ -541,16 +556,6 @@
         input[type="text"]:focus {
             outline: none;
             border-color: #0969da;
-        }
-
-        #tokenContainer {
-            display: none;
-        }
-
-        #tokenContainer.visible {
-            display: flex;
-            gap: 8px;
-            align-items: center;
         }
 
         .status-bar {
@@ -1270,6 +1275,268 @@
         .modal-note ul {
             font-size: 12px;
         }
+
+        /* Welcome Modal Styles */
+        .welcome-modal {
+            display: none;
+            position: fixed;
+            z-index: 3000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        .welcome-modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .welcome-content {
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+            width: 90%;
+            max-width: 600px;
+            padding: 32px;
+            animation: slideUp 0.3s ease-out;
+            text-align: center;
+        }
+
+        .welcome-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+
+        .welcome-content h1 {
+            font-size: 28px;
+            font-weight: 600;
+            color: #24292f;
+            margin-bottom: 16px;
+        }
+
+        .welcome-content p {
+            font-size: 16px;
+            color: #57606a;
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+
+        .welcome-required {
+            background-color: #fff8c5;
+            border: 1px solid #d4a72c;
+            border-radius: 6px;
+            padding: 16px;
+            margin: 24px 0;
+            text-align: left;
+        }
+
+        .welcome-required strong {
+            color: #7d4e00;
+            font-size: 14px;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .welcome-required p {
+            color: #7d4e00;
+            font-size: 14px;
+            margin: 0;
+        }
+
+        .welcome-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 24px;
+        }
+
+        .btn-large {
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .btn-large.primary {
+            background-color: #0969da;
+            color: #ffffff;
+        }
+
+        .btn-large.primary:hover {
+            background-color: #0860ca;
+        }
+
+        /* Settings Modal Tabs */
+        .settings-tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid #d0d7de;
+            margin: -16px -20px 20px -20px;
+            padding: 0 20px;
+        }
+
+        .settings-tab {
+            padding: 12px 16px;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: #57606a;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .settings-tab:hover {
+            color: #24292f;
+            background-color: #f6f8fa;
+        }
+
+        .settings-tab.active {
+            color: #24292f;
+            border-bottom-color: #fd8c73;
+        }
+
+        .settings-tab-content {
+            display: none;
+        }
+
+        .settings-tab-content.active {
+            display: block;
+        }
+
+        .token-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .token-status.valid {
+            background-color: #dafbe1;
+            color: #1a7f37;
+        }
+
+        .token-status.invalid {
+            background-color: #ffebe9;
+            color: #cf222e;
+        }
+
+        .token-status.missing {
+            background-color: #fff8c5;
+            color: #7d4e00;
+        }
+
+        .token-input-wrapper {
+            position: relative;
+            margin-bottom: 16px;
+        }
+
+        .token-input-wrapper input {
+            width: 100%;
+            padding-right: 80px;
+        }
+
+        .token-toggle {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #57606a;
+            cursor: pointer;
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+
+        .token-toggle:hover {
+            color: #24292f;
+        }
+
+        .token-info {
+            background-color: #ddf4ff;
+            border: 1px solid #54aeff;
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .token-info h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #0969da;
+            margin: 0 0 8px 0;
+        }
+
+        .token-info p {
+            font-size: 13px;
+            color: #0969da;
+            margin: 0 0 12px 0;
+            line-height: 1.5;
+        }
+
+        .token-info ul {
+            margin: 0 0 12px 20px;
+            padding: 0;
+            font-size: 13px;
+            color: #0969da;
+        }
+
+        .token-info li {
+            margin-bottom: 4px;
+        }
+
+        .token-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .btn-create-token {
+            flex: 1;
+            padding: 8px 16px;
+            background-color: #1a7f37;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .btn-create-token:hover {
+            background-color: #1a7f37;
+            opacity: 0.9;
+        }
+
+        .btn-test-token {
+            padding: 8px 16px;
+            background-color: #f6f8fa;
+            color: #24292f;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .btn-test-token:hover {
+            background-color: #eaeef2;
+        }
     </style>
 </head>
 <body>
@@ -1284,20 +1551,13 @@
                 </div>
 
                 <div class="header-controls">
+                    <span id="tokenStatus" class="token-status missing">⚠️ No Token</span>
                     <button id="loadBtn">Reload PRs</button>
-                    <button id="toggleToken">Token</button>
-                    <button id="editLabelsBtn">Edit Labels</button>
-                    <button id="querySettingsBtn">Settings</button>
+                    <button id="settingsBtn">⚙️ Settings</button>
                 </div>
             </div>
 
             <div class="header-bottom">
-                <div class="controls">
-                    <div id="tokenContainer">
-                        <input type="text" id="tokenInput" placeholder="GitHub Token (optional for private repos)">
-                    </div>
-                </div>
-
                 <div class="status-bar">
                     <div class="last-updated">
                         <span>Last updated:</span>
@@ -1306,10 +1566,6 @@
                     <div class="pr-count">
                         <span>Total PRs:</span>
                         <span id="totalPRCount">0</span>
-                    </div>
-                    <div class="auto-refresh-toggle">
-                        <input type="checkbox" id="autoRefresh" checked>
-                        <label for="autoRefresh">Auto-refresh every 5 minutes</label>
                     </div>
                     <div class="flagged-filter">
                         <input type="checkbox" id="showOnlyFlagged">
@@ -1337,16 +1593,123 @@
         <div id="prList" class="loading">Click "Load PRs" to fetch your pull requests</div>
     </div>
 
-    <!-- Label Editor Modal -->
-    <div id="labelEditorModal" class="modal">
+    <!-- Welcome Modal -->
+    <div id="welcomeModal" class="welcome-modal">
+        <div class="welcome-content">
+            <div class="welcome-icon">👋</div>
+            <h1>Welcome to GitHub PR Dashboard</h1>
+            <p>Manage all your pull requests across repositories in one beautiful kanban board.</p>
+
+            <div class="welcome-required">
+                <strong>⚠️ GitHub Token Required</strong>
+                <p>This app requires a GitHub Personal Access Token to function. The default queries use <code>@me</code> which requires authentication.</p>
+            </div>
+
+            <p style="font-size: 14px; color: #57606a;">Your token is stored locally in your browser and is only used to communicate with GitHub's API.</p>
+
+            <div class="welcome-actions">
+                <button class="btn-large primary" id="welcomeSetupBtn">Set Up Token</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Unified Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Settings</h2>
+                <button class="modal-close" id="closeSettingsModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-tabs">
+                    <button class="settings-tab active" data-tab="token">🔑 Token</button>
+                    <button class="settings-tab" data-tab="queries">🔍 Queries</button>
+                    <button class="settings-tab" data-tab="columns">📋 Columns</button>
+                    <button class="settings-tab" data-tab="preferences">⚙️ Preferences</button>
+                </div>
+
+                <!-- Token Tab -->
+                <div id="tokenTab" class="settings-tab-content active">
+                    <div class="token-info">
+                        <h3>GitHub Personal Access Token</h3>
+                        <p><strong>Required:</strong> This app needs a token to fetch your pull requests using <code>@me</code> queries.</p>
+                        <p><strong>Required Permissions:</strong></p>
+                        <ul>
+                            <li><code>public_repo</code> - Access public repositories</li>
+                            <li><code>repo</code> - Access private repositories (optional)</li>
+                        </ul>
+                        <p style="margin: 0;">Your token is stored locally and never sent anywhere except GitHub's API.</p>
+                    </div>
+
+                    <div class="token-input-wrapper">
+                        <input type="password" id="tokenInput" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+                        <button class="token-toggle" id="tokenToggle">Show</button>
+                    </div>
+
+                    <div class="token-actions">
+                        <a href="https://github.com/settings/tokens/new?description=GitHub%20PR%20Dashboard&scopes=public_repo,repo"
+                           target="_blank"
+                           class="btn-create-token">
+                            Create Token on GitHub
+                        </a>
+                        <button class="btn-test-token" id="testTokenBtn">Test Token</button>
+                    </div>
+                </div>
+
+                <!-- Queries Tab -->
+                <div id="queriesTab" class="settings-tab-content">
+                    <div id="queryList" class="query-list"></div>
+                    <button id="addQueryBtn" class="add-label-btn">+ Add New Query</button>
+                    <div class="modal-note">
+                        <strong>Note:</strong> Use GitHub search syntax. Disabled queries will be skipped.
+                        Use <code>@me</code> for yourself, or specify usernames like <code>author:username</code>.
+                        You can also add additional filters like <code>org:myorg</code> or <code>repo:owner/repo</code>.
+                        <br><br>
+                        <strong>Examples:</strong>
+                        <ul style="margin: 8px 0 0 20px; padding: 0;">
+                            <li><code>author:@me</code> - PRs you authored</li>
+                            <li><code>assignee:@me</code> - PRs assigned to you</li>
+                            <li><code>review-requested:@me</code> - PRs requesting your review</li>
+                            <li><code>reviewed-by:@me</code> - PRs you've reviewed</li>
+                            <li><code>author:username org:myorg</code> - PRs by user in specific org</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Columns Tab -->
+                <div id="columnsTab" class="settings-tab-content">
+                    <div id="labelList" class="label-list"></div>
+                    <button id="addLabelBtn" class="add-label-btn">+ Add New Column</button>
+                    <div class="modal-note">
+                        Note: "Unlabeled" cannot be deleted or reordered. PRs in deleted columns will move to "Unlabeled".
+                    </div>
+                </div>
+
+                <!-- Preferences Tab -->
+                <div id="preferencesTab" class="settings-tab-content">
+                    <div class="auto-refresh-toggle" style="padding: 12px; background-color: #f6f8fa; border-radius: 6px;">
+                        <input type="checkbox" id="autoRefreshSetting" checked>
+                        <label for="autoRefreshSetting">Auto-refresh every 5 minutes</label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelSettingsBtn" class="btn-secondary">Cancel</button>
+                <button id="saveSettingsBtn" class="btn-primary">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Label Editor Modal (kept for backwards compatibility, but hidden) -->
+    <div id="labelEditorModal" class="modal" style="display: none;">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Manage Kanban Columns</h2>
                 <button class="modal-close" id="closeModal">&times;</button>
             </div>
             <div class="modal-body">
-                <div id="labelList" class="label-list"></div>
-                <button id="addLabelBtn" class="add-label-btn">+ Add New Label</button>
+                <div id="labelListOld" class="label-list"></div>
+                <button id="addLabelBtnOld" class="add-label-btn">+ Add New Label</button>
                 <div class="modal-note">
                     Note: "Unlabeled" cannot be deleted or reordered. PRs in deleted columns will move to "Unlabeled".
                 </div>
@@ -1381,38 +1744,7 @@
     <!-- Global tooltip for PR info -->
     <div id="globalPRTooltip" class="pr-tooltip"></div>
 
-    <!-- Query Settings Modal -->
-    <div id="querySettingsModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Manage Queries</h2>
-                <button class="modal-close" id="closeQuerySettingsModal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div id="queryList" class="query-list"></div>
-                <button id="addQueryBtn" class="add-label-btn">+ Add New Query</button>
-                <div class="modal-note">
-                    <strong>Note:</strong> Use GitHub search syntax. Disabled queries will be skipped.
-                    Use <code>@me</code> for yourself, or specify usernames like <code>author:username</code>.
-                    You can also add additional filters like <code>org:myorg</code> or <code>repo:owner/repo</code>.
-                    <br><br>
-                    <strong>Examples:</strong>
-                    <ul style="margin: 8px 0 0 20px; padding: 0;">
-                        <li><code>author:@me</code> - PRs you authored</li>
-                        <li><code>assignee:@me</code> - PRs assigned to you</li>
-                        <li><code>review-requested:@me</code> - PRs requesting your review</li>
-                        <li><code>reviewed-by:@me</code> - PRs you've reviewed</li>
-                        <li><code>author:username org:myorg</code> - PRs by user in specific org</li>
-                    </ul>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button id="resetQuerySettingsBtn" class="btn-secondary">Reset to Defaults</button>
-                <button id="cancelQuerySettingsBtn" class="btn-secondary">Cancel</button>
-                <button id="saveQuerySettingsBtn" class="btn-primary">Save Settings</button>
-            </div>
-        </div>
-    </div>
+
 
     <script>
         const DEFAULT_LABELS = [
@@ -1535,6 +1867,10 @@
         let currentRepoFilter = ''; // Track current repository filter
         let currentQueryFilter = ''; // Track current query filter
         let currentUser = null; // Cache current user login
+        let tokenValid = false; // Track if token is valid
+        let currentSettingsTab = 'token'; // Track current settings tab
+        let tempLabels = []; // Temporary labels for editing
+        let tempQueries = []; // Temporary queries for editing
 
         // Load labels from localStorage
         function getLabels() {
@@ -1598,7 +1934,7 @@
 
         // Update PR branch with latest from base
         window.updatePRBranch = async function(prNumber, repoUrl) {
-            const token = document.getElementById('tokenInput').value;
+            const token = getStoredToken();
             if (!token) {
                 showNotification('GitHub token is required', 'error');
                 return;
@@ -1665,7 +2001,7 @@
             const button = document.getElementById('updateAllBtn');
             if (!button) return;
 
-            const token = document.getElementById('tokenInput').value;
+            const token = getStoredToken();
             if (!token || allPRs.length === 0) {
                 button.style.display = 'none';
                 return;
@@ -1704,7 +2040,7 @@
 
         // Update all branches that need updating
         window.updateAllBranches = async function() {
-            const token = document.getElementById('tokenInput').value;
+            const token = getStoredToken();
             if (!token) {
                 showNotification('GitHub token is required to update branches', 'error');
                 return;
@@ -2142,16 +2478,102 @@
             return null;
         }
 
+        // Token validation and status functions
+        async function validateToken(token) {
+            if (!token || token.trim() === '') {
+                return { valid: false, error: 'No token provided' };
+            }
+
+            try {
+                const response = await fetch('https://api.github.com/user', {
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+
+                if (response.ok) {
+                    const userData = await response.json();
+                    currentUser = userData.login;
+                    return { valid: true, user: userData };
+                } else if (response.status === 401) {
+                    return { valid: false, error: 'Invalid token or token expired' };
+                } else if (response.status === 403) {
+                    return { valid: false, error: 'Token lacks required permissions' };
+                } else {
+                    return { valid: false, error: `HTTP ${response.status}: ${response.statusText}` };
+                }
+            } catch (error) {
+                return { valid: false, error: `Network error: ${error.message}` };
+            }
+        }
+
+        function updateTokenStatus(valid, message = '') {
+            const statusEl = document.getElementById('tokenStatus');
+            if (!statusEl) return;
+
+            if (valid) {
+                statusEl.className = 'token-status valid';
+                statusEl.textContent = '✅ Token Valid';
+                tokenValid = true;
+            } else if (message) {
+                statusEl.className = 'token-status invalid';
+                statusEl.textContent = '❌ Invalid Token';
+                tokenValid = false;
+            } else {
+                statusEl.className = 'token-status missing';
+                statusEl.textContent = '⚠️ No Token';
+                tokenValid = false;
+            }
+        }
+
+        function getStoredToken() {
+            return localStorage.getItem('github_token') || '';
+        }
+
+        function saveToken(token) {
+            if (token && token.trim()) {
+                localStorage.setItem('github_token', token.trim());
+            } else {
+                localStorage.removeItem('github_token');
+            }
+        }
+
+        // Welcome modal functions
+        function showWelcomeModal() {
+            document.getElementById('welcomeModal').classList.add('show');
+        }
+
+        function hideWelcomeModal() {
+            document.getElementById('welcomeModal').classList.remove('show');
+        }
+
+        function checkFirstTimeUser() {
+            const token = getStoredToken();
+            if (!token) {
+                showWelcomeModal();
+                return true;
+            }
+            return false;
+        }
+
         // Fetch PRs from GitHub
         async function fetchPRs(isAutoRefresh = false) {
-            const token = document.getElementById('tokenInput').value.trim();
-            const headers = {
-                'Accept': 'application/vnd.github.v3+json'
-            };
+            const token = getStoredToken();
 
-            if (token) {
-                headers['Authorization'] = `token ${token}`;
+            // Check if token exists
+            if (!token) {
+                const errorMsg = '⚠️ <strong>GitHub Token Required</strong><br>This app requires a GitHub Personal Access Token to function. Please add your token in Settings.';
+                document.getElementById('error').innerHTML = `<div class="error">${errorMsg}</div>`;
+                document.getElementById('prList').innerHTML = '';
+                updateTokenStatus(false);
+                return;
             }
+
+            const headers = {
+                'Accept': 'application/vnd.github.v3+json',
+                'Authorization': `token ${token}`
+            };
 
             try {
                 // Load and display cached data immediately if not auto-refresh
@@ -2250,7 +2672,24 @@
                     document.getElementById('error').innerHTML = '';
                 }
             } catch (error) {
-                document.getElementById('error').innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                let errorMessage = 'Error: ';
+
+                // Provide helpful error messages
+                if (error.message.includes('rate limit')) {
+                    errorMessage = '🚫 <strong>API Rate Limit Exceeded</strong><br>Please wait a few minutes before trying again. With a valid token, you get 5,000 requests per hour.';
+                } else if (error.message.includes('401') || error.message.includes('Bad credentials')) {
+                    errorMessage = '❌ <strong>Invalid Token</strong><br>Your GitHub token is invalid or has expired. Please update your token in Settings.<br><br>Required permissions: <code>public_repo</code> or <code>repo</code>';
+                    updateTokenStatus(false, 'invalid');
+                } else if (error.message.includes('403')) {
+                    errorMessage = '🔒 <strong>Permission Denied</strong><br>Your token lacks the required permissions.<br><br>Required scopes: <code>public_repo</code> (for public repos) or <code>repo</code> (for private repos)';
+                    updateTokenStatus(false, 'invalid');
+                } else if (error.message.includes('No enabled queries')) {
+                    errorMessage = '⚠️ <strong>No Queries Configured</strong><br>Please configure at least one query in Settings → Queries.';
+                } else {
+                    errorMessage += error.message;
+                }
+
+                document.getElementById('error').innerHTML = `<div class="error">${errorMessage}</div>`;
                 if (!isAutoRefresh && allPRs.length === 0) {
                     document.getElementById('prList').innerHTML = '';
                 }
@@ -2841,9 +3280,9 @@
 
         // Setup auto-refresh
         function setupAutoRefresh() {
-            const autoRefreshCheckbox = document.getElementById('autoRefresh');
+            const autoRefreshCheckbox = document.getElementById('autoRefreshSetting');
 
-            if (autoRefreshCheckbox.checked) {
+            if (autoRefreshCheckbox && autoRefreshCheckbox.checked) {
                 // Clear existing timer if any
                 if (autoRefreshTimer) {
                     clearInterval(autoRefreshTimer);
@@ -2862,23 +3301,137 @@
             }
         }
 
-        // Label Editor Modal Functions
-        let tempLabels = [];
+        // Unified Settings Modal Functions
         let draggedLabelIndex = null;
         let labelScrollInterval = null;
-        let tempQueries = []; // Temporary array for editing queries
 
-        // Query Settings Modal Functions
-        function openQuerySettings() {
-            tempQueries = JSON.parse(JSON.stringify(getQuerySettings())); // Deep copy
+        function openSettings(tab = 'token') {
+            currentSettingsTab = tab;
+
+            // Load current values into temp variables
+            tempLabels = JSON.parse(JSON.stringify(LABELS));
+            tempQueries = JSON.parse(JSON.stringify(getQuerySettings()));
+
+            // Populate token input
+            document.getElementById('tokenInput').value = getStoredToken();
+
+            // Populate auto-refresh setting from localStorage
+            const autoRefreshEnabled = localStorage.getItem('autoRefreshEnabled');
+            document.getElementById('autoRefreshSetting').checked = autoRefreshEnabled !== 'false';
+
+            // Render editors
             renderQueryEditor();
-            document.getElementById('querySettingsModal').classList.add('show');
+            renderLabelEditor();
+
+            // Show the modal and switch to the requested tab
+            document.getElementById('settingsModal').classList.add('show');
+            switchSettingsTab(tab);
         }
 
-        function closeQuerySettings() {
-            document.getElementById('querySettingsModal').classList.remove('show');
+        function closeSettings() {
+            document.getElementById('settingsModal').classList.remove('show');
         }
 
+        function switchSettingsTab(tabName) {
+            currentSettingsTab = tabName;
+
+            // Update tab buttons
+            document.querySelectorAll('.settings-tab').forEach(tab => {
+                if (tab.dataset.tab === tabName) {
+                    tab.classList.add('active');
+                } else {
+                    tab.classList.remove('active');
+                }
+            });
+
+            // Update tab content
+            document.querySelectorAll('.settings-tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+
+            const tabMap = {
+                'token': 'tokenTab',
+                'queries': 'queriesTab',
+                'columns': 'columnsTab',
+                'preferences': 'preferencesTab'
+            };
+
+            const contentId = tabMap[tabName];
+            if (contentId) {
+                document.getElementById(contentId).classList.add('active');
+            }
+        }
+
+        async function testToken() {
+            const token = document.getElementById('tokenInput').value.trim();
+            const button = document.getElementById('testTokenBtn');
+
+            if (!token) {
+                showNotification('Please enter a token first', 'error');
+                return;
+            }
+
+            button.disabled = true;
+            button.textContent = 'Testing...';
+
+            const result = await validateToken(token);
+
+            button.disabled = false;
+            button.textContent = 'Test Token';
+
+            if (result.valid) {
+                showNotification(`✅ Token is valid! Authenticated as: ${result.user.login}`, 'success');
+                updateTokenStatus(true);
+            } else {
+                showNotification(`❌ Token validation failed: ${result.error}`, 'error');
+                updateTokenStatus(false, 'invalid');
+            }
+        }
+
+        async function saveSettings() {
+            // Save token
+            const token = document.getElementById('tokenInput').value.trim();
+            saveToken(token);
+
+            // Validate token if provided
+            if (token) {
+                const result = await validateToken(token);
+                updateTokenStatus(result.valid, result.valid ? '' : 'invalid');
+
+                if (!result.valid) {
+                    showNotification(`Token saved but validation failed: ${result.error}`, 'info');
+                }
+            } else {
+                updateTokenStatus(false);
+            }
+
+            // Save queries
+            const hasEnabledQuery = tempQueries.some(q => q.enabled && q.query.trim());
+            if (!hasEnabledQuery) {
+                showNotification('Please enable at least one query with a valid query string.', 'error');
+                return;
+            }
+            saveQuerySettings(tempQueries);
+
+            // Save labels
+            LABELS = [...tempLabels];
+            saveLabelsList(LABELS);
+
+            // Save preferences
+            const autoRefreshEnabled = document.getElementById('autoRefreshSetting').checked;
+            localStorage.setItem('autoRefreshEnabled', autoRefreshEnabled);
+            setupAutoRefresh();
+
+            closeSettings();
+            showNotification('Settings saved successfully!', 'success');
+
+            // Re-render if we have PRs
+            if (allPRs.length > 0) {
+                renderPRs();
+            }
+        }
+
+        // Query Settings Functions (used by unified modal)
         function renderQueryEditor() {
             const queryList = document.getElementById('queryList');
 
@@ -2893,13 +3446,13 @@
                         <div class="query-inputs">
                             <input type="text"
                                    class="query-name-input"
-                                   value="${query.name}"
+                                   value="${escapeHtml(query.name)}"
                                    placeholder="Query name"
                                    data-index="${index}"
                                    data-field="name">
                             <input type="text"
                                    class="query-input"
-                                   value="${query.query}"
+                                   value="${escapeHtml(query.query)}"
                                    placeholder="e.g., author:@me"
                                    data-index="${index}"
                                    data-field="query">
@@ -2949,19 +3502,6 @@
         function deleteQuery(index) {
             tempQueries.splice(index, 1);
             renderQueryEditor();
-        }
-
-        function saveQuerySettingsFromModal() {
-            // Validate that at least one query is enabled
-            const hasEnabledQuery = tempQueries.some(q => q.enabled && q.query.trim());
-            if (!hasEnabledQuery) {
-                showNotification('Please enable at least one query with a valid query string.', 'error');
-                return;
-            }
-
-            saveQuerySettings(tempQueries);
-            closeQuerySettings();
-            showNotification('Query settings saved! Reload PRs to apply changes.', 'success');
         }
 
         function resetQuerySettingsToDefaults() {
@@ -3235,21 +3775,51 @@
         document.getElementById('loadBtn').addEventListener('click', () => fetchPRs(false));
         document.getElementById('updateAllBtn').addEventListener('click', updateAllBranches);
 
-        document.getElementById('toggleToken').addEventListener('click', () => {
-            const tokenContainer = document.getElementById('tokenContainer');
-            const toggleBtn = document.getElementById('toggleToken');
-
-            if (tokenContainer.classList.contains('visible')) {
-                tokenContainer.classList.remove('visible');
-                toggleBtn.textContent = 'View/Add GitHub Token';
-            } else {
-                tokenContainer.classList.add('visible');
-                toggleBtn.textContent = 'Hide Token';
-                document.getElementById('tokenInput').focus();
-            }
+        // Welcome modal event listeners
+        document.getElementById('welcomeSetupBtn').addEventListener('click', () => {
+            hideWelcomeModal();
+            openSettings('token');
         });
 
-        document.getElementById('autoRefresh').addEventListener('change', setupAutoRefresh);
+        // Unified settings modal event listeners
+        document.getElementById('settingsBtn').addEventListener('click', () => openSettings('token'));
+        document.getElementById('closeSettingsModal').addEventListener('click', closeSettings);
+        document.getElementById('cancelSettingsBtn').addEventListener('click', closeSettings);
+        document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
+
+        // Settings tab switching
+        document.querySelectorAll('.settings-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                switchSettingsTab(tab.dataset.tab);
+            });
+        });
+
+        // Token tab event listeners
+        document.getElementById('tokenToggle').addEventListener('click', () => {
+            const input = document.getElementById('tokenInput');
+            const button = document.getElementById('tokenToggle');
+            if (input.type === 'password') {
+                input.type = 'text';
+                button.textContent = 'Hide';
+            } else {
+                input.type = 'password';
+                button.textContent = 'Show';
+            }
+        });
+        document.getElementById('testTokenBtn').addEventListener('click', testToken);
+
+        // Queries tab event listeners
+        document.getElementById('addQueryBtn').addEventListener('click', addNewQuery);
+
+        // Columns tab event listeners
+        document.getElementById('addLabelBtn').addEventListener('click', addNewLabel);
+
+        // Close settings modal when clicking outside
+        document.getElementById('settingsModal').addEventListener('click', (e) => {
+            if (e.target.id === 'settingsModal') {
+                closeSettings();
+            }
+        });
 
         // Repository filter event listener
         document.getElementById('repoFilter').addEventListener('change', (e) => {
@@ -3268,35 +3838,6 @@
             renderPRs();
         });
 
-        // Query settings modal event listeners
-        document.getElementById('querySettingsBtn').addEventListener('click', openQuerySettings);
-        document.getElementById('closeQuerySettingsModal').addEventListener('click', closeQuerySettings);
-        document.getElementById('cancelQuerySettingsBtn').addEventListener('click', closeQuerySettings);
-        document.getElementById('saveQuerySettingsBtn').addEventListener('click', saveQuerySettingsFromModal);
-        document.getElementById('resetQuerySettingsBtn').addEventListener('click', resetQuerySettingsToDefaults);
-        document.getElementById('addQueryBtn').addEventListener('click', addNewQuery);
-
-        // Close query settings modal when clicking outside
-        document.getElementById('querySettingsModal').addEventListener('click', (e) => {
-            if (e.target.id === 'querySettingsModal') {
-                closeQuerySettings();
-            }
-        });
-
-        // Label editor modal event listeners
-        document.getElementById('editLabelsBtn').addEventListener('click', openLabelEditor);
-        document.getElementById('closeModal').addEventListener('click', closeLabelEditor);
-        document.getElementById('cancelLabelsBtn').addEventListener('click', closeLabelEditor);
-        document.getElementById('saveLabelsBtn').addEventListener('click', saveLabels);
-        document.getElementById('addLabelBtn').addEventListener('click', addNewLabel);
-
-        // Close modal when clicking outside
-        document.getElementById('labelEditorModal').addEventListener('click', (e) => {
-            if (e.target.id === 'labelEditorModal') {
-                closeLabelEditor();
-            }
-        });
-
         // Note editor modal event listeners
         document.getElementById('closeNoteModal').addEventListener('click', closeNoteEditor);
         document.getElementById('cancelNoteBtn').addEventListener('click', closeNoteEditor);
@@ -3309,27 +3850,41 @@
             }
         });
 
-        // Load token from localStorage if available
-        const savedToken = localStorage.getItem('github_token');
-        if (savedToken) {
-            document.getElementById('tokenInput').value = savedToken;
-            // Don't show token by default even if saved
-            // document.getElementById('tokenContainer').classList.add('visible');
-            // document.getElementById('toggleToken').textContent = 'Hide Token';
-        }
-
-        // Save token to localStorage when changed
-        document.getElementById('tokenInput').addEventListener('change', (e) => {
-            const token = e.target.value.trim();
-            if (token) {
-                localStorage.setItem('github_token', token);
-            } else {
-                localStorage.removeItem('github_token');
+        // Initialize token status on page load
+        async function initializeApp() {
+            // Initialize auto-refresh checkbox from localStorage
+            const autoRefreshEnabled = localStorage.getItem('autoRefreshEnabled');
+            const autoRefreshCheckbox = document.getElementById('autoRefreshSetting');
+            if (autoRefreshCheckbox) {
+                autoRefreshCheckbox.checked = autoRefreshEnabled !== 'false'; // Default to true
             }
-            // Reset cached user when token changes
-            currentUser = null;
-            updateButtonVisibility();
-        });
+
+            const savedToken = getStoredToken();
+
+            if (savedToken) {
+                // Validate the saved token
+                const result = await validateToken(savedToken);
+                updateTokenStatus(result.valid, result.valid ? '' : 'invalid');
+
+                if (result.valid) {
+                    // Token is valid, load PRs
+                    fetchPRs(false);
+                } else {
+                    // Token is invalid, show welcome modal
+                    showWelcomeModal();
+                    document.getElementById('prList').innerHTML = '<div class="loading">Please configure your GitHub token in Settings</div>';
+                }
+            } else {
+                // No token, show welcome modal
+                updateTokenStatus(false);
+                checkFirstTimeUser();
+                document.getElementById('prList').innerHTML = '<div class="loading">Please configure your GitHub token in Settings</div>';
+            }
+
+            setupAutoRefresh();
+            setupNoteTooltips();
+            setupPRTooltips();
+        }
 
         // Global tooltip handling
         function setupNoteTooltips() {
@@ -3504,10 +4059,7 @@
 
         // Auto-load PRs on page load
         window.addEventListener('DOMContentLoaded', () => {
-            fetchPRs(false);
-            setupAutoRefresh();
-            setupNoteTooltips();
-            setupPRTooltips();
+            initializeApp();
         });
     </script>
 </body>
