@@ -85,7 +85,7 @@
 
         #prList {
             flex: 1;
-            overflow: hidden;
+            overflow: auto;
             position: relative;
         }
 
@@ -347,13 +347,16 @@
             text-align: center;
             color: #57606a;
             font-size: 16px;
+        }
+
+        .loading.with-spinner {
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 16px;
         }
 
-        .loading::before {
+        .loading.with-spinner::before {
             content: '';
             width: 40px;
             height: 40px;
@@ -2812,7 +2815,7 @@
                         document.getElementById('error').innerHTML = '<div style="color: #0969da; font-size: 12px; margin-top: 4px;">Refreshing...</div>';
                     } else {
                         document.getElementById('error').innerHTML = '';
-                        document.getElementById('prList').innerHTML = '<div class="loading">Loading pull requests...</div>';
+                        document.getElementById('prList').innerHTML = '<div class="loading with-spinner">Loading pull requests...</div>';
                     }
                 }
 
