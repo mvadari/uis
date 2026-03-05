@@ -1986,6 +1986,7 @@
         const SORT_KEY = 'github_pr_sort';
         const CUSTOM_ORDER_KEY = 'github_pr_custom_order';
         const MINIMIZED_KEY = 'github_pr_minimized';
+        const MANUALLY_TOGGLED_KEY = 'github_pr_manually_toggled';
         const CACHE_KEY = 'github_pr_cache';
         const CACHE_TIMESTAMP_KEY = 'github_pr_cache_timestamp';
         const NOTES_KEY = 'github_pr_notes';
@@ -2088,6 +2089,8 @@
         let lastUpdateTime = null;
         let columnSortModes = {}; // Track sort mode per column
         let minimizedColumns = new Set(); // Track minimized columns
+        let manuallyToggledColumns = new Set(); // Track which columns user manually toggled
+        let shouldApplyAutoCollapse = false; // Flag to trigger auto-collapse on next render
         let currentRepoFilter = ''; // Track current repository filter
         let currentQueryFilter = ''; // Track current query filter
         let currentUser = null; // Cache current user login
@@ -2438,6 +2441,17 @@
         // Get minimized columns from localStorage
         function getMinimizedColumns() {
             const stored = localStorage.getItem(MINIMIZED_KEY);
+            return stored ? new Set(JSON.parse(stored)) : new Set();
+        }
+
+        // Save manually toggled columns to localStorage
+        function saveManuallyToggledColumns() {
+            localStorage.setItem(MANUALLY_TOGGLED_KEY, JSON.stringify([...manuallyToggledColumns]));
+        }
+
+        // Get manually toggled columns from localStorage
+        function getManuallyToggledColumns() {
+            const stored = localStorage.getItem(MANUALLY_TOGGLED_KEY);
             return stored ? new Set(JSON.parse(stored)) : new Set();
         }
 
@@ -3138,9 +3152,9 @@
                 return;
             }
 
-            // Load sort modes and minimized state
+            // Load sort modes (but not minimized state - that's managed in memory)
             columnSortModes = getSortModes();
-            minimizedColumns = getMinimizedColumns();
+            // Don't reload minimizedColumns or manuallyToggledColumns - they persist in memory
 
             // Filter PRs by repository if a filter is active
             let filteredPRs = allPRs;
@@ -3194,6 +3208,25 @@
                 const mode = columnSortModes[label.id] || 'updated';
                 columns[label.id] = sortPRs(columns[label.id], mode, label.id);
             });
+
+            // Auto-collapse/expand columns based on content when filters change
+            if (shouldApplyAutoCollapse) {
+                LABELS.forEach(label => {
+                    const count = columns[label.id].length;
+                    const wasManuallyToggled = manuallyToggledColumns.has(label.id);
+
+                    if (!wasManuallyToggled) {
+                        // Auto-collapse if empty, auto-expand if has items
+                        if (count === 0) {
+                            minimizedColumns.add(label.id);
+                        } else {
+                            minimizedColumns.delete(label.id);
+                        }
+                    }
+                    // If manually toggled, respect the user's choice completely
+                });
+                shouldApplyAutoCollapse = false; // Reset flag
+            }
 
             // Generate Kanban HTML
             const kanbanHTML = LABELS.map(label => {
@@ -3297,6 +3330,9 @@
                     const column = headerTop.closest('.kanban-column');
                     const label = column.dataset.label;
 
+                    // Mark this column as manually toggled
+                    manuallyToggledColumns.add(label);
+
                     if (column.classList.contains('minimized')) {
                         column.classList.remove('minimized');
                         minimizedColumns.delete(label);
@@ -3306,6 +3342,7 @@
                     }
 
                     saveMinimizedColumns();
+                    saveManuallyToggledColumns();
                 });
             });
 
@@ -3462,6 +3499,13 @@
                             const newLabel = column.dataset.label;
                             const sortMode = columnSortModes[newLabel] || 'updated';
 
+                            // Auto-expand destination column if not manually toggled
+                            if (!manuallyToggledColumns.has(newLabel)) {
+                                minimizedColumns.delete(newLabel);
+                                column.classList.remove('minimized');
+                                saveMinimizedColumns();
+                            }
+
                             // Get the content element
                             const contentElement = element.classList.contains('kanban-content')
                                 ? element
@@ -3578,7 +3622,8 @@
                 prNotes: JSON.parse(localStorage.getItem('pr_notes') || '{}'),
                 prFlags: JSON.parse(localStorage.getItem('pr_flags') || '{}'),
                 columnSortModes: JSON.parse(localStorage.getItem('column_sort_modes') || '{}'),
-                customOrders: JSON.parse(localStorage.getItem('custom_orders') || '{}')
+                customOrders: JSON.parse(localStorage.getItem('custom_orders') || '{}'),
+                manuallyToggledColumns: JSON.parse(localStorage.getItem(MANUALLY_TOGGLED_KEY) || '[]')
             };
 
             const dataStr = JSON.stringify(settings, null, 2);
@@ -3648,6 +3693,9 @@
                     }
                     if (settings.customOrders) {
                         localStorage.setItem('custom_orders', JSON.stringify(settings.customOrders));
+                    }
+                    if (settings.manuallyToggledColumns) {
+                        localStorage.setItem(MANUALLY_TOGGLED_KEY, JSON.stringify(settings.manuallyToggledColumns));
                     }
 
                     showNotification('Settings imported successfully! Reloading page...', 'success');
@@ -4159,13 +4207,23 @@
 
         // Repository filter event listener
         document.getElementById('repoFilter').addEventListener('change', (e) => {
+            const oldFilter = currentRepoFilter;
             currentRepoFilter = e.target.value;
+            // Trigger auto-collapse when filter changes (but keep manual toggles)
+            if (oldFilter !== currentRepoFilter) {
+                shouldApplyAutoCollapse = true;
+            }
             renderPRs();
         });
 
         // Query filter event listener
         document.getElementById('queryFilter').addEventListener('change', (e) => {
+            const oldFilter = currentQueryFilter;
             currentQueryFilter = e.target.value;
+            // Trigger auto-collapse when filter changes (but keep manual toggles)
+            if (oldFilter !== currentQueryFilter) {
+                shouldApplyAutoCollapse = true;
+            }
             renderPRs();
         });
 
@@ -4246,6 +4304,10 @@
             if (autoRefreshCheckbox) {
                 autoRefreshCheckbox.checked = autoRefreshEnabled !== 'false'; // Default to true
             }
+
+            // Initialize column state from localStorage (only once, then managed in memory)
+            minimizedColumns = getMinimizedColumns();
+            manuallyToggledColumns = getManuallyToggledColumns();
 
             const savedToken = getStoredToken();
 
