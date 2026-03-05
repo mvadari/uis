@@ -1,0 +1,364 @@
+/* ============================================
+   SHARED STYLES - Common CSS for all UI tools
+   ============================================ */
+
+/* CSS Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Base Typography & Layout */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+}
+
+/* Container - can be overridden by specific pages */
+.container {
+    width: 100%;
+}
+
+/* Button Styles */
+.btn {
+    background-color: #f6f8fa;
+    color: #1f2328;
+    border: 1px solid #d0d7de;
+    padding: 5px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.2s ease;
+}
+
+.btn:hover {
+    background-color: #f3f4f6;
+    border-color: #1f2328;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background-color: #1f883d;
+    color: #ffffff;
+    border-color: #1f883d;
+}
+
+.btn-primary:hover {
+    background-color: #1a7f37;
+}
+
+.btn-secondary {
+    background-color: #0969da;
+    color: #ffffff;
+    border-color: #0969da;
+}
+
+.btn-secondary:hover {
+    background-color: #0860ca;
+}
+
+.btn-danger {
+    background-color: #d1242f;
+    color: #ffffff;
+    border-color: #d1242f;
+}
+
+.btn-danger:hover {
+    background-color: #b62324;
+}
+
+.btn-small {
+    padding: 3px 10px;
+    font-size: 12px;
+}
+
+/* Form Elements */
+input[type="text"],
+input[type="password"],
+input[type="number"],
+input[type="search"],
+select,
+textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+    background-color: #ffffff;
+    color: #1f2328;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    outline: none;
+    border-color: #0969da;
+    box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.1);
+}
+
+/* Label styles - use .form-label class for block labels to avoid breaking inline layouts */
+.form-label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    font-size: 14px;
+    color: #1f2328;
+}
+
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    animation: fadeIn 0.2s ease;
+}
+
+.modal.active,
+.modal.show {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    animation: slideIn 0.3s ease;
+}
+
+.modal-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #d0d7de;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1f2328;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #656d76;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-close:hover {
+    color: #1f2328;
+}
+
+.modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.modal-footer {
+    padding: 16px 20px;
+    border-top: 1px solid #d0d7de;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+/* Toast/Notification Styles */
+.toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background-color: #1f2328;
+    color: #ffffff;
+    padding: 12px 20px;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 2000;
+    animation: slideInRight 0.3s ease;
+    max-width: 400px;
+}
+
+.toast.success {
+    background-color: #1f883d;
+}
+
+.toast.error {
+    background-color: #d1242f;
+}
+
+.toast.warning {
+    background-color: #bf8700;
+}
+
+.toast.info {
+    background-color: #0969da;
+}
+
+/* Loading Spinner */
+.spinner {
+    border: 3px solid #f3f4f6;
+    border-top: 3px solid #0969da;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    animation: spin 1s linear infinite;
+}
+
+.spinner-large {
+    width: 48px;
+    height: 48px;
+    border-width: 4px;
+}
+
+/* Card Styles */
+.card {
+    background-color: #ffffff;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.card-header {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #1f2328;
+}
+
+/* Badge Styles */
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.5;
+}
+
+.badge-success {
+    background-color: #dafbe1;
+    color: #1a7f37;
+}
+
+.badge-error {
+    background-color: #ffebe9;
+    color: #d1242f;
+}
+
+.badge-warning {
+    background-color: #fff8c5;
+    color: #7d4e00;
+}
+
+.badge-info {
+    background-color: #ddf4ff;
+    color: #0969da;
+}
+
+.badge-neutral {
+    background-color: #f6f8fa;
+    color: #656d76;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(100px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Utility Classes */
+.text-center {
+    text-align: center;
+}
+
+.text-right {
+    text-align: right;
+}
+
+.mt-1 { margin-top: 8px; }
+.mt-2 { margin-top: 16px; }
+.mt-3 { margin-top: 24px; }
+
+.mb-1 { margin-bottom: 8px; }
+.mb-2 { margin-bottom: 16px; }
+.mb-3 { margin-bottom: 24px; }
+
+.p-1 { padding: 8px; }
+.p-2 { padding: 16px; }
+.p-3 { padding: 24px; }
+
+.flex {
+    display: flex;
+}
+
+.flex-column {
+    flex-direction: column;
+}
+
+.gap-1 { gap: 8px; }
+.gap-2 { gap: 16px; }
+.gap-3 { gap: 24px; }
+
+.hidden {
+    display: none !important;
+}
+
