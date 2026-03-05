@@ -1255,6 +1255,64 @@
             color: #0969da;
         }
 
+        /* Context Menu Styles */
+        .context-menu {
+            display: none;
+            position: fixed;
+            background: white;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            box-shadow: 0 8px 24px rgba(140, 149, 159, 0.2);
+            z-index: 10000;
+            min-width: 200px;
+            max-width: 300px;
+            overflow: hidden;
+        }
+
+        .context-menu.show {
+            display: block;
+        }
+
+        .context-menu-header {
+            padding: 8px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #57606a;
+            background-color: #f6f8fa;
+            border-bottom: 1px solid #d0d7de;
+        }
+
+        .context-menu-items {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .context-menu-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #24292f;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background-color 0.1s;
+        }
+
+        .context-menu-item:hover {
+            background-color: #f6f8fa;
+        }
+
+        .context-menu-item.current {
+            background-color: #ddf4ff;
+            color: #0969da;
+            font-weight: 500;
+        }
+
+        .context-menu-item.current::before {
+            content: '✓';
+            font-weight: bold;
+        }
+
         .note-textarea {
             width: 100%;
             min-height: 150px;
@@ -1967,6 +2025,12 @@
 
     <!-- Global tooltip for PR info -->
     <div id="globalPRTooltip" class="pr-tooltip"></div>
+
+    <!-- Context menu for PR items -->
+    <div id="prContextMenu" class="context-menu">
+        <div class="context-menu-header">Move to Column</div>
+        <div id="contextMenuItems" class="context-menu-items"></div>
+    </div>
 
 
 
@@ -3293,6 +3357,9 @@
             // Setup drag and drop
             setupDragAndDrop();
 
+            // Setup context menu
+            setupContextMenu();
+
             // Setup scroll indicator
             setupScrollIndicator();
 
@@ -3553,6 +3620,79 @@
                     return closest;
                 }
             }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+
+        // Setup context menu for PR items
+        function setupContextMenu() {
+            const contextMenu = document.getElementById('prContextMenu');
+            const contextMenuItems = document.getElementById('contextMenuItems');
+            let currentPRId = null;
+
+            // Handle right-click on PR items
+            document.addEventListener('contextmenu', (e) => {
+                const prItem = e.target.closest('.pr-item');
+                if (prItem) {
+                    e.preventDefault();
+                    currentPRId = prItem.dataset.prId;
+
+                    // Get current label for this PR
+                    const currentLabel = getLabels()[currentPRId] || '';
+                    const normalizedCurrentLabel = currentLabel === '' ? 'unlabeled' : currentLabel;
+
+                    // Build menu items
+                    contextMenuItems.innerHTML = LABELS.map(label => {
+                        const isCurrent = label.id === normalizedCurrentLabel;
+                        return `
+                            <div class="context-menu-item ${isCurrent ? 'current' : ''}" data-label="${label.id}">
+                                ${label.name}
+                            </div>
+                        `;
+                    }).join('');
+
+                    // Position the menu
+                    contextMenu.style.left = `${e.pageX}px`;
+                    contextMenu.style.top = `${e.pageY}px`;
+                    contextMenu.classList.add('show');
+                }
+            });
+
+            // Handle menu item clicks
+            contextMenu.addEventListener('click', (e) => {
+                const menuItem = e.target.closest('.context-menu-item');
+                if (menuItem && currentPRId) {
+                    const newLabel = menuItem.dataset.label;
+
+                    // Save the new label
+                    if (newLabel === 'unlabeled') {
+                        saveLabel(currentPRId, '');
+                    } else {
+                        saveLabel(currentPRId, newLabel);
+                    }
+
+                    // Re-render
+                    renderPRs();
+
+                    // Close menu
+                    contextMenu.classList.remove('show');
+                    currentPRId = null;
+                }
+            });
+
+            // Close menu when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!contextMenu.contains(e.target)) {
+                    contextMenu.classList.remove('show');
+                    currentPRId = null;
+                }
+            });
+
+            // Close menu on escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    contextMenu.classList.remove('show');
+                    currentPRId = null;
+                }
+            });
         }
 
         // Setup auto-refresh
