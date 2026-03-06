@@ -3514,6 +3514,11 @@
 
             // Handle right-click on PR items
             document.addEventListener('contextmenu', (e) => {
+                // Don't show context menu if right-clicking on a link
+                if (e.target.closest('a')) {
+                    return;
+                }
+
                 const prItem = e.target.closest('.pr-item');
                 if (prItem) {
                     e.preventDefault();
