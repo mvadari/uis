@@ -1,0 +1,1556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stacked PR Dashboard - rippled</title>
+    <style>
+        :root {
+            /* GitHub Light Mode Colors */
+            --bg-primary: #ffffff;
+            --bg-secondary: #f6f8fa;
+            --bg-tertiary: #eaeef2;
+            --border-color: #d0d7de;
+            --text-primary: #1f2328;
+            --text-secondary: #656d76;
+            --text-muted: #8c959f;
+            --accent-blue: #0969da;
+            --accent-green: #1a7f37;
+            --accent-red: #cf222e;
+            --accent-yellow: #9a6700;
+            --accent-purple: #8250df;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+        }
+
+        /* Top Bar */
+        .top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+        }
+
+        .top-bar-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .repo-badge {
+            background: var(--bg-tertiary);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .filters {
+            display: flex;
+            gap: 8px;
+        }
+
+        .filter-btn {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .filter-btn:hover {
+            border-color: var(--text-muted);
+        }
+
+        .filter-btn.active {
+            background: var(--accent-blue);
+            color: white;
+            border-color: var(--accent-blue);
+        }
+
+        .top-bar-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .refresh-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--accent-blue);
+            font-size: 12px;
+        }
+
+        .spinner-small {
+            width: 14px;
+            height: 14px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .last-updated {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        /* Main Layout */
+        .main-container {
+            display: flex;
+            margin-top: 57px;
+            height: calc(100vh - 57px);
+        }
+
+        /* Stacks List (Left Column) */
+        .stacks-list {
+            width: 380px;
+            min-width: 380px;
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            background: var(--bg-secondary);
+        }
+
+        .stacks-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .show-singles-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 400;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+
+        .show-singles-toggle input {
+            cursor: pointer;
+        }
+
+        .stack-card {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .stack-card:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .stack-card.selected {
+            background: var(--bg-tertiary);
+            border-left: 3px solid var(--accent-blue);
+        }
+
+        .stack-name {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+            color: var(--text-primary);
+        }
+
+        .stack-owner {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .stack-summary {
+            display: flex;
+            gap: 12px;
+            font-size: 12px;
+        }
+
+        .summary-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .summary-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .dot-ready { background: var(--accent-green); }
+        .dot-blocked { background: var(--accent-red); }
+        .dot-pending { background: var(--accent-yellow); }
+        .dot-total { background: var(--text-muted); }
+
+        /* Stack Details (Right Column) */
+        .stack-details {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+        }
+
+        .stack-details-header {
+            margin-bottom: 24px;
+        }
+
+        .stack-details-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .stack-details-meta {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        /* DAG Tree Layout */
+        .stack-tree {
+            position: relative;
+        }
+
+        .tree-node {
+            position: relative;
+            margin-bottom: 8px;
+        }
+
+        .tree-children {
+            margin-left: 16px;
+            padding-left: 12px;
+            border-left: 2px solid var(--border-color);
+            margin-top: 8px;
+        }
+
+        .tree-children:empty {
+            display: none;
+        }
+
+        .pr-node {
+            position: relative;
+            padding: 12px 12px 12px 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .pr-node:hover {
+            border-color: var(--accent-blue);
+        }
+
+        .pr-node.focused {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 2px rgba(9, 105, 218, 0.2);
+        }
+
+        /* Status indicator dot */
+        .pr-node .status-dot {
+            position: absolute;
+            left: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--bg-tertiary);
+            border: 2px solid var(--border-color);
+        }
+
+        .pr-node.status-ready .status-dot {
+            background: var(--accent-green);
+            border-color: var(--accent-green);
+        }
+
+        .pr-node.status-blocked .status-dot {
+            background: var(--accent-red);
+            border-color: var(--accent-red);
+        }
+
+        .pr-node.status-pending .status-dot {
+            background: var(--accent-yellow);
+            border-color: var(--accent-yellow);
+        }
+
+        .pr-node.status-merged .status-dot {
+            background: var(--accent-purple);
+            border-color: var(--accent-purple);
+        }
+
+        /* Root node styling */
+        .tree-node.is-root > .pr-node {
+            border-left: 3px solid var(--accent-blue);
+            padding-left: 16px;
+        }
+
+        .tree-node.is-root > .pr-node .status-dot {
+            left: -7px;
+        }
+
+        /* Sibling branches - stack vertically to avoid width issues */
+        .tree-siblings {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 8px;
+            margin-left: 16px;
+            padding-left: 12px;
+            border-left: 2px solid var(--border-color);
+        }
+
+        .tree-siblings > .tree-branch {
+            background: transparent;
+        }
+        /* Branch header with collapse toggle */
+        .tree-branch-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+
+        .collapse-toggle {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            padding: 0;
+            transition: all 0.15s;
+        }
+
+        .collapse-toggle:hover {
+            background: var(--bg-secondary);
+            border-color: var(--text-muted);
+            color: var(--text-primary);
+        }
+
+        .collapsed-count {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .tree-branch.collapsed {
+            opacity: 0.8;
+        }
+
+        .tree-branch.collapsed .tree-branch-header {
+            margin-bottom: 0;
+        }
+
+        .pr-position {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .pr-branch-name {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+            background: var(--bg-tertiary);
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-bottom: 6px;
+            display: inline-block;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .pr-header {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 4px;
+        }
+
+        .pr-number {
+            color: var(--accent-blue);
+            font-weight: 600;
+            font-size: 13px;
+            text-decoration: none;
+        }
+
+        .pr-number:hover {
+            text-decoration: underline;
+        }
+
+        .pr-title {
+            font-size: 13px;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+            line-height: 1.4;
+        }
+
+        .pr-badges {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 1px 6px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 500;
+        }
+
+        .badge-ci-pass { background: rgba(26, 127, 55, 0.15); color: var(--accent-green); }
+        .badge-ci-fail { background: rgba(207, 34, 46, 0.15); color: var(--accent-red); }
+        .badge-ci-pending { background: rgba(154, 103, 0, 0.15); color: var(--accent-yellow); }
+        .badge-review-approved { background: rgba(26, 127, 55, 0.15); color: var(--accent-green); }
+        .badge-review-changes { background: rgba(207, 34, 46, 0.15); color: var(--accent-red); }
+        .badge-review-pending { background: rgba(154, 103, 0, 0.15); color: var(--accent-yellow); }
+        .badge-draft { background: rgba(101, 109, 118, 0.15); color: var(--text-secondary); }
+        .badge-merged { background: rgba(130, 80, 223, 0.15); color: var(--accent-purple); }
+
+        .pr-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .action-btn {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            text-decoration: none;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .action-btn:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border-color: var(--text-muted);
+        }
+
+        /* Auth Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(27, 31, 36, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.hidden {
+            display: none;
+        }
+
+        .modal {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 450px;
+            width: 90%;
+            position: relative;
+            box-shadow: 0 8px 24px rgba(140, 149, 159, 0.2);
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: none;
+            border: none;
+            font-size: 20px;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 4px 8px;
+            line-height: 1;
+        }
+
+        .modal-close:hover {
+            color: var(--text-primary);
+        }
+
+        .modal h2 {
+            margin-bottom: 8px;
+            font-size: 20px;
+        }
+
+        .modal p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .modal .token-status {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 16px;
+            font-size: 13px;
+        }
+
+        .modal .token-status.connected {
+            border-color: var(--accent-green);
+            background: rgba(26, 127, 55, 0.1);
+        }
+
+        .modal .token-status .status-icon {
+            margin-right: 6px;
+        }
+
+        .modal input {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        .modal input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.15);
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .modal button.primary {
+            flex: 1;
+            padding: 10px 16px;
+            background: var(--accent-green);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .modal button.primary:hover {
+            opacity: 0.9;
+        }
+
+        .modal button.secondary {
+            padding: 10px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .modal button.secondary:hover {
+            background: var(--bg-tertiary);
+        }
+
+        /* Empty States */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state h3 {
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        /* Loading State */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 12px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Status Summary Box */
+        .status-summary {
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+
+        .status-summary-title {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        .status-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-count {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .status-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <!-- Auth Modal -->
+    <div id="authModal" class="modal-overlay hidden" onclick="if(event.target === this) hideAuthModal()">
+        <div class="modal">
+            <button class="modal-close" onclick="hideAuthModal()" title="Close">&times;</button>
+            <h2>⚙️ Settings</h2>
+            <p>Connect with a Personal Access Token with <code>repo</code> read permissions to view PR stacks.</p>
+            <div id="tokenStatus" class="token-status">
+                <span class="status-icon">⚪</span>
+                <span>No token configured</span>
+            </div>
+            <input type="password" id="tokenInput" placeholder="ghp_xxxxxxxxxxxx">
+            <div class="modal-buttons">
+                <button class="primary" onclick="saveToken()">Save Token</button>
+                <button class="secondary" onclick="clearToken()">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Bar -->
+    <header class="top-bar">
+        <div class="top-bar-left">
+            <span class="logo">📚 Stacked PRs</span>
+            <span class="repo-badge">XRPLF/rippled</span>
+            <div class="filters">
+                <button class="filter-btn active" data-filter="my" onclick="setFilter('my')">My Stacks</button>
+                <button class="filter-btn" data-filter="all" onclick="setFilter('all')">All Stacks</button>
+            </div>
+        </div>
+        <div class="top-bar-right">
+            <div id="refreshIndicator" class="refresh-indicator" style="display: none;">
+                <div class="spinner-small"></div>
+                <span>Refreshing...</span>
+            </div>
+            <span id="lastUpdated" class="last-updated"></span>
+            <button class="filter-btn" onclick="fetchPRs(true)" title="Refresh now">🔄</button>
+            <span id="userDisplay">Not connected</span>
+            <button class="filter-btn" onclick="showAuthModal()">⚙️</button>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Stacks List -->
+        <aside class="stacks-list" id="stacksList">
+            <div class="stacks-header">
+                <span id="stacksCount">Loading stacks...</span>
+                <label class="show-singles-toggle">
+                    <input type="checkbox" id="showSinglesCheckbox" onchange="toggleShowSingles()">
+                    <span>Show singles</span>
+                </label>
+            </div>
+            <div id="stacksContainer">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Loading...
+                </div>
+            </div>
+        </aside>
+
+        <!-- Stack Details -->
+        <main class="stack-details" id="stackDetails">
+            <div class="empty-state">
+                <h3>Select a stack</h3>
+                <p>Click on a stack from the list to view details</p>
+            </div>
+        </main>
+    </div>
+
+    <script>
+    // ============================================================
+    // CONFIGURATION
+    // ============================================================
+    const REPO_OWNER = 'XRPLF';
+    const REPO_NAME = 'rippled';
+    const DEFAULT_BRANCH = 'develop';
+    const GITHUB_GRAPHQL_URL = 'https://api.github.com/graphql';
+    const CACHE_KEY = 'stacked_prs_cache';
+    const CACHE_TIMESTAMP_KEY = 'stacked_prs_cache_timestamp';
+    const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
+
+    // ============================================================
+    // STATE
+    // ============================================================
+    let state = {
+        token: localStorage.getItem('github_token') || '',
+        currentUser: null,
+        prs: [],
+        stacks: [],
+        selectedStackId: null,
+        filter: 'my', // 'my' or 'all'
+        showSingles: false, // Whether to show single-PR "stacks"
+        collapsedBranches: new Set(), // Set of branch names that are collapsed
+        lastUpdateTime: null,
+        isRefreshing: false
+    };
+
+    let autoRefreshTimer = null;
+
+    function toggleBranchCollapse(branchName) {
+        if (state.collapsedBranches.has(branchName)) {
+            state.collapsedBranches.delete(branchName);
+        } else {
+            state.collapsedBranches.add(branchName);
+        }
+        renderStackDetails();
+    }
+
+    function countBranchPRs(pr, stack) {
+        let count = 1;
+        const children = stack.children.get(pr.number) || [];
+        for (const child of children) {
+            count += countBranchPRs(child, stack);
+        }
+        return count;
+    }
+
+    // ============================================================
+    // INITIALIZATION
+    // ============================================================
+    document.addEventListener('DOMContentLoaded', () => {
+        // Check for ?pr= query param
+        const urlParams = new URLSearchParams(window.location.search);
+        const prNumber = urlParams.get('pr');
+
+        if (!state.token) {
+            // Show empty state, user can click settings to add token
+            document.getElementById('stacksContainer').innerHTML = `
+                <div class="empty-state">
+                    <h3>Not connected</h3>
+                    <p>Click ⚙️ to add a GitHub token</p>
+                </div>
+            `;
+            document.getElementById('stacksCount').textContent = '0 stacks';
+        } else {
+            init(prNumber ? parseInt(prNumber) : null);
+        }
+    });
+
+    async function init(focusPrNumber = null) {
+        try {
+            await fetchCurrentUser();
+
+            // Load cached data first for instant display
+            const cached = loadFromCache();
+            if (cached) {
+                state.prs = cached.prs;
+                state.lastUpdateTime = cached.timestamp;
+                buildStacks();
+                renderStacksList();
+                updateLastUpdatedTime();
+
+                if (focusPrNumber) {
+                    const stack = state.stacks.find(s => s.prs.some(pr => pr.number === focusPrNumber));
+                    if (stack) {
+                        selectStack(stack.id, focusPrNumber);
+                    }
+                }
+            }
+
+            // Then fetch fresh data in background
+            await fetchPRs(!cached);
+
+            if (focusPrNumber && !cached) {
+                const stack = state.stacks.find(s => s.prs.some(pr => pr.number === focusPrNumber));
+                if (stack) {
+                    selectStack(stack.id, focusPrNumber);
+                }
+            }
+
+            // Setup auto-refresh
+            setupAutoRefresh();
+        } catch (err) {
+            console.error('Init error:', err);
+            showAuthModal();
+        }
+    }
+
+    // ============================================================
+    // CACHING
+    // ============================================================
+    function saveToCache(prs) {
+        try {
+            localStorage.setItem(CACHE_KEY, JSON.stringify(prs));
+            localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+        } catch (e) {
+            console.warn('Failed to cache PRs:', e);
+        }
+    }
+
+    function loadFromCache() {
+        try {
+            const cached = localStorage.getItem(CACHE_KEY);
+            const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
+            if (cached && timestamp) {
+                return {
+                    prs: JSON.parse(cached),
+                    timestamp: parseInt(timestamp)
+                };
+            }
+        } catch (e) {
+            console.warn('Failed to load cached PRs:', e);
+        }
+        return null;
+    }
+
+    function updateLastUpdatedTime() {
+        const el = document.getElementById('lastUpdated');
+        if (!el || !state.lastUpdateTime) return;
+
+        const now = Date.now();
+        const diff = now - state.lastUpdateTime;
+        const minutes = Math.floor(diff / 60000);
+
+        if (minutes < 1) {
+            el.textContent = 'Updated just now';
+        } else if (minutes === 1) {
+            el.textContent = 'Updated 1 minute ago';
+        } else if (minutes < 60) {
+            el.textContent = `Updated ${minutes} minutes ago`;
+        } else {
+            const hours = Math.floor(minutes / 60);
+            el.textContent = `Updated ${hours} hour${hours > 1 ? 's' : ''} ago`;
+        }
+    }
+
+    function setupAutoRefresh() {
+        // Clear existing timer
+        if (autoRefreshTimer) {
+            clearInterval(autoRefreshTimer);
+        }
+
+        // Refresh every 5 minutes
+        autoRefreshTimer = setInterval(() => {
+            fetchPRs(false);
+        }, AUTO_REFRESH_INTERVAL);
+
+        // Update the "Updated X minutes ago" text every minute
+        setInterval(updateLastUpdatedTime, 60000);
+    }
+
+    // ============================================================
+    // AUTH
+    // ============================================================
+    function showAuthModal() {
+        updateTokenStatus();
+        document.getElementById('tokenInput').value = '';
+        document.getElementById('authModal').classList.remove('hidden');
+    }
+
+    function hideAuthModal() {
+        document.getElementById('authModal').classList.add('hidden');
+    }
+
+    function updateTokenStatus() {
+        const statusEl = document.getElementById('tokenStatus');
+        if (state.token) {
+            const maskedToken = state.token.slice(0, 7) + '...' + state.token.slice(-4);
+            statusEl.className = 'token-status connected';
+            statusEl.innerHTML = `<span class="status-icon">✅</span><span>Connected: ${maskedToken}</span>`;
+        } else {
+            statusEl.className = 'token-status';
+            statusEl.innerHTML = `<span class="status-icon">⚪</span><span>No token configured</span>`;
+        }
+    }
+
+    function saveToken() {
+        const token = document.getElementById('tokenInput').value.trim();
+        if (token) {
+            state.token = token;
+            localStorage.setItem('github_token', token);
+            updateTokenStatus();
+            hideAuthModal();
+            init();
+        }
+    }
+
+    function clearToken() {
+        state.token = '';
+        localStorage.removeItem('github_token');
+        localStorage.removeItem(CACHE_KEY);
+        localStorage.removeItem(CACHE_TIMESTAMP_KEY);
+        updateTokenStatus();
+        document.getElementById('tokenInput').value = '';
+        document.getElementById('userDisplay').textContent = 'Not connected';
+        document.getElementById('stacksContainer').innerHTML = `
+            <div class="empty-state">
+                <h3>Not connected</h3>
+                <p>Add a GitHub token in settings to view PR stacks</p>
+            </div>
+        `;
+        document.getElementById('stacksCount').textContent = '0 stacks';
+    }
+
+    // ============================================================
+    // GITHUB API
+    // ============================================================
+    async function graphqlQuery(query, variables = {}) {
+        const response = await fetch(GITHUB_GRAPHQL_URL, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${state.token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ query, variables })
+        });
+
+        if (!response.ok) {
+            throw new Error(`GitHub API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (data.errors) {
+            throw new Error(data.errors[0].message);
+        }
+
+        return data.data;
+    }
+
+    async function fetchCurrentUser() {
+        const data = await graphqlQuery(`
+            query {
+                viewer {
+                    login
+                    avatarUrl
+                }
+            }
+        `);
+        state.currentUser = data.viewer;
+        document.getElementById('userDisplay').textContent = `@${state.currentUser.login}`;
+    }
+
+    async function fetchPRs(showLoading = true) {
+        // Show refreshing indicator
+        state.isRefreshing = true;
+        updateRefreshingIndicator();
+
+        const query = `
+            query($owner: String!, $name: String!, $cursor: String) {
+                repository(owner: $owner, name: $name) {
+                    pullRequests(first: 100, states: [OPEN], orderBy: {field: UPDATED_AT, direction: DESC}, after: $cursor) {
+                        pageInfo {
+                            hasNextPage
+                            endCursor
+                        }
+                        nodes {
+                            number
+                            title
+                            state
+                            isDraft
+                            author { login }
+                            headRefName
+                            baseRefName
+                            headRefOid
+                            mergeable
+                            reviewDecision
+                            updatedAt
+                            commits(last: 1) {
+                                nodes {
+                                    commit {
+                                        statusCheckRollup {
+                                            state
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        `;
+
+        try {
+            let allPRs = [];
+            let cursor = null;
+            let pageCount = 0;
+            const maxPages = 3; // Limit pages to avoid rate limiting
+
+            do {
+                const data = await graphqlQuery(query, {
+                    owner: REPO_OWNER,
+                    name: REPO_NAME,
+                    cursor: cursor
+                });
+
+                const prs = data.repository.pullRequests.nodes.map(pr => ({
+                    number: pr.number,
+                    title: pr.title,
+                    state: pr.state,
+                    isDraft: pr.isDraft,
+                    author: pr.author?.login || 'unknown',
+                    headRefName: pr.headRefName,
+                    baseRefName: pr.baseRefName,
+                    headSha: pr.headRefOid,
+                    mergeable: pr.mergeable,
+                    reviewDecision: pr.reviewDecision,
+                    updatedAt: pr.updatedAt,
+                    ciStatus: pr.commits.nodes[0]?.commit?.statusCheckRollup?.state || 'UNKNOWN'
+                }));
+
+                allPRs = allPRs.concat(prs);
+                cursor = data.repository.pullRequests.pageInfo.endCursor;
+                pageCount++;
+
+            } while (cursor && pageCount < maxPages);
+
+            state.prs = allPRs;
+            state.lastUpdateTime = Date.now();
+            saveToCache(allPRs);
+            buildStacks();
+            renderStacksList();
+            updateLastUpdatedTime();
+
+            // Re-render details if a stack is selected
+            if (state.selectedStackId) {
+                renderStackDetails();
+            }
+        } catch (err) {
+            console.error('Fetch error:', err);
+        } finally {
+            state.isRefreshing = false;
+            updateRefreshingIndicator();
+        }
+    }
+
+    function updateRefreshingIndicator() {
+        const indicator = document.getElementById('refreshIndicator');
+        if (indicator) {
+            indicator.style.display = state.isRefreshing ? 'flex' : 'none';
+        }
+    }
+
+    // ============================================================
+    // STACK INFERENCE
+    // ============================================================
+    function buildStacks() {
+        const prs = state.prs;
+        const prsByHead = new Map();
+
+        // Index PRs by their head branch
+        // Only index open PRs - we use this to find parent PRs
+        prs.forEach(pr => {
+            // Don't index PRs whose head is the default branch
+            // (these shouldn't be parents of other PRs in a stack)
+            if (pr.headRefName !== DEFAULT_BRANCH) {
+                prsByHead.set(pr.headRefName, pr);
+            }
+        });
+
+        // Build parent-child relationships
+        // A PR is a child of another if:
+        // 1. Its base branch equals the parent's head branch
+        // 2. Its base branch is NOT the default branch (those are root PRs)
+        const children = new Map();
+        const parents = new Map();
+
+        prs.forEach(pr => {
+            // PRs targeting the default branch are always roots (no parent)
+            if (pr.baseRefName === DEFAULT_BRANCH) {
+                return;
+            }
+
+            const parentPR = prsByHead.get(pr.baseRefName);
+            if (parentPR && parentPR.number !== pr.number) {
+                parents.set(pr.number, parentPR);
+                if (!children.has(parentPR.number)) {
+                    children.set(parentPR.number, []);
+                }
+                children.get(parentPR.number).push(pr);
+            }
+        });
+
+        // Find root PRs (no parent PR, or parent PR is targeting default branch)
+        const roots = prs.filter(pr => !parents.has(pr.number));
+
+        // Build stacks from roots
+        const stacks = [];
+        const visited = new Set();
+
+        function buildStackFromRoot(root) {
+            if (visited.has(root.number)) return null;
+
+            const stackPRs = [];
+            const queue = [root];
+
+            while (queue.length > 0) {
+                const current = queue.shift();
+                if (visited.has(current.number)) continue;
+                visited.add(current.number);
+                stackPRs.push(current);
+
+                const childPRs = children.get(current.number) || [];
+                queue.push(...childPRs);
+            }
+
+            if (stackPRs.length === 0) return null;
+
+            // Sort by position in stack (roots first)
+            // We need to order them: root at index 0, then children
+            const ordered = [];
+            const addOrdered = (pr) => {
+                ordered.push(pr);
+                const kids = children.get(pr.number) || [];
+                kids.forEach(kid => addOrdered(kid));
+            };
+            addOrdered(root);
+
+            // Build children map for this stack
+            const stackChildren = new Map();
+            const stackParents = new Map();
+            ordered.forEach(pr => {
+                const kids = children.get(pr.number) || [];
+                const inStackKids = kids.filter(k => ordered.includes(k));
+                if (inStackKids.length > 0) {
+                    stackChildren.set(pr.number, inStackKids);
+                }
+                const parent = parents.get(pr.number);
+                if (parent && ordered.includes(parent)) {
+                    stackParents.set(pr.number, parent);
+                }
+            });
+
+            return {
+                id: `stack-${root.number}`,
+                prs: ordered,
+                owner: root.author,
+                rootPR: root,
+                children: stackChildren,
+                parents: stackParents
+            };
+        }
+
+        roots.forEach(root => {
+            const stack = buildStackFromRoot(root);
+            if (stack) {
+                stacks.push(stack);
+            }
+        });
+
+        // Compute summaries for each stack
+        stacks.forEach(stack => {
+            stack.summary = computeStackSummary(stack);
+        });
+
+        state.stacks = stacks;
+    }
+
+    function computeStackSummary(stack) {
+        let ready = 0;
+        let blocked = 0;
+        let pending = 0;
+
+        stack.prs.forEach(pr => {
+            const status = computePRStatus(pr, stack.parents);
+            if (status === 'ready') ready++;
+            else if (status === 'blocked') blocked++;
+            else pending++;
+        });
+
+        return { total: stack.prs.length, ready, blocked, pending };
+    }
+
+    function computePRStatus(pr, parents) {
+        // Check if draft
+        if (pr.isDraft) return 'pending';
+
+        // Check parent status - if parent exists in stack, PR is blocked
+        const parent = parents?.get(pr.number);
+        if (parent) {
+            return 'blocked'; // Blocked by parent PR that needs to merge first
+        }
+
+        // Check CI
+        if (pr.ciStatus === 'FAILURE' || pr.ciStatus === 'ERROR') {
+            return 'blocked';
+        }
+
+        // Check review
+        if (pr.reviewDecision === 'CHANGES_REQUESTED') {
+            return 'blocked';
+        }
+
+        // Check if ready
+        if (pr.reviewDecision === 'APPROVED' &&
+            (pr.ciStatus === 'SUCCESS' || pr.ciStatus === 'EXPECTED') &&
+            pr.mergeable === 'MERGEABLE') {
+            return 'ready';
+        }
+
+        return 'pending';
+    }
+
+    // ============================================================
+    // FILTERS
+    // ============================================================
+    function setFilter(filter) {
+        state.filter = filter;
+        document.querySelectorAll('.filter-btn[data-filter]').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.filter === filter);
+        });
+        renderStacksList();
+    }
+
+    function toggleShowSingles() {
+        state.showSingles = document.getElementById('showSinglesCheckbox').checked;
+        renderStacksList();
+    }
+
+    function getFilteredStacks() {
+        let stacks = state.stacks;
+
+        // Filter out single-PR stacks unless showSingles is enabled
+        if (!state.showSingles) {
+            stacks = stacks.filter(stack => stack.prs.length > 1);
+        }
+
+        // Filter by user if needed
+        if (state.filter === 'my') {
+            stacks = stacks.filter(stack =>
+                stack.prs.some(pr => pr.author === state.currentUser?.login)
+            );
+        }
+
+        return stacks;
+    }
+
+    // ============================================================
+    // UI RENDERING
+    // ============================================================
+    function renderStacksList() {
+        const container = document.getElementById('stacksContainer');
+        const countEl = document.getElementById('stacksCount');
+        const filteredStacks = getFilteredStacks();
+
+        countEl.textContent = `${filteredStacks.length} stack${filteredStacks.length !== 1 ? 's' : ''}`;
+
+        if (filteredStacks.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <h3>No stacks found</h3>
+                    <p>Try switching to "All Stacks" to see more</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = filteredStacks.map(stack => `
+            <div class="stack-card ${state.selectedStackId === stack.id ? 'selected' : ''}"
+                 onclick="selectStack('${stack.id}')">
+                <div class="stack-name">${escapeHtml(stack.prs[0].title)}</div>
+                <div class="stack-owner">by @${escapeHtml(stack.owner)}</div>
+                <div class="stack-summary">
+                    <span class="summary-item">
+                        <span class="summary-dot dot-total"></span>
+                        ${stack.summary.total} PR${stack.summary.total !== 1 ? 's' : ''}
+                    </span>
+                    ${stack.summary.ready > 0 ? `
+                        <span class="summary-item">
+                            <span class="summary-dot dot-ready"></span>
+                            ${stack.summary.ready} ready
+                        </span>
+                    ` : ''}
+                    ${stack.summary.blocked > 0 ? `
+                        <span class="summary-item">
+                            <span class="summary-dot dot-blocked"></span>
+                            ${stack.summary.blocked} blocked
+                        </span>
+                    ` : ''}
+                    ${stack.summary.pending > 0 ? `
+                        <span class="summary-item">
+                            <span class="summary-dot dot-pending"></span>
+                            ${stack.summary.pending} pending
+                        </span>
+                    ` : ''}
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function selectStack(stackId, focusPrNumber = null) {
+        state.selectedStackId = stackId;
+        renderStacksList();
+        renderStackDetails(focusPrNumber);
+    }
+
+    function renderStackDetails(focusPrNumber = null) {
+        const container = document.getElementById('stackDetails');
+        const stack = state.stacks.find(s => s.id === state.selectedStackId);
+
+        if (!stack) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <h3>Select a stack</h3>
+                    <p>Click on a stack from the list to view details</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Render tree recursively
+        function renderTreeNode(pr, isRoot = false, depth = 0) {
+            const status = computePRStatus(pr, stack.parents);
+            const parent = stack.parents.get(pr.number);
+            const children = stack.children.get(pr.number) || [];
+            const prUrl = `https://github.com/${REPO_OWNER}/${REPO_NAME}/pull/${pr.number}`;
+            const compareParentUrl = parent
+                ? `https://github.com/${REPO_OWNER}/${REPO_NAME}/compare/${parent.headRefName}...${pr.headRefName}`
+                : null;
+            const compareBaseUrl = `https://github.com/${REPO_OWNER}/${REPO_NAME}/compare/${pr.baseRefName}...${pr.headRefName}`;
+
+            const hasMultipleChildren = children.length > 1;
+
+            let childrenHtml = '';
+            if (children.length > 0) {
+                if (hasMultipleChildren) {
+                    // Multiple branches - each can be collapsed
+                    childrenHtml = `
+                        <div class="tree-siblings">
+                            ${children.map(child => {
+                                const branchName = child.headRefName;
+                                const isCollapsed = state.collapsedBranches.has(branchName);
+                                const prCount = countBranchPRs(child, stack);
+                                return `
+                                    <div class="tree-branch ${isCollapsed ? 'collapsed' : ''}">
+                                        <div class="tree-branch-header">
+                                            <button class="collapse-toggle" onclick="toggleBranchCollapse('${escapeHtml(branchName)}')" title="${isCollapsed ? 'Expand' : 'Collapse'}">
+                                                ${isCollapsed ? '▶' : '▼'}
+                                            </button>
+                                            ${isCollapsed ? `<span class="collapsed-count">${escapeHtml(branchName)} (${prCount} PR${prCount !== 1 ? 's' : ''})</span>` : ''}
+                                        </div>
+                                        ${isCollapsed ? '' : renderTreeNode(child, false, depth + 1)}
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    `;
+                } else {
+                    // Single child - simple continuation
+                    childrenHtml = `
+                        <div class="tree-children">
+                            ${children.map(child => renderTreeNode(child, false, depth + 1)).join('')}
+                        </div>
+                    `;
+                }
+            }
+
+            return `
+                <div class="tree-node ${isRoot ? 'is-root' : ''}">
+                    <div class="pr-node status-${status} ${focusPrNumber === pr.number ? 'focused' : ''}">
+                        <div class="status-dot"></div>
+                        <div class="pr-branch-name">${escapeHtml(pr.headRefName)}</div>
+                        <div class="pr-header">
+                            <a href="${prUrl}" target="_blank" class="pr-number">#${pr.number}</a>
+                            ${renderBadges(pr, parent)}
+                        </div>
+                        <div class="pr-title">${escapeHtml(pr.title)}</div>
+                        <div class="pr-badges">
+                            ${renderStatusBadges(pr)}
+                        </div>
+                        <div class="pr-actions">
+                            <a href="${prUrl}" target="_blank" class="action-btn">Open PR</a>
+                            ${compareParentUrl ? `<a href="${compareParentUrl}" target="_blank" class="action-btn">Child vs Parent</a>` : ''}
+                            <a href="${compareBaseUrl}" target="_blank" class="action-btn">PR vs Base</a>
+                        </div>
+                    </div>
+                    ${childrenHtml}
+                </div>
+            `;
+        }
+
+        container.innerHTML = `
+            <div class="stack-details-header">
+                <div class="stack-details-title">${escapeHtml(stack.rootPR.title)}</div>
+                <div class="stack-details-meta">
+                    Stack by @${escapeHtml(stack.owner)} • ${stack.prs.length} PR${stack.prs.length !== 1 ? 's' : ''} •
+                    Base: <code>${escapeHtml(stack.rootPR.baseRefName)}</code>
+                </div>
+            </div>
+
+            <div class="status-summary">
+                <div class="status-summary-title">Stack Status</div>
+                <div class="status-items">
+                    <div class="status-item">
+                        <span class="status-count" style="color: var(--accent-green)">${stack.summary.ready}</span>
+                        <span class="status-label">Ready to merge</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-count" style="color: var(--accent-yellow)">${stack.summary.pending}</span>
+                        <span class="status-label">Pending</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-count" style="color: var(--accent-red)">${stack.summary.blocked}</span>
+                        <span class="status-label">Blocked</span>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="stack-tree">
+                ${renderTreeNode(stack.rootPR, true, 0)}
+            </div>
+        `;
+    }
+
+    function renderBadges(pr, parent) {
+        const badges = [];
+
+        if (pr.isDraft) {
+            badges.push('<span class="badge badge-draft">Draft</span>');
+        }
+
+        if (parent) {
+            badges.push('<span class="badge badge-ci-pending">⏳ Waiting on parent</span>');
+        }
+
+        return badges.join('');
+    }
+
+    function renderStatusBadges(pr) {
+        const badges = [];
+
+        // CI Badge
+        switch (pr.ciStatus) {
+            case 'SUCCESS':
+                badges.push('<span class="badge badge-ci-pass">✓ CI Passed</span>');
+                break;
+            case 'FAILURE':
+            case 'ERROR':
+                badges.push('<span class="badge badge-ci-fail">✗ CI Failed</span>');
+                break;
+            case 'PENDING':
+            case 'EXPECTED':
+                badges.push('<span class="badge badge-ci-pending">⏳ CI Pending</span>');
+                break;
+        }
+
+        // Review Badge
+        switch (pr.reviewDecision) {
+            case 'APPROVED':
+                badges.push('<span class="badge badge-review-approved">✓ Approved</span>');
+                break;
+            case 'CHANGES_REQUESTED':
+                badges.push('<span class="badge badge-review-changes">✗ Changes Requested</span>');
+                break;
+            case 'REVIEW_REQUIRED':
+                badges.push('<span class="badge badge-review-pending">⏳ Needs Review</span>');
+                break;
+        }
+
+        // Mergeable Badge
+        if (pr.mergeable === 'CONFLICTING') {
+            badges.push('<span class="badge badge-ci-fail">⚠ Has Conflicts</span>');
+        }
+
+        return badges.join('');
+    }
+
+    // ============================================================
+    // UTILITIES
+    // ============================================================
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    </script>
+</body>
+</html>
+
