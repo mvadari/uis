@@ -79,6 +79,23 @@ Explore proposed changes to the XRP Ledger server (rippled) in a non-technical f
 
 ---
 
+### 📚 Stacked PR Dashboard
+Visualize and navigate stacked pull requests in a repository as a DAG (Directed Acyclic Graph).
+
+**Features:**
+- Automatically infers PR stacks from branch relationships
+- DAG visualization with collapsible branches
+- Filter between "My Stacks" and "All Stacks"
+- Status indicators for CI, reviews, and mergeability
+- Branch names shown on every PR for easy identification
+- Quick links for PR comparisons (child vs parent, PR vs base)
+- Auto-refresh every 5 minutes with caching
+- Shares GitHub token with other tools
+
+[**Launch Stacked PR Dashboard →**](https://mvadari.github.io/uis/stacked.html)
+
+---
+
 ## Local Development
 
 All tools are self-contained HTML files. To run locally:
@@ -98,6 +115,7 @@ All tools are self-contained HTML files. To run locally:
    open github.html
    open smart-escrow-prs.html
    open xrpld.html
+   open stacked.html
    ```
 
 Alternatively, use a local server:
