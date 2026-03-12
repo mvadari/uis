@@ -173,11 +173,67 @@
             cursor: pointer;
         }
 
+        /* Base branch sections */
+        .base-branch-section {
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .base-branch-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            background: var(--bg-tertiary);
+            cursor: pointer;
+            user-select: none;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        .base-branch-header:hover {
+            background: var(--bg-secondary);
+        }
+
+        .base-collapse-toggle {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 10px;
+            padding: 0;
+            cursor: pointer;
+            width: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .base-branch-name {
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .base-branch-count {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-left: auto;
+        }
+
+        .base-branch-section.collapsed .base-branch-header {
+            background: var(--bg-secondary);
+        }
+
         .stack-card {
-            padding: 16px;
+            padding: 12px 16px 12px 28px;
             border-bottom: 1px solid var(--border-color);
             cursor: pointer;
             transition: background 0.2s;
+        }
+
+        .stack-card:last-child {
+            border-bottom: none;
         }
 
         .stack-card:hover {
@@ -187,25 +243,26 @@
         .stack-card.selected {
             background: var(--bg-tertiary);
             border-left: 3px solid var(--accent-blue);
+            padding-left: 25px;
         }
 
         .stack-name {
             font-weight: 600;
-            font-size: 14px;
+            font-size: 13px;
             margin-bottom: 4px;
             color: var(--text-primary);
         }
 
         .stack-owner {
-            font-size: 12px;
+            font-size: 11px;
             color: var(--text-secondary);
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
 
         .stack-summary {
             display: flex;
-            gap: 12px;
-            font-size: 12px;
+            gap: 10px;
+            font-size: 11px;
         }
 
         .summary-item {
@@ -778,7 +835,8 @@
         selectedStackId: null,
         filter: 'my', // 'my' or 'all'
         showSingles: false, // Whether to show single-PR "stacks"
-        collapsedBranches: new Set(), // Set of branch names that are collapsed
+        collapsedBranches: new Set(), // Set of branch names that are collapsed in DAG view
+        collapsedBaseBranches: new Set(), // Set of base branch names collapsed in stacks list
         lastUpdateTime: null,
         isRefreshing: false
     };
@@ -792,6 +850,15 @@
             state.collapsedBranches.add(branchName);
         }
         renderStackDetails();
+    }
+
+    function toggleBaseBranchCollapse(baseBranch) {
+        if (state.collapsedBaseBranches.has(baseBranch)) {
+            state.collapsedBaseBranches.delete(baseBranch);
+        } else {
+            state.collapsedBaseBranches.add(baseBranch);
+        }
+        renderStacksList();
     }
 
     function countBranchPRs(pr, stack) {
@@ -1332,37 +1399,76 @@
             return;
         }
 
-        container.innerHTML = filteredStacks.map(stack => `
-            <div class="stack-card ${state.selectedStackId === stack.id ? 'selected' : ''}"
-                 onclick="selectStack('${stack.id}')">
-                <div class="stack-name">${escapeHtml(stack.prs[0].title)}</div>
-                <div class="stack-owner">by @${escapeHtml(stack.owner)}</div>
-                <div class="stack-summary">
-                    <span class="summary-item">
-                        <span class="summary-dot dot-total"></span>
-                        ${stack.summary.total} PR${stack.summary.total !== 1 ? 's' : ''}
-                    </span>
-                    ${stack.summary.ready > 0 ? `
-                        <span class="summary-item">
-                            <span class="summary-dot dot-ready"></span>
-                            ${stack.summary.ready} ready
-                        </span>
-                    ` : ''}
-                    ${stack.summary.blocked > 0 ? `
-                        <span class="summary-item">
-                            <span class="summary-dot dot-blocked"></span>
-                            ${stack.summary.blocked} blocked
-                        </span>
-                    ` : ''}
-                    ${stack.summary.pending > 0 ? `
-                        <span class="summary-item">
-                            <span class="summary-dot dot-pending"></span>
-                            ${stack.summary.pending} pending
-                        </span>
-                    ` : ''}
+        // Group stacks by base branch
+        const groupedByBase = new Map();
+        filteredStacks.forEach(stack => {
+            const baseBranch = stack.rootPR.baseRefName;
+            if (!groupedByBase.has(baseBranch)) {
+                groupedByBase.set(baseBranch, []);
+            }
+            groupedByBase.get(baseBranch).push(stack);
+        });
+
+        // Sort base branches: default branch first, then alphabetically
+        const sortedBases = Array.from(groupedByBase.keys()).sort((a, b) => {
+            if (a === DEFAULT_BRANCH) return -1;
+            if (b === DEFAULT_BRANCH) return 1;
+            return a.localeCompare(b);
+        });
+
+        // Render grouped sections
+        container.innerHTML = sortedBases.map(baseBranch => {
+            const stacks = groupedByBase.get(baseBranch);
+            const isCollapsed = state.collapsedBaseBranches.has(baseBranch);
+            const totalPRs = stacks.reduce((sum, s) => sum + s.summary.total, 0);
+
+            return `
+                <div class="base-branch-section ${isCollapsed ? 'collapsed' : ''}">
+                    <div class="base-branch-header" onclick="toggleBaseBranchCollapse('${escapeHtml(baseBranch)}')">
+                        <button class="base-collapse-toggle" title="${isCollapsed ? 'Expand' : 'Collapse'}">
+                            ${isCollapsed ? '▶' : '▼'}
+                        </button>
+                        <span class="base-branch-name">${escapeHtml(baseBranch)}</span>
+                        <span class="base-branch-count">${stacks.length} stack${stacks.length !== 1 ? 's' : ''} · ${totalPRs} PR${totalPRs !== 1 ? 's' : ''}</span>
+                    </div>
+                    ${isCollapsed ? '' : `
+                        <div class="base-branch-stacks">
+                            ${stacks.map(stack => `
+                                <div class="stack-card ${state.selectedStackId === stack.id ? 'selected' : ''}"
+                                     onclick="event.stopPropagation(); selectStack('${stack.id}')">
+                                    <div class="stack-name">${escapeHtml(stack.prs[0].title)}</div>
+                                    <div class="stack-owner">by @${escapeHtml(stack.owner)}</div>
+                                    <div class="stack-summary">
+                                        <span class="summary-item">
+                                            <span class="summary-dot dot-total"></span>
+                                            ${stack.summary.total} PR${stack.summary.total !== 1 ? 's' : ''}
+                                        </span>
+                                        ${stack.summary.ready > 0 ? `
+                                            <span class="summary-item">
+                                                <span class="summary-dot dot-ready"></span>
+                                                ${stack.summary.ready} ready
+                                            </span>
+                                        ` : ''}
+                                        ${stack.summary.blocked > 0 ? `
+                                            <span class="summary-item">
+                                                <span class="summary-dot dot-blocked"></span>
+                                                ${stack.summary.blocked} blocked
+                                            </span>
+                                        ` : ''}
+                                        ${stack.summary.pending > 0 ? `
+                                            <span class="summary-item">
+                                                <span class="summary-dot dot-pending"></span>
+                                                ${stack.summary.pending} pending
+                                            </span>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `}
                 </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }
 
     function selectStack(stackId, focusPrNumber = null) {
