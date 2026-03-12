@@ -2792,9 +2792,20 @@
                     // Process the query to handle special placeholders and proper encoding
                     let processedQuery = q.query.trim();
 
-                    // Replace @today with actual date in YYYY-MM-DD format
-                    const today = new Date().toISOString().split('T')[0];
-                    processedQuery = processedQuery.replace(/@today/gi, today);
+                    // Replace date placeholders:
+                    // - @today -> current date
+                    // - @today-Nd -> N days ago (e.g., @today-1d, @today-7d)
+                    // - @today+Nd -> N days in future (e.g., @today+1d)
+                    processedQuery = processedQuery.replace(/@today([+-]\d+d)?/gi, (match, offset) => {
+                        const date = new Date();
+                        if (offset) {
+                            // Parse the offset (e.g., "-1d", "+7d")
+                            const sign = offset.charAt(0) === '-' ? -1 : 1;
+                            const days = parseInt(offset.slice(1, -1), 10);
+                            date.setDate(date.getDate() + (sign * days));
+                        }
+                        return date.toISOString().split('T')[0];
+                    });
 
                     // Build the full query string with is:pr and state:open
                     // Each space-separated term should be joined with + for URL encoding
