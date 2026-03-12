@@ -2788,7 +2788,21 @@
 
                 // Build queries array from enabled queries with non-empty query strings
                 const enabledQueries = querySettings.filter(q => q.enabled && q.query.trim());
-                const queries = enabledQueries.map(q => `is:pr+${q.query.trim()}+state:open`);
+                const queries = enabledQueries.map(q => {
+                    // Process the query to handle special placeholders and proper encoding
+                    let processedQuery = q.query.trim();
+
+                    // Replace @today with actual date in YYYY-MM-DD format
+                    const today = new Date().toISOString().split('T')[0];
+                    processedQuery = processedQuery.replace(/@today/gi, today);
+
+                    // Build the full query string with is:pr and state:open
+                    // Each space-separated term should be joined with + for URL encoding
+                    const fullQuery = `is:pr ${processedQuery} state:open`;
+
+                    // URL-encode the query properly (spaces become +)
+                    return encodeURIComponent(fullQuery).replace(/%20/g, '+');
+                });
 
                 // If no queries are configured, show an error
                 if (queries.length === 0) {
