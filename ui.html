@@ -191,19 +191,23 @@
         .CodeMirror-gutters {
             background: #1e1e1e;
             border-right: 1px solid #2a3038;
-            padding-right: 8px;
-            min-width: 40px;
+            left: 0 !important;
+            min-width: 45px;
         }
 
         .CodeMirror-linenumber {
             color: #858585;
-            padding: 0 8px 0 4px;
-            min-width: 24px;
+            padding: 0 8px;
+            min-width: 30px;
             text-align: right;
         }
 
-        .CodeMirror pre.CodeMirror-line,
-        .CodeMirror pre.CodeMirror-line-like {
+        .CodeMirror-sizer {
+            margin-left: 45px !important;
+            border-left: none !important;
+        }
+
+        .CodeMirror-lines {
             padding-left: 8px;
         }
 
@@ -1201,6 +1205,7 @@
                         command: "submit",
                         tx_json: tx,
                         secret: secret,
+                        debug: true,
                     });
                     await client.request({ command: 'ledger_accept' });
                 } else {
