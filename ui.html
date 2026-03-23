@@ -604,6 +604,7 @@
                 </div>
                 <div style="display: flex; gap: 12px;">
                     <button onclick="sendRequest()" aria-label="Send WebSocket request">Send Request</button>
+                    <button onclick="copyOutput('requestOutput')" aria-label="Copy request log">Copy</button>
                     <button onclick="document.getElementById('requestOutput').textContent = ''" aria-label="Clear request log">Clear Log</button>
                 </div>
                 <div class="output" id="requestOutput" role="log" aria-live="polite"></div>
@@ -634,6 +635,7 @@
                 </div>
                 <div style="display: flex; gap: 12px;">
                     <button onclick="sendTransaction()" aria-label="Submit and sign transaction">Send Transaction</button>
+                    <button onclick="copyOutput('txOutput')" aria-label="Copy transaction log">Copy</button>
                     <button onclick="document.getElementById('txOutput').textContent = ''" aria-label="Clear transaction log">Clear Log</button>
                 </div>
                 <div class="output" id="txOutput" role="log" aria-live="polite"></div>
@@ -803,6 +805,7 @@
                 </div>
                 <div style="display: flex; gap: 12px;">
                     <button onclick="sendRequest()" aria-label="Send WebSocket request">Send Request</button>
+                    <button onclick="copyOutput('requestOutput')" aria-label="Copy request log">Copy</button>
                     <button onclick="document.getElementById('requestOutput').textContent = ''" aria-label="Clear request log">Clear Log</button>
                 </div>
                 <div class="output" id="requestOutput" role="log" aria-live="polite"></div>
@@ -831,6 +834,7 @@
                 </div>
                 <div style="display: flex; gap: 12px;">
                     <button onclick="sendTransaction()" aria-label="Submit and sign transaction">Send Transaction</button>
+                    <button onclick="copyOutput('txOutput')" aria-label="Copy transaction log">Copy</button>
                     <button onclick="document.getElementById('txOutput').textContent = ''" aria-label="Clear transaction log">Clear Log</button>
                 </div>
                 <div class="output" id="txOutput" role="log" aria-live="polite"></div>
@@ -863,6 +867,37 @@
                     toast.remove();
                 }
             }, 5000);
+        }
+
+        // Copy output to clipboard
+        async function copyOutput(elementId) {
+            const outputEl = document.getElementById(elementId);
+            const text = outputEl.textContent;
+
+            if (!text) {
+                showToast('Nothing to copy', 'info');
+                return;
+            }
+
+            try {
+                await navigator.clipboard.writeText(text);
+                showToast('Copied to clipboard!', 'success');
+            } catch (err) {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                textArea.style.position = 'fixed';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showToast('Copied to clipboard!', 'success');
+                } catch (e) {
+                    showToast('Failed to copy', 'error');
+                }
+                document.body.removeChild(textArea);
+            }
         }
 
         // Check if xrpl library is loaded
