@@ -3531,6 +3531,31 @@
             }, { offset: Number.NEGATIVE_INFINITY }).element;
         }
 
+        // Update the count displayed in a column header
+        function updateColumnHeaderCount(contentElement) {
+            if (!contentElement) return;
+            const column = contentElement.closest('.kanban-column');
+            if (!column) return;
+            const labelId = column.dataset.label;
+            const label = LABELS.find(l => l.id === labelId);
+            if (!label) return;
+            const count = contentElement.querySelectorAll('.pr-item').length;
+            const headerSpan = column.querySelector('.kanban-header-top span');
+            if (headerSpan) {
+                headerSpan.textContent = `${label.name} (${count})`;
+            }
+            // Show empty state if column is now empty
+            if (count === 0 && !contentElement.querySelector('.empty-state')) {
+                contentElement.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📭</div>
+                        <div class="empty-state-text">No PRs here</div>
+                        <div class="empty-state-hint">Drag PRs here to organize them</div>
+                    </div>
+                `;
+            }
+        }
+
         // Setup context menu for PR items
         function setupContextMenu() {
             const contextMenu = document.getElementById('prContextMenu');
@@ -3575,16 +3600,38 @@
                 const menuItem = e.target.closest('.context-menu-item');
                 if (menuItem && currentPRId) {
                     const newLabel = menuItem.dataset.label;
+                    const currentLabel = getLabels()[currentPRId] || '';
+                    const normalizedCurrentLabel = currentLabel === '' ? 'unlabeled' : currentLabel;
 
-                    // Save the new label
-                    if (newLabel === 'unlabeled') {
-                        saveLabel(currentPRId, '');
-                    } else {
-                        saveLabel(currentPRId, newLabel);
+                    // Only move if the label actually changed
+                    if (newLabel !== normalizedCurrentLabel) {
+                        // Save the new label
+                        if (newLabel === 'unlabeled') {
+                            saveLabel(currentPRId, '');
+                        } else {
+                            saveLabel(currentPRId, newLabel);
+                        }
+
+                        // Move the card in the DOM directly instead of re-rendering
+                        const prItem = document.querySelector(`.pr-item[data-pr-id="${currentPRId}"]`);
+                        const targetContent = document.querySelector(`.kanban-content[data-label="${newLabel}"]`);
+
+                        if (prItem && targetContent) {
+                            // Remove empty state from target column if present
+                            const emptyState = targetContent.querySelector('.empty-state');
+                            if (emptyState) emptyState.remove();
+
+                            // Remember source column to update its count and possibly show empty state
+                            const sourceContent = prItem.closest('.kanban-content');
+
+                            // Move the card
+                            targetContent.appendChild(prItem);
+
+                            // Update column header counts
+                            updateColumnHeaderCount(sourceContent);
+                            updateColumnHeaderCount(targetContent);
+                        }
                     }
-
-                    // Re-render
-                    renderPRs();
 
                     // Close menu
                     contextMenu.classList.remove('show');
