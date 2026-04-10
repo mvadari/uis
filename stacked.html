@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stacked PR Dashboard - rippled</title>
+    <title>Stacked PR Dashboard - xrpld</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <style>
         :root {
@@ -564,7 +564,7 @@
             border: 1px solid var(--border-color);
             border-radius: 12px;
             padding: 24px;
-            max-width: 450px;
+            max-width: 520px;
             width: 90%;
             position: relative;
             box-shadow: 0 8px 24px rgba(140, 149, 159, 0.2);
@@ -671,6 +671,72 @@
             background: var(--bg-tertiary);
         }
 
+        .modal h3 {
+            font-size: 15px;
+            margin-top: 20px;
+            margin-bottom: 8px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .repo-list {
+            list-style: none;
+            margin-bottom: 12px;
+        }
+
+        .repo-list-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 10px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+
+        .repo-list-item .repo-label {
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+            color: var(--text-primary);
+        }
+
+        .repo-list-item .repo-default-branch {
+            color: var(--text-muted);
+            font-size: 11px;
+            margin-left: 8px;
+        }
+
+        .repo-list-item .remove-repo-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 16px;
+            padding: 0 4px;
+            line-height: 1;
+        }
+
+        .repo-list-item .remove-repo-btn:hover {
+            color: var(--accent-red);
+        }
+
+        .add-repo-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .add-repo-row input {
+            margin-bottom: 0;
+            font-size: 13px;
+            padding: 8px 10px;
+        }
+
+        .add-repo-row button {
+            white-space: nowrap;
+        }
+
         /* Empty States */
         .empty-state {
             text-align: center;
@@ -759,6 +825,15 @@
                 <button class="primary" onclick="saveToken()">Save Token</button>
                 <button class="secondary" onclick="clearToken()">Clear</button>
             </div>
+
+            <h3>📦 Repositories</h3>
+            <ul class="repo-list" id="repoList"></ul>
+            <div class="add-repo-row">
+                <input type="text" id="addRepoOwner" placeholder="owner">
+                <input type="text" id="addRepoName" placeholder="repo">
+                <input type="text" id="addRepoBranch" placeholder="default branch">
+                <button class="secondary" onclick="addRepo()">Add</button>
+            </div>
         </div>
     </div>
 
@@ -766,7 +841,7 @@
     <header class="top-bar">
         <div class="top-bar-left">
             <span class="logo">📚 Stacked PRs</span>
-            <span class="repo-badge">XRPLF/rippled</span>
+            <span class="repo-badge" id="repoBadge"></span>
             <div class="filters">
                 <button class="filter-btn active" data-filter="my" onclick="setFilter('my')">My Stacks</button>
                 <button class="filter-btn" data-filter="all" onclick="setFilter('all')">All Stacks</button>
@@ -816,10 +891,25 @@
     // ============================================================
     // CONFIGURATION
     // ============================================================
-    const REPO_OWNER = 'XRPLF';
-    const REPO_NAME = 'rippled';
-    const DEFAULT_BRANCH = 'develop';
+    const DEFAULT_REPOS = [
+        { owner: 'XRPLF', name: 'rippled', defaultBranch: 'develop' },
+    ];
+    const REPOS_KEY = 'stacked_prs_repos';
     const GITHUB_GRAPHQL_URL = 'https://api.github.com/graphql';
+
+    function loadRepos() {
+        try {
+            const saved = localStorage.getItem(REPOS_KEY);
+            if (saved) return JSON.parse(saved);
+        } catch (e) {}
+        return DEFAULT_REPOS;
+    }
+
+    function saveRepos(repos) {
+        localStorage.setItem(REPOS_KEY, JSON.stringify(repos));
+    }
+
+    let REPOS = loadRepos();
     const CACHE_KEY = 'stacked_prs_cache';
     const CACHE_TIMESTAMP_KEY = 'stacked_prs_cache_timestamp';
     const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
@@ -874,6 +964,8 @@
     // INITIALIZATION
     // ============================================================
     document.addEventListener('DOMContentLoaded', () => {
+        updateRepoBadge();
+
         // Check for ?pr= query param
         const urlParams = new URLSearchParams(window.location.search);
         const prNumber = urlParams.get('pr');
@@ -995,16 +1087,72 @@
     }
 
     // ============================================================
-    // AUTH
+    // AUTH & SETTINGS
     // ============================================================
     function showAuthModal() {
         updateTokenStatus();
+        renderRepoList();
         document.getElementById('tokenInput').value = '';
         document.getElementById('authModal').classList.remove('hidden');
     }
 
     function hideAuthModal() {
         document.getElementById('authModal').classList.add('hidden');
+    }
+
+    function renderRepoList() {
+        const list = document.getElementById('repoList');
+        list.innerHTML = REPOS.map((repo, i) => `
+            <li class="repo-list-item">
+                <span>
+                    <span class="repo-label">${escapeHtml(repo.owner)}/${escapeHtml(repo.name)}</span>
+                    <span class="repo-default-branch">(${escapeHtml(repo.defaultBranch)})</span>
+                </span>
+                <button class="remove-repo-btn" onclick="removeRepo(${i})" title="Remove">&times;</button>
+            </li>
+        `).join('');
+    }
+
+    function addRepo() {
+        const owner = document.getElementById('addRepoOwner').value.trim();
+        const name = document.getElementById('addRepoName').value.trim();
+        const branch = document.getElementById('addRepoBranch').value.trim() || 'main';
+        if (!owner || !name) return;
+
+        // Avoid duplicates
+        if (REPOS.some(r => r.owner === owner && r.name === name)) return;
+
+        REPOS.push({ owner, name, defaultBranch: branch });
+        saveRepos(REPOS);
+        renderRepoList();
+        updateRepoBadge();
+
+        document.getElementById('addRepoOwner').value = '';
+        document.getElementById('addRepoName').value = '';
+        document.getElementById('addRepoBranch').value = '';
+
+        // Clear cache and re-fetch
+        localStorage.removeItem(CACHE_KEY);
+        localStorage.removeItem(CACHE_TIMESTAMP_KEY);
+        if (state.token) fetchPRs(true);
+    }
+
+    function removeRepo(index) {
+        REPOS.splice(index, 1);
+        saveRepos(REPOS);
+        renderRepoList();
+        updateRepoBadge();
+
+        // Clear cache and re-fetch
+        localStorage.removeItem(CACHE_KEY);
+        localStorage.removeItem(CACHE_TIMESTAMP_KEY);
+        if (state.token) fetchPRs(true);
+    }
+
+    function updateRepoBadge() {
+        const badge = document.getElementById('repoBadge');
+        if (!badge) return;
+        badge.textContent = REPOS.map(r => `${r.owner}/${r.name}`).join(', ');
     }
 
     function updateTokenStatus() {
@@ -1127,37 +1275,43 @@
 
         try {
             let allPRs = [];
-            let cursor = null;
-            let pageCount = 0;
-            const maxPages = 3; // Limit pages to avoid rate limiting
 
-            do {
-                const data = await graphqlQuery(query, {
-                    owner: REPO_OWNER,
-                    name: REPO_NAME,
-                    cursor: cursor
-                });
+            for (const repo of REPOS) {
+                let cursor = null;
+                let pageCount = 0;
+                const maxPages = 3; // Limit pages to avoid rate limiting
 
-                const prs = data.repository.pullRequests.nodes.map(pr => ({
-                    number: pr.number,
-                    title: pr.title,
-                    state: pr.state,
-                    isDraft: pr.isDraft,
-                    author: pr.author?.login || 'unknown',
-                    headRefName: pr.headRefName,
-                    baseRefName: pr.baseRefName,
-                    headSha: pr.headRefOid,
-                    mergeable: pr.mergeable,
-                    reviewDecision: pr.reviewDecision,
-                    updatedAt: pr.updatedAt,
-                    ciStatus: pr.commits.nodes[0]?.commit?.statusCheckRollup?.state || 'UNKNOWN'
-                }));
+                do {
+                    const data = await graphqlQuery(query, {
+                        owner: repo.owner,
+                        name: repo.name,
+                        cursor: cursor
+                    });
 
-                allPRs = allPRs.concat(prs);
-                cursor = data.repository.pullRequests.pageInfo.endCursor;
-                pageCount++;
+                    const prs = data.repository.pullRequests.nodes.map(pr => ({
+                        number: pr.number,
+                        title: pr.title,
+                        state: pr.state,
+                        isDraft: pr.isDraft,
+                        author: pr.author?.login || 'unknown',
+                        headRefName: pr.headRefName,
+                        baseRefName: pr.baseRefName,
+                        headSha: pr.headRefOid,
+                        mergeable: pr.mergeable,
+                        reviewDecision: pr.reviewDecision,
+                        updatedAt: pr.updatedAt,
+                        ciStatus: pr.commits.nodes[0]?.commit?.statusCheckRollup?.state || 'UNKNOWN',
+                        repoOwner: repo.owner,
+                        repoName: repo.name,
+                        defaultBranch: repo.defaultBranch
+                    }));
 
-            } while (cursor && pageCount < maxPages);
+                    allPRs = allPRs.concat(prs);
+                    cursor = data.repository.pullRequests.pageInfo.endCursor;
+                    pageCount++;
+
+                } while (cursor && pageCount < maxPages);
+            }
 
             state.prs = allPRs;
             state.lastUpdateTime = Date.now();
@@ -1188,63 +1342,69 @@
     // ============================================================
     // STACK INFERENCE
     // ============================================================
+    function prKey(pr) {
+        return `${pr.repoOwner}/${pr.repoName}#${pr.number}`;
+    }
+
     function buildStacks() {
         const prs = state.prs;
         const prsByHead = new Map();
 
-        // Index PRs by their head branch
+        // Index PRs by their head branch (scoped by repo)
         // Only index open PRs - we use this to find parent PRs
         prs.forEach(pr => {
             // Don't index PRs whose head is the default branch
             // (these shouldn't be parents of other PRs in a stack)
-            if (pr.headRefName !== DEFAULT_BRANCH) {
-                prsByHead.set(pr.headRefName, pr);
+            if (pr.headRefName !== pr.defaultBranch) {
+                const key = `${pr.repoOwner}/${pr.repoName}:${pr.headRefName}`;
+                prsByHead.set(key, pr);
             }
         });
 
         // Build parent-child relationships
         // A PR is a child of another if:
-        // 1. Its base branch equals the parent's head branch
+        // 1. Its base branch equals the parent's head branch (in the same repo)
         // 2. Its base branch is NOT the default branch (those are root PRs)
         const children = new Map();
         const parents = new Map();
 
         prs.forEach(pr => {
             // PRs targeting the default branch are always roots (no parent)
-            if (pr.baseRefName === DEFAULT_BRANCH) {
+            if (pr.baseRefName === pr.defaultBranch) {
                 return;
             }
 
-            const parentPR = prsByHead.get(pr.baseRefName);
-            if (parentPR && parentPR.number !== pr.number) {
-                parents.set(pr.number, parentPR);
-                if (!children.has(parentPR.number)) {
-                    children.set(parentPR.number, []);
+            const key = `${pr.repoOwner}/${pr.repoName}:${pr.baseRefName}`;
+            const parentPR = prsByHead.get(key);
+            if (parentPR && prKey(parentPR) !== prKey(pr)) {
+                parents.set(prKey(pr), parentPR);
+                if (!children.has(prKey(parentPR))) {
+                    children.set(prKey(parentPR), []);
                 }
-                children.get(parentPR.number).push(pr);
+                children.get(prKey(parentPR)).push(pr);
             }
         });
 
         // Find root PRs (no parent PR, or parent PR is targeting default branch)
-        const roots = prs.filter(pr => !parents.has(pr.number));
+        const roots = prs.filter(pr => !parents.has(prKey(pr)));
 
         // Build stacks from roots
         const stacks = [];
         const visited = new Set();
 
         function buildStackFromRoot(root) {
-            if (visited.has(root.number)) return null;
+            if (visited.has(prKey(root))) return null;
 
             const stackPRs = [];
             const queue = [root];
 
             while (queue.length > 0) {
                 const current = queue.shift();
-                if (visited.has(current.number)) continue;
-                visited.add(current.number);
+                if (visited.has(prKey(current))) continue;
+                visited.add(prKey(current));
                 stackPRs.push(current);
 
-                const childPRs = children.get(current.number) || [];
+                const childPRs = children.get(prKey(current)) || [];
                 queue.push(...childPRs);
             }
 
@@ -1255,7 +1415,7 @@
             const ordered = [];
             const addOrdered = (pr) => {
                 ordered.push(pr);
-                const kids = children.get(pr.number) || [];
+                const kids = children.get(prKey(pr)) || [];
                 kids.forEach(kid => addOrdered(kid));
             };
             addOrdered(root);
@@ -1264,19 +1424,19 @@
             const stackChildren = new Map();
             const stackParents = new Map();
             ordered.forEach(pr => {
-                const kids = children.get(pr.number) || [];
+                const kids = children.get(prKey(pr)) || [];
                 const inStackKids = kids.filter(k => ordered.includes(k));
                 if (inStackKids.length > 0) {
                     stackChildren.set(pr.number, inStackKids);
                 }
-                const parent = parents.get(pr.number);
+                const parent = parents.get(prKey(pr));
                 if (parent && ordered.includes(parent)) {
                     stackParents.set(pr.number, parent);
                 }
             });
 
             return {
-                id: `stack-${root.number}`,
+                id: `stack-${root.repoOwner}-${root.repoName}-${root.number}`,
                 prs: ordered,
                 owner: root.author,
                 rootPR: root,
@@ -1409,10 +1569,13 @@
             groupedByBase.get(baseBranch).push(stack);
         });
 
-        // Sort base branches: default branch first, then alphabetically
+        // Sort base branches: default branches first, then alphabetically
+        const defaultBranches = new Set(REPOS.map(r => r.defaultBranch));
         const sortedBases = Array.from(groupedByBase.keys()).sort((a, b) => {
-            if (a === DEFAULT_BRANCH) return -1;
-            if (b === DEFAULT_BRANCH) return 1;
+            const aIsDefault = defaultBranches.has(a);
+            const bIsDefault = defaultBranches.has(b);
+            if (aIsDefault && !bIsDefault) return -1;
+            if (!aIsDefault && bIsDefault) return 1;
             return a.localeCompare(b);
         });
 
@@ -1437,7 +1600,7 @@
                                 <div class="stack-card ${state.selectedStackId === stack.id ? 'selected' : ''}"
                                      onclick="event.stopPropagation(); selectStack('${stack.id}')">
                                     <div class="stack-name">${escapeHtml(stack.prs[0].title)}</div>
-                                    <div class="stack-owner">by @${escapeHtml(stack.owner)}</div>
+                                    <div class="stack-owner">by @${escapeHtml(stack.owner)} · ${escapeHtml(stack.rootPR.repoName)}</div>
                                     <div class="stack-summary">
                                         <span class="summary-item">
                                             <span class="summary-dot dot-total"></span>
@@ -1496,11 +1659,12 @@
             const status = computePRStatus(pr, stack.parents);
             const parent = stack.parents.get(pr.number);
             const children = stack.children.get(pr.number) || [];
-            const prUrl = `https://github.com/${REPO_OWNER}/${REPO_NAME}/pull/${pr.number}`;
+            const repoSlug = `${pr.repoOwner}/${pr.repoName}`;
+            const prUrl = `https://github.com/${repoSlug}/pull/${pr.number}`;
             const compareParentUrl = parent
-                ? `https://github.com/${REPO_OWNER}/${REPO_NAME}/compare/${parent.headRefName}...${pr.headRefName}`
+                ? `https://github.com/${repoSlug}/compare/${parent.headRefName}...${pr.headRefName}`
                 : null;
-            const compareBaseUrl = `https://github.com/${REPO_OWNER}/${REPO_NAME}/compare/${pr.baseRefName}...${pr.headRefName}`;
+            const compareBaseUrl = `https://github.com/${repoSlug}/compare/${pr.baseRefName}...${pr.headRefName}`;
 
             const hasMultipleChildren = children.length > 1;
 
