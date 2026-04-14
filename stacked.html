@@ -1355,7 +1355,9 @@
         prs.forEach(pr => {
             // Don't index PRs whose head is the default branch
             // (these shouldn't be parents of other PRs in a stack)
-            if (pr.headRefName !== pr.defaultBranch) {
+            // Also don't index PRs where head === base, which indicates a fork PR
+            // targeting the same-named branch (not a stacked feature branch)
+            if (pr.headRefName !== pr.defaultBranch && pr.headRefName !== pr.baseRefName) {
                 const key = `${pr.repoOwner}/${pr.repoName}:${pr.headRefName}`;
                 prsByHead.set(key, pr);
             }
