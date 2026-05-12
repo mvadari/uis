@@ -1617,6 +1617,500 @@
         .btn-test-token:hover {
             background-color: #eaeef2;
         }
+
+        /* ============================================
+           DARK MODE - github.html specific
+           ============================================ */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #0d1117;
+                color: #e6edf3;
+            }
+            .header {
+                background-color: #161b22;
+                border-bottom-color: #30363d;
+            }
+            .header-top {
+                border-bottom-color: #30363d;
+            }
+            .header-bottom {
+                background-color: #161b22;
+            }
+            .header-logo {
+                color: #e6edf3;
+            }
+            .github-icon {
+                fill: #e6edf3;
+            }
+            .header-title {
+                color: #e6edf3;
+            }
+            button {
+                background-color: #21262d;
+                color: #e6edf3;
+                border-color: #30363d;
+            }
+            button:hover {
+                background-color: #30363d;
+                border-color: #8b949e;
+            }
+            button.active {
+                background-color: #1f6feb;
+                border-color: #1f6feb;
+                color: #ffffff;
+            }
+            .header-controls button {
+                background-color: #21262d;
+                color: #e6edf3;
+                border-color: #30363d;
+            }
+            .header-controls button:hover {
+                background-color: #30363d;
+                border-color: #8b949e;
+            }
+            .kanban-view::after {
+                background: linear-gradient(to left, rgba(13, 17, 23, 0.9), transparent);
+            }
+            .kanban-view::-webkit-scrollbar-track {
+                background: #0d1117;
+            }
+            .kanban-view::-webkit-scrollbar-thumb {
+                background: #30363d;
+            }
+            .kanban-view::-webkit-scrollbar-thumb:hover {
+                background: #3d444d;
+            }
+            .kanban-column {
+                background-color: #161b22;
+            }
+            .kanban-header {
+                background-color: #21262d;
+                border-color: #30363d;
+                color: #e6edf3;
+            }
+            .kanban-header .collapse-icon {
+                color: #8b949e;
+            }
+            .kanban-sort button {
+                border-color: #30363d;
+                color: #8b949e;
+            }
+            .kanban-sort button:hover {
+                background-color: #30363d;
+            }
+            .kanban-sort button.active {
+                background-color: #1f6feb;
+                color: #ffffff;
+                border-color: #1f6feb;
+            }
+            .kanban-content::-webkit-scrollbar-thumb {
+                background: #30363d;
+            }
+            .kanban-content::-webkit-scrollbar-thumb:hover {
+                background: #3d444d;
+            }
+            .kanban-column .pr-item {
+                border-color: #30363d;
+                background-color: #0d1117;
+            }
+            .kanban-column.drag-over {
+                background-color: #1c2a3d;
+            }
+            .empty-state {
+                color: #8b949e;
+            }
+            .empty-state-hint {
+                color: #6e7681;
+            }
+            .loading {
+                color: #8b949e;
+            }
+            .loading.with-spinner::before {
+                border-color: #21262d;
+                border-top-color: #58a6ff;
+            }
+            .pr-item:hover {
+                background-color: #161b22;
+            }
+            .pr-item.flagged {
+                background-color: #2d1b1b;
+                border-left-color: #f85149;
+            }
+            .pr-item.flagged:hover {
+                background-color: #3d1c1c;
+            }
+            .pr-icon {
+                color: #3fb950;
+            }
+            .pr-icon.draft {
+                color: #8b949e;
+            }
+            .pr-icon.queued {
+                color: #e3b341;
+            }
+            .pr-title {
+                color: #58a6ff;
+            }
+            .pr-meta {
+                color: #8b949e;
+            }
+            .ci-success {
+                color: #3fb950;
+            }
+            .ci-failure {
+                color: #f85149;
+            }
+            .ci-pending {
+                color: #e3b341;
+            }
+            .conflict-warning {
+                background-color: #3d2d00;
+                border-color: #9e6a03;
+                color: #e3b341;
+            }
+            .update-branch-btn {
+                background: linear-gradient(180deg, #21262d 0%, #1c2128 100%);
+                border-color: rgba(240, 246, 252, 0.1);
+                color: #e6edf3;
+                box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
+            }
+            .update-branch-btn:hover {
+                background: linear-gradient(180deg, #30363d 0%, #282e35 100%);
+                border-color: rgba(240, 246, 252, 0.2);
+            }
+            .update-branch-btn:active {
+                background-color: #282e35;
+                border-color: rgba(240, 246, 252, 0.25);
+            }
+            .last-updated {
+                color: #8b949e;
+            }
+            .pr-repo {
+                color: #58a6ff;
+            }
+            .label-selector select {
+                background-color: #0d1117;
+                color: #e6edf3;
+                border-color: #30363d;
+            }
+            .label-badge {
+                background-color: #1c2a3d;
+                border-color: #1f6feb;
+                color: #58a6ff;
+            }
+            .error {
+                background-color: #3d1c1c;
+                color: #f85149;
+                border-color: #da3633;
+            }
+            .error code {
+                background-color: #0d1117;
+            }
+            kbd {
+                background-color: #21262d;
+                border-color: #30363d;
+                box-shadow: inset 0 -1px 0 #30363d;
+                color: #e6edf3;
+            }
+            .help-section {
+                border-bottom-color: #30363d;
+            }
+            .help-section h3 {
+                color: #e6edf3;
+            }
+            .help-section a {
+                color: #58a6ff;
+            }
+            .preference-section {
+                border-bottom-color: #30363d;
+            }
+            .preference-section h3 {
+                color: #e6edf3;
+            }
+            input[type="text"] {
+                background-color: #0d1117;
+                color: #e6edf3;
+                border-color: #30363d;
+            }
+            .status-bar {
+                color: #8b949e;
+            }
+            .pr-count {
+                color: #8b949e;
+            }
+            .pr-count span:last-child {
+                color: #e6edf3;
+            }
+            .repo-filter label {
+                color: #8b949e;
+            }
+            .repo-filter select {
+                background-color: #21262d;
+                color: #e6edf3;
+                border-color: #30363d;
+            }
+            .notification {
+                background-color: #1f6feb;
+            }
+            .notification.success {
+                background-color: #238636;
+            }
+            .notification.info {
+                background-color: #1f6feb;
+            }
+            .label-item {
+                background-color: #21262d;
+                border-color: #30363d;
+            }
+            .label-item.dragging {
+                background-color: #1c2a3d;
+            }
+            .label-drag-handle {
+                color: #8b949e;
+            }
+            .label-name {
+                color: #e6edf3;
+            }
+            .label-name-input {
+                color: #e6edf3;
+                border-color: #30363d;
+                background-color: #0d1117;
+            }
+            .label-name-input[readonly] {
+                background-color: transparent;
+            }
+            .label-delete {
+                border-color: #30363d;
+                color: #f85149;
+            }
+            .label-delete:hover {
+                background-color: #da3633;
+                color: #ffffff;
+                border-color: #da3633;
+            }
+            .add-label-btn {
+                background-color: #21262d;
+                border-color: #30363d;
+                color: #58a6ff;
+            }
+            .add-label-btn:hover {
+                background-color: #30363d;
+                border-color: #58a6ff;
+            }
+            .modal-note {
+                background-color: #1c2a3d;
+                border-color: #1f6feb;
+                color: #58a6ff;
+            }
+            .modal-note code {
+                background-color: #21262d;
+            }
+            .note-tooltip {
+                background: linear-gradient(135deg, #3d2f00 0%, #4d3a00 100%);
+                color: #e6edf3;
+                border-color: #9e6a03;
+            }
+            .note-tooltip::after {
+                border-top-color: #9e6a03;
+            }
+            .note-tooltip::before {
+                border-top-color: #3d2f00;
+            }
+            .pr-tooltip {
+                background-color: #161b22;
+                color: #e6edf3;
+                border-color: #30363d;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            }
+            .pr-tooltip-title {
+                color: #e6edf3;
+            }
+            .pr-tooltip-row {
+                color: #8b949e;
+            }
+            .pr-tooltip-label {
+                color: #8b949e;
+            }
+            .pr-tooltip-value {
+                color: #e6edf3;
+            }
+            .pr-tooltip-branch {
+                background-color: #21262d;
+            }
+            .pr-tooltip-divider {
+                background-color: #30363d;
+            }
+            .pr-tooltip-query-badge {
+                background-color: #1c2a3d;
+                border-color: #1f6feb;
+                color: #58a6ff;
+            }
+            .context-menu {
+                background: #161b22;
+                border-color: #30363d;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            }
+            .context-menu-header {
+                color: #8b949e;
+                background-color: #21262d;
+                border-bottom-color: #30363d;
+            }
+            .context-menu-item {
+                color: #e6edf3;
+            }
+            .context-menu-item:hover {
+                background-color: #30363d;
+            }
+            .context-menu-item.current {
+                background-color: #1c2a3d;
+                color: #58a6ff;
+            }
+            .note-textarea {
+                background-color: #0d1117;
+                color: #e6edf3;
+                border-color: #30363d;
+            }
+            .note-textarea:focus {
+                border-color: #58a6ff;
+                box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+            }
+            .sort-controls select {
+                background-color: #0d1117;
+                color: #e6edf3;
+                border-color: #30363d;
+            }
+            .query-item {
+                background-color: #21262d;
+                border-color: #30363d;
+            }
+            .query-name-input {
+                background-color: #0d1117;
+                color: #e6edf3;
+                border-color: #30363d;
+            }
+            .query-name-input:focus {
+                border-color: #58a6ff;
+                box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+            }
+            .query-input {
+                background-color: #0d1117;
+                color: #e6edf3;
+                border-color: #30363d;
+            }
+            .query-input:focus {
+                border-color: #58a6ff;
+                box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+            }
+            .query-delete {
+                border-color: #30363d;
+                color: #f85149;
+            }
+            .query-delete:hover {
+                background-color: #da3633;
+                color: #ffffff;
+                border-color: #da3633;
+            }
+            .drop-indicator {
+                background-color: #58a6ff;
+            }
+            .drop-indicator::before {
+                background-color: #58a6ff;
+            }
+            .welcome-content {
+                background-color: #161b22;
+            }
+            .welcome-content h1 {
+                color: #e6edf3;
+            }
+            .welcome-content p {
+                color: #8b949e;
+            }
+            .welcome-required {
+                background-color: #3d2d00;
+                border-color: #9e6a03;
+            }
+            .welcome-required strong {
+                color: #e3b341;
+            }
+            .welcome-required p {
+                color: #e3b341;
+            }
+            .btn-large.primary {
+                background-color: #1f6feb;
+                color: #ffffff;
+            }
+            .btn-large.primary:hover {
+                background-color: #388bfd;
+            }
+            .settings-tabs {
+                border-bottom-color: #30363d;
+            }
+            .settings-tab {
+                color: #8b949e;
+            }
+            .settings-tab:hover {
+                color: #e6edf3;
+                background-color: #21262d;
+            }
+            .settings-tab.active {
+                color: #e6edf3;
+                border-bottom-color: #fd8c73;
+            }
+            .token-status:hover::after {
+                background-color: #30363d;
+                color: #e6edf3;
+            }
+            .token-status:hover::before {
+                border-top-color: #30363d;
+            }
+            .token-status.valid {
+                background-color: #1a4426;
+                color: #3fb950;
+            }
+            .token-status.invalid {
+                background-color: #3d1c1c;
+                color: #f85149;
+            }
+            .token-status.missing {
+                background-color: #3d2d00;
+                color: #e3b341;
+            }
+            .token-toggle {
+                color: #8b949e;
+            }
+            .token-toggle:hover {
+                color: #e6edf3;
+            }
+            .token-info {
+                background-color: #1c2a3d;
+                border-color: #1f6feb;
+            }
+            .token-info h3 {
+                color: #58a6ff;
+            }
+            .token-info p {
+                color: #58a6ff;
+            }
+            .token-info ul {
+                color: #58a6ff;
+            }
+            .btn-create-token {
+                background-color: #238636;
+                color: #ffffff;
+            }
+            .btn-create-token:hover {
+                background-color: #2ea043;
+                opacity: 1;
+            }
+            .btn-test-token {
+                background-color: #21262d;
+                color: #e6edf3;
+                border-color: #30363d;
+            }
+            .btn-test-token:hover {
+                background-color: #30363d;
+            }
+        }
     </style>
 </head>
 <body>
