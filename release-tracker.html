@@ -712,6 +712,7 @@
         const RELEASE_KEY = 'rippled_release_tracker_release';
         const CACHE_KEY = 'rippled_release_tracker_cache';
         const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000;
+        const CLOSED_PR_LIMIT = 100;
         const APPROVAL_EXCLUDED_REVIEWERS = new Set(['xrplf-ai-reviewer[bot]', 'Copilot']);
 
         let prs = [];
@@ -830,8 +831,8 @@
             return value.trim();
         }
 
-        function buildQuery(release) {
-            return `repo:${REPO_OWNER}/${REPO_NAME} is:pr milestone:"${release.replace(/"/g, '\\"')}"`;
+        function buildQuery(release, state) {
+            return `repo:${REPO_OWNER}/${REPO_NAME} is:pr is:${state} milestone:"${release.replace(/"/g, '\\"')}"`;
         }
 
         function updateQueryPreview() {
@@ -841,7 +842,7 @@
                 preview.textContent = 'Release lists are defined by GitHub milestones.';
                 return;
             }
-            preview.innerHTML = `Searching <code>milestone:"${escape(value)}"</code>.`;
+            preview.innerHTML = `Searching open PRs in <code>milestone:"${escape(value)}"</code>; recent closed PRs are capped at ${CLOSED_PR_LIMIT}.`;
         }
 
         function selectedMilestone() {
@@ -924,16 +925,28 @@
             }
         }
 
-        async function searchPRNumbersForRelease(release) {
+        async function searchPRNumbers(release, state, limit = Infinity) {
             const found = new Set();
-            const query = buildQuery(release);
-            for (let page = 1; page <= 3; page++) {
+            const query = buildQuery(release, state);
+            const maxPages = Number.isFinite(limit) ? Math.ceil(limit / 100) : 10;
+            for (let page = 1; page <= maxPages; page++) {
                 const url = `https://api.github.com/search/issues?q=${encodeURIComponent(query)}&per_page=100&page=${page}&sort=updated&order=desc`;
                 const data = await githubRequest(url);
-                (data.items || []).forEach(item => found.add(item.number));
-                if (!data.items || data.items.length < 100) break;
+                for (const item of data.items || []) {
+                    if (found.size >= limit) break;
+                    found.add(item.number);
+                }
+                if (!data.items || data.items.length < 100 || found.size >= limit) break;
             }
             return [...found].sort((a, b) => b - a);
+        }
+
+        async function searchPRNumbersForRelease(release) {
+            const [openNumbers, closedNumbers] = await Promise.all([
+                searchPRNumbers(release, 'open'),
+                searchPRNumbers(release, 'closed', CLOSED_PR_LIMIT)
+            ]);
+            return [...new Set([...openNumbers, ...closedNumbers])].sort((a, b) => b - a);
         }
 
         async function fetchPR(number) {
