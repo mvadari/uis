@@ -1224,7 +1224,7 @@
             const total = prs.length;
             const open = prs.filter(pr => pr.state === 'open').length;
             const merged = prs.filter(pr => pr.merged_at).length;
-            const readyToMerge = prs.filter(pr => (pr.labels || []).some(label => label.name === 'Ready to merge')).length;
+            const readyToMerge = prs.filter(pr => !pr.merged_at && (pr.labels || []).some(label => label.name === 'Ready to merge')).length;
             const attention = prs.filter(needsAttention).length;
 
             document.getElementById('totalCount').textContent = total;
