@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>rippled Release Tracker</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="stylesheet" href="shared-styles.css">
+    <style>
+        body {
+            background-color: #f6f8fa;
+            color: #1f2328;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+
+        .header {
+            background-color: #ffffff;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .github-icon {
+            width: 28px;
+            height: 28px;
+            fill: #1f2328;
+            flex-shrink: 0;
+        }
+
+        .title-block {
+            min-width: 0;
+        }
+
+        .header-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1f2328;
+            line-height: 1.2;
+        }
+
+        .header-subtitle {
+            font-size: 13px;
+            color: #656d76;
+            margin-top: 2px;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .panel {
+            background-color: #ffffff;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            margin-top: 12px;
+            padding: 14px 16px;
+        }
+
+        .release-form {
+            display: grid;
+            grid-template-columns: minmax(180px, 280px) 1fr auto auto;
+            gap: 10px;
+            align-items: end;
+        }
+
+        .field label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #656d76;
+        }
+
+        .query-preview {
+            font-size: 12px;
+            color: #656d76;
+            padding-bottom: 7px;
+            min-width: 0;
+        }
+
+        .query-preview code {
+            background-color: #f6f8fa;
+            border: 1px solid #d0d7de;
+            border-radius: 4px;
+            padding: 2px 5px;
+            color: #1f2328;
+            overflow-wrap: anywhere;
+        }
+
+        .token-input-container {
+            display: none;
+            gap: 8px;
+            align-items: center;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #d0d7de;
+        }
+
+        .token-input-container.visible {
+            display: flex;
+        }
+
+        .token-input-container input {
+            flex: 1;
+        }
+
+        .status-bar {
+            display: flex;
+            gap: 18px;
+            flex-wrap: wrap;
+            align-items: center;
+            font-size: 13px;
+            color: #656d76;
+        }
+
+        .status-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .status-item strong {
+            color: #1f2328;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(130px, 1fr));
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .summary-tile {
+            background-color: #ffffff;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            padding: 12px;
+        }
+
+        .summary-label {
+            font-size: 12px;
+            color: #656d76;
+        }
+
+        .summary-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1f2328;
+            line-height: 1.1;
+            margin-top: 4px;
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .add-pr-form {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex: 1;
+            min-width: 280px;
+            justify-content: flex-end;
+        }
+
+        .add-pr-form input {
+            max-width: 360px;
+        }
+
+        .filter-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .filter-controls select,
+        .filter-controls input {
+            width: auto;
+            min-width: 160px;
+        }
+
+        .pr-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .pr-card {
+            background-color: #ffffff;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            padding: 14px 16px;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .pr-card:hover {
+            border-color: #afb8c1;
+            box-shadow: 0 1px 3px rgba(31, 35, 40, 0.12);
+        }
+
+        .pr-card.closed {
+            opacity: 0.82;
+        }
+
+        .pr-card.merged {
+            border-left: 4px solid #8250df;
+        }
+
+        .pr-card.open {
+            border-left: 4px solid #1a7f37;
+        }
+
+        .pr-card.draft {
+            border-left-color: #656d76;
+        }
+
+        .pr-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .pr-title-row {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            flex-wrap: wrap;
+        }
+
+        .pr-title {
+            color: #0969da;
+            text-decoration: none;
+            font-size: 15px;
+            font-weight: 600;
+            line-height: 1.35;
+        }
+
+        .pr-title:hover {
+            text-decoration: underline;
+        }
+
+        .pr-number {
+            color: #656d76;
+            font-size: 14px;
+        }
+
+        .pr-actions {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .icon-button {
+            width: 30px;
+            height: 30px;
+            padding: 0;
+            justify-content: center;
+        }
+
+        .pr-meta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            color: #656d76;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        .branch-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+            padding: 7px 10px;
+            background-color: #f6f8fa;
+            border-radius: 4px;
+            font-size: 11px;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+        }
+
+        .branch-info code {
+            background-color: #ffffff;
+            border: 1px solid #d0d7de;
+            border-radius: 3px;
+            padding: 1px 5px;
+        }
+
+        .pr-badges {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+            align-items: center;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 500;
+            border: 1px solid transparent;
+            white-space: nowrap;
+        }
+
+        .badge-success {
+            background-color: #dafbe1;
+            color: #1a7f37;
+            border-color: #aceebb;
+        }
+
+        .badge-warning {
+            background-color: #fff8c5;
+            color: #9a6700;
+            border-color: #d4a72c;
+        }
+
+        .badge-danger {
+            background-color: #ffebe9;
+            color: #d1242f;
+            border-color: #ff8182;
+        }
+
+        .badge-info {
+            background-color: #ddf4ff;
+            color: #0969da;
+            border-color: #54aeff;
+        }
+
+        .badge-merged {
+            background-color: #fbefff;
+            color: #8250df;
+            border-color: #d8b9ff;
+        }
+
+        .badge-neutral {
+            background-color: #eaeef2;
+            color: #656d76;
+            border-color: #d0d7de;
+        }
+
+        .label-badge {
+            border-color: rgba(31, 35, 40, 0.15);
+        }
+
+        .loading,
+        .empty-state {
+            background-color: #ffffff;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            padding: 36px 20px;
+            text-align: center;
+            color: #656d76;
+            font-size: 14px;
+        }
+
+        .error-banner {
+            display: none;
+            background-color: #ffebe9;
+            border: 1px solid #ff8182;
+            color: #d1242f;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin-top: 12px;
+            line-height: 1.5;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 16px;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            animation: slideIn 0.25s ease-out;
+            font-size: 14px;
+            color: #ffffff;
+            max-width: 420px;
+        }
+
+        .notification.success { background-color: #1f883d; }
+        .notification.error { background-color: #d1242f; }
+        .notification.info { background-color: #0969da; }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @media (max-width: 900px) {
+            .header {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .header-controls {
+                justify-content: flex-start;
+            }
+
+            .release-form {
+                grid-template-columns: 1fr;
+            }
+
+            .summary-grid {
+                grid-template-columns: repeat(2, minmax(130px, 1fr));
+            }
+
+            .toolbar,
+            .add-pr-form {
+                align-items: stretch;
+                flex-direction: column;
+                justify-content: flex-start;
+            }
+
+            .add-pr-form input,
+            .filter-controls select,
+            .filter-controls input {
+                max-width: none;
+                width: 100%;
+            }
+        }
+
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #0d1117;
+                color: #e6edf3;
+            }
+
+            .header,
+            .panel,
+            .summary-tile,
+            .pr-card,
+            .loading,
+            .empty-state {
+                background-color: #161b22;
+                border-color: #30363d;
+            }
+
+            .github-icon {
+                fill: #e6edf3;
+            }
+
+            .header-title,
+            .summary-value,
+            .status-item strong,
+            .query-preview code {
+                color: #e6edf3;
+            }
+
+            .header-subtitle,
+            .field label,
+            .query-preview,
+            .status-bar,
+            .summary-label,
+            .pr-number,
+            .pr-meta,
+            .empty-state,
+            .loading {
+                color: #8b949e;
+            }
+
+            .token-input-container,
+            .error-banner {
+                border-color: #30363d;
+            }
+
+            .query-preview code,
+            .branch-info {
+                background-color: #0d1117;
+                border-color: #30363d;
+            }
+
+            .branch-info code {
+                background-color: #161b22;
+                border-color: #30363d;
+            }
+
+            .pr-title {
+                color: #58a6ff;
+            }
+
+            .badge-neutral {
+                background-color: #21262d;
+                color: #8b949e;
+                border-color: #30363d;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-left">
+                <svg class="github-icon" viewBox="0 0 16 16" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+                </svg>
+                <div class="title-block">
+                    <div class="header-title">rippled Release Tracker</div>
+                    <div class="header-subtitle">XRPLF/rippled release PR status</div>
+                </div>
+            </div>
+            <div class="header-controls">
+                <a class="btn" href="github.html">PR Board</a>
+                <button class="btn" id="toggleToken" title="Configure GitHub token">Token</button>
+                <button class="btn btn-primary" id="refreshBtn">Refresh</button>
+            </div>
+        </div>
+
+        <div class="panel">
+            <form class="release-form" id="releaseForm">
+                <div class="field">
+                    <label for="releaseSelect">Release Milestone</label>
+                    <select id="releaseSelect">
+                        <option value="">Loading milestones...</option>
+                    </select>
+                </div>
+                <div class="query-preview" id="queryPreview"></div>
+                <button class="btn" type="submit">Load Milestone</button>
+                <button class="btn" type="button" id="clearManualBtn">Clear Added PRs</button>
+            </form>
+            <div class="token-input-container" id="tokenContainer">
+                <input type="password" id="tokenInput" placeholder="GitHub Personal Access Token">
+                <button class="btn" id="saveToken" type="button">Save</button>
+            </div>
+        </div>
+
+        <div class="panel status-bar">
+            <div class="status-item">
+                <span>Repository:</span>
+                <strong>XRPLF/rippled</strong>
+            </div>
+            <div class="status-item">
+                <span>Last updated:</span>
+                <strong id="lastUpdated">Never</strong>
+            </div>
+            <div class="status-item">
+                <span>Auto-refresh:</span>
+                <input type="checkbox" id="autoRefresh" checked>
+                <label for="autoRefresh">every 5 min</label>
+            </div>
+            <div class="status-item">
+                <span>Token:</span>
+                <strong id="tokenStatus">Not set</strong>
+            </div>
+        </div>
+
+        <div class="summary-grid" id="summaryGrid">
+            <div class="summary-tile"><div class="summary-label">Total PRs</div><div class="summary-value" id="totalCount">0</div></div>
+            <div class="summary-tile"><div class="summary-label">Open</div><div class="summary-value" id="openCount">0</div></div>
+            <div class="summary-tile"><div class="summary-label">Merged</div><div class="summary-value" id="mergedCount">0</div></div>
+            <div class="summary-tile"><div class="summary-label">CI Passing</div><div class="summary-value" id="passingCount">0</div></div>
+            <div class="summary-tile"><div class="summary-label">Needs Attention</div><div class="summary-value" id="attentionCount">0</div></div>
+        </div>
+
+        <div class="panel toolbar">
+            <div class="filter-controls">
+                <select id="statusFilter" aria-label="Filter by status">
+                    <option value="all">All statuses</option>
+                    <option value="open">Open</option>
+                    <option value="draft">Draft</option>
+                    <option value="merged">Merged</option>
+                    <option value="closed">Closed</option>
+                    <option value="attention">Needs attention</option>
+                </select>
+                <select id="sortMode" aria-label="Sort pull requests">
+                    <option value="number-desc">Newest first</option>
+                    <option value="number-asc">Oldest first</option>
+                    <option value="updated-desc">Recently updated</option>
+                    <option value="ci">CI status</option>
+                    <option value="approvals">Approvals</option>
+                </select>
+                <input type="search" id="searchInput" placeholder="Filter PRs or labels">
+            </div>
+            <form class="add-pr-form" id="addPrForm">
+                <input type="text" id="addPrInput" placeholder="Add PR number or GitHub URL" autocomplete="off">
+                <button class="btn btn-secondary" type="submit">Add PR</button>
+            </form>
+        </div>
+
+        <div id="error" class="error-banner"></div>
+        <div id="prList" class="pr-list">
+            <div class="empty-state">Choose a release milestone to load matching pull requests.</div>
+        </div>
+    </div>
+
+    <script src="shared-utils.js"></script>
+    <script>
+        const REPO_OWNER = 'XRPLF';
+        const REPO_NAME = 'rippled';
+        const TOKEN_KEY = 'github_token';
+        const RELEASE_KEY = 'rippled_release_tracker_release';
+        const CACHE_KEY = 'rippled_release_tracker_cache';
+        const MANUAL_KEY = 'rippled_release_tracker_manual_prs';
+        const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000;
+
+        let prs = [];
+        let milestones = [];
+        let releaseName = localStorage.getItem(RELEASE_KEY) || '';
+        let autoRefreshTimer = null;
+
+        function getToken() {
+            return localStorage.getItem(TOKEN_KEY) || '';
+        }
+
+        function getHeaders() {
+            const token = getToken();
+            const headers = {
+                'Accept': 'application/vnd.github+json',
+                'X-GitHub-Api-Version': '2022-11-28'
+            };
+            if (token) headers.Authorization = `token ${token}`;
+            return headers;
+        }
+
+        function notify(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 3200);
+        }
+
+        function escape(value) {
+            return escapeHtml(String(value ?? ''));
+        }
+
+        function formatRelativeTime(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+
+            if (diffMins < 1) return 'just now';
+            if (diffMins < 60) return `${diffMins}m ago`;
+            if (diffHours < 24) return `${diffHours}h ago`;
+            if (diffDays < 30) return `${diffDays}d ago`;
+            return date.toLocaleDateString();
+        }
+
+        function manualMap() {
+            try {
+                return JSON.parse(localStorage.getItem(MANUAL_KEY) || '{}');
+            } catch {
+                return {};
+            }
+        }
+
+        function getManualPRs() {
+            const key = releaseName.trim();
+            if (!key) return [];
+            return manualMap()[key] || [];
+        }
+
+        function saveManualPRs(numbers) {
+            const key = releaseName.trim();
+            if (!key) return;
+            const map = manualMap();
+            map[key] = [...new Set(numbers.map(Number))].sort((a, b) => b - a);
+            localStorage.setItem(MANUAL_KEY, JSON.stringify(map));
+        }
+
+        function cacheKey() {
+            return `${CACHE_KEY}:${releaseName.trim() || 'default'}`;
+        }
+
+        function normalizeRelease(value) {
+            return value.trim();
+        }
+
+        function buildQuery(release) {
+            return `repo:${REPO_OWNER}/${REPO_NAME} is:pr milestone:"${release.replace(/"/g, '\\"')}"`;
+        }
+
+        function updateQueryPreview() {
+            const value = normalizeRelease(document.getElementById('releaseSelect').value);
+            const preview = document.getElementById('queryPreview');
+            if (!value) {
+                preview.textContent = 'Release lists are defined by GitHub milestones. Added PRs are saved per milestone.';
+                return;
+            }
+            preview.innerHTML = `Searching <code>milestone:"${escape(value)}"</code>.`;
+        }
+
+        async function githubRequest(url, options = {}) {
+            const response = await fetch(url, {
+                ...options,
+                headers: {
+                    ...getHeaders(),
+                    ...(options.headers || {})
+                }
+            });
+            if (!response.ok) {
+                let message = `GitHub API returned ${response.status}`;
+                try {
+                    const data = await response.json();
+                    if (data.message) message = data.message;
+                } catch {}
+                throw new Error(message);
+            }
+            return response.json();
+        }
+
+        async function fetchMilestones() {
+            const allMilestones = [];
+            for (let page = 1; page <= 5; page++) {
+                const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/milestones?state=open&sort=due_on&direction=desc&per_page=100&page=${page}`;
+                const data = await githubRequest(url);
+                allMilestones.push(...data);
+                if (data.length < 100) break;
+            }
+            return allMilestones;
+        }
+
+        function renderMilestoneOptions() {
+            const select = document.getElementById('releaseSelect');
+            const previous = releaseName || select.value;
+
+            if (milestones.length === 0) {
+                select.innerHTML = '<option value="">No milestones found</option>';
+                updateQueryPreview();
+                return;
+            }
+
+            select.innerHTML = [
+                '<option value="">Choose a milestone...</option>',
+                ...milestones.map(milestone => {
+                    const details = [
+                        `${milestone.open_issues} open`,
+                        `${milestone.closed_issues} closed`
+                    ].join(', ');
+                    return `<option value="${escape(milestone.title)}" title="${escape(details)}">${escape(milestone.title)} (${escape(details)})</option>`;
+                })
+            ].join('');
+
+            if (previous && milestones.some(milestone => milestone.title === previous)) {
+                select.value = previous;
+            } else if (previous) {
+                releaseName = '';
+                localStorage.removeItem(RELEASE_KEY);
+            }
+            updateQueryPreview();
+        }
+
+        async function loadMilestones() {
+            const select = document.getElementById('releaseSelect');
+            select.innerHTML = '<option value="">Loading milestones...</option>';
+            try {
+                milestones = await fetchMilestones();
+                renderMilestoneOptions();
+            } catch (error) {
+                console.error('Error fetching milestones:', error);
+                select.innerHTML = '<option value="">Failed to load milestones</option>';
+                document.getElementById('error').textContent = `Failed to load milestones: ${error.message}`;
+                document.getElementById('error').style.display = 'block';
+                updateQueryPreview();
+            }
+        }
+
+        async function searchPRNumbersForRelease(release) {
+            const found = new Set();
+            const query = buildQuery(release);
+            for (let page = 1; page <= 3; page++) {
+                const url = `https://api.github.com/search/issues?q=${encodeURIComponent(query)}&per_page=100&page=${page}&sort=updated&order=desc`;
+                const data = await githubRequest(url);
+                (data.items || []).forEach(item => found.add(item.number));
+                if (!data.items || data.items.length < 100) break;
+            }
+            getManualPRs().forEach(number => found.add(number));
+            return [...found].sort((a, b) => b - a);
+        }
+
+        async function fetchPR(number) {
+            const data = await githubRequest(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${number}`);
+            data.releaseTrackerManual = getManualPRs().includes(number);
+            return data;
+        }
+
+        async function fetchCIStatus(sha) {
+            try {
+                const [checksData, statusData] = await Promise.all([
+                    githubRequest(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits/${sha}/check-runs`),
+                    githubRequest(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits/${sha}/status`)
+                ]);
+
+                let successCount = 0;
+                let failureCount = 0;
+                let pendingCount = 0;
+                const failedChecks = [];
+
+                (checksData.check_runs || []).forEach(check => {
+                    if (check.conclusion === 'success' || check.conclusion === 'skipped' || check.conclusion === 'neutral') successCount++;
+                    else if (['failure', 'timed_out', 'cancelled', 'action_required'].includes(check.conclusion)) {
+                        failureCount++;
+                        failedChecks.push({ name: check.name, url: check.html_url });
+                    } else if (check.status === 'in_progress' || check.status === 'queued' || check.status === 'waiting') {
+                        pendingCount++;
+                    }
+                });
+
+                (statusData.statuses || []).forEach(status => {
+                    if (status.state === 'success') successCount++;
+                    else if (status.state === 'failure' || status.state === 'error') {
+                        failureCount++;
+                        failedChecks.push({ name: status.context, url: status.target_url || statusData.target_url });
+                    } else if (status.state === 'pending') {
+                        pendingCount++;
+                    }
+                });
+
+                return {
+                    totalCount: (checksData.total_count || 0) + (statusData.statuses || []).length,
+                    successCount,
+                    failureCount,
+                    pendingCount,
+                    failedChecks
+                };
+            } catch (error) {
+                console.error('Error fetching CI status:', error);
+                return null;
+            }
+        }
+
+        async function fetchReviews(prNumber) {
+            try {
+                const reviews = await githubRequest(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${prNumber}/reviews`);
+                const reviewerStates = {};
+                reviews.forEach(review => {
+                    if (review.state !== 'COMMENTED' && review.state !== 'PENDING' && review.user) {
+                        reviewerStates[review.user.login] = review.state;
+                    }
+                });
+
+                return {
+                    approvals: Object.entries(reviewerStates).filter(([, state]) => state === 'APPROVED').map(([user]) => user),
+                    changesRequested: Object.entries(reviewerStates).filter(([, state]) => state === 'CHANGES_REQUESTED').map(([user]) => user)
+                };
+            } catch (error) {
+                console.error('Error fetching reviews:', error);
+                return { approvals: [], changesRequested: [] };
+            }
+        }
+
+        async function enrichPR(pr) {
+            const [ciStatus, reviews] = await Promise.all([
+                fetchCIStatus(pr.head.sha),
+                fetchReviews(pr.number)
+            ]);
+            return { ...pr, ciStatus, reviews };
+        }
+
+        async function fetchAllPRs(isAutoRefresh = false) {
+            const release = normalizeRelease(document.getElementById('releaseSelect').value);
+            if (!release) {
+                notify('Choose a milestone first', 'error');
+                return;
+            }
+
+            releaseName = release;
+            localStorage.setItem(RELEASE_KEY, releaseName);
+            document.getElementById('error').style.display = 'none';
+            if (!isAutoRefresh) document.getElementById('prList').innerHTML = '<div class="loading">Loading release PRs...</div>';
+
+            try {
+                const numbers = await searchPRNumbersForRelease(releaseName);
+                if (numbers.length === 0) {
+                    prs = [];
+                    localStorage.setItem(cacheKey(), JSON.stringify(prs));
+                    document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+                    renderPRs();
+                    return;
+                }
+
+                const fetched = await Promise.all(numbers.map(fetchPR));
+                prs = await Promise.all(fetched.map(enrichPR));
+                localStorage.setItem(cacheKey(), JSON.stringify(prs));
+                document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+                renderPRs();
+                if (isAutoRefresh) notify('Release tracker refreshed', 'success');
+            } catch (error) {
+                console.error('Error fetching release PRs:', error);
+                document.getElementById('error').textContent = error.message;
+                document.getElementById('error').style.display = 'block';
+
+                const cached = localStorage.getItem(cacheKey());
+                if (cached) {
+                    prs = JSON.parse(cached);
+                    renderPRs();
+                    notify('Showing cached release data', 'info');
+                } else {
+                    document.getElementById('prList').innerHTML = '<div class="empty-state">Failed to load release PRs.</div>';
+                }
+            }
+        }
+
+        function ciState(pr) {
+            const ci = pr.ciStatus;
+            if (!ci || ci.totalCount === 0) return 'none';
+            if (ci.failureCount > 0) return 'failure';
+            if (ci.pendingCount > 0) return 'pending';
+            return 'success';
+        }
+
+        function needsAttention(pr) {
+            return pr.draft ||
+                pr.reviews?.changesRequested?.length > 0 ||
+                ciState(pr) === 'failure' ||
+                ciState(pr) === 'pending' ||
+                pr.mergeable === false ||
+                pr.mergeable_state === 'dirty' ||
+                pr.mergeable_state === 'blocked';
+        }
+
+        function renderStateBadge(pr) {
+            if (pr.merged_at) return '<span class="badge badge-merged">Merged</span>';
+            if (pr.state === 'closed') return '<span class="badge badge-neutral">Closed</span>';
+            if (pr.draft) return '<span class="badge badge-neutral">Draft</span>';
+            if (pr.mergeable === false || pr.mergeable_state === 'dirty') return '<span class="badge badge-danger">Conflicts</span>';
+            if (pr.mergeable_state === 'blocked') return '<span class="badge badge-warning">Blocked</span>';
+            return '<span class="badge badge-success">Open</span>';
+        }
+
+        function renderCIStatus(pr) {
+            const ci = pr.ciStatus;
+            if (!ci) return '<span class="badge badge-neutral">CI unknown</span>';
+            if (ci.failureCount > 0) {
+                const failedUrl = ci.failedChecks[0]?.url || `${pr.html_url}/checks`;
+                const failedNames = ci.failedChecks.map(check => check.name).slice(0, 4).join(', ');
+                return `<a class="badge badge-danger" href="${escape(failedUrl)}" target="_blank" title="${escape(failedNames)}">${ci.failureCount} failed</a>`;
+            }
+            if (ci.pendingCount > 0) return `<span class="badge badge-warning">${ci.pendingCount} pending</span>`;
+            if (ci.successCount > 0) return `<span class="badge badge-success">${ci.successCount} passed</span>`;
+            return '<span class="badge badge-neutral">No CI</span>';
+        }
+
+        function renderApprovals(pr) {
+            const reviews = pr.reviews || { approvals: [], changesRequested: [] };
+            const badges = [];
+            if (reviews.approvals.length > 0) {
+                badges.push(`<span class="badge badge-success" title="Approved by ${escape(reviews.approvals.join(', '))}">${reviews.approvals.length} approval${reviews.approvals.length === 1 ? '' : 's'}</span>`);
+            } else {
+                badges.push('<span class="badge badge-neutral">0 approvals</span>');
+            }
+            if (reviews.changesRequested.length > 0) {
+                badges.push(`<span class="badge badge-danger" title="Changes requested by ${escape(reviews.changesRequested.join(', '))}">Changes requested: ${reviews.changesRequested.length}</span>`);
+            }
+            return badges.join('');
+        }
+
+        function labelStyle(label) {
+            const color = label.color || 'eaeef2';
+            const red = parseInt(color.slice(0, 2), 16);
+            const green = parseInt(color.slice(2, 4), 16);
+            const blue = parseInt(color.slice(4, 6), 16);
+            const brightness = (red * 299 + green * 587 + blue * 114) / 1000;
+            const textColor = brightness > 145 ? '#1f2328' : '#ffffff';
+            return `background-color:#${color};color:${textColor};`;
+        }
+
+        function sortPRs(items) {
+            const mode = document.getElementById('sortMode').value;
+            const sorted = [...items];
+            sorted.sort((a, b) => {
+                if (mode === 'number-asc') return a.number - b.number;
+                if (mode === 'updated-desc') return new Date(b.updated_at) - new Date(a.updated_at);
+                if (mode === 'ci') return ['failure', 'pending', 'none', 'success'].indexOf(ciState(a)) - ['failure', 'pending', 'none', 'success'].indexOf(ciState(b));
+                if (mode === 'approvals') return (b.reviews?.approvals?.length || 0) - (a.reviews?.approvals?.length || 0);
+                return b.number - a.number;
+            });
+            return sorted;
+        }
+
+        function filteredPRs() {
+            const status = document.getElementById('statusFilter').value;
+            const search = document.getElementById('searchInput').value.trim().toLowerCase();
+            return sortPRs(prs.filter(pr => {
+                const statusMatch =
+                    status === 'all' ||
+                    (status === 'open' && pr.state === 'open' && !pr.draft) ||
+                    (status === 'draft' && pr.draft) ||
+                    (status === 'merged' && pr.merged_at) ||
+                    (status === 'closed' && pr.state === 'closed' && !pr.merged_at) ||
+                    (status === 'attention' && needsAttention(pr));
+
+                const haystack = [
+                    pr.number,
+                    pr.title,
+                    pr.user?.login,
+                    pr.base?.ref,
+                    pr.head?.ref,
+                    ...(pr.labels || []).map(label => label.name)
+                ].join(' ').toLowerCase();
+                return statusMatch && (!search || haystack.includes(search));
+            }));
+        }
+
+        function renderSummary() {
+            const total = prs.length;
+            const open = prs.filter(pr => pr.state === 'open').length;
+            const merged = prs.filter(pr => pr.merged_at).length;
+            const passing = prs.filter(pr => ciState(pr) === 'success').length;
+            const attention = prs.filter(needsAttention).length;
+
+            document.getElementById('totalCount').textContent = total;
+            document.getElementById('openCount').textContent = open;
+            document.getElementById('mergedCount').textContent = merged;
+            document.getElementById('passingCount').textContent = passing;
+            document.getElementById('attentionCount').textContent = attention;
+        }
+
+        function renderPRs() {
+            renderSummary();
+            document.getElementById('tokenStatus').textContent = getToken() ? 'Set' : 'Not set';
+            const container = document.getElementById('prList');
+            const items = filteredPRs();
+
+            if (prs.length === 0) {
+                container.innerHTML = '<div class="empty-state">No PRs found for this release yet. Add a PR manually or try a different release name.</div>';
+                return;
+            }
+
+            if (items.length === 0) {
+                container.innerHTML = '<div class="empty-state">No PRs match the current filters.</div>';
+                return;
+            }
+
+            container.innerHTML = items.map(pr => {
+                const cardState = pr.merged_at ? 'merged' : pr.state === 'open' ? 'open' : 'closed';
+                const labels = (pr.labels || []).map(label => `<span class="badge label-badge" style="${labelStyle(label)}">${escape(label.name)}</span>`).join('');
+                const manual = pr.releaseTrackerManual ? '<span class="badge badge-info">Added</span>' : '';
+                const reviewers = pr.requested_reviewers?.length ? `<span class="badge badge-info">${pr.requested_reviewers.length} awaiting review</span>` : '';
+                const removeButton = `<button class="btn icon-button" title="Remove this PR from the selected GitHub milestone" onclick="removeFromMilestone(${pr.number})">x</button>`;
+
+                return `
+                    <article class="pr-card ${cardState} ${pr.draft ? 'draft' : ''}">
+                        <div class="pr-header">
+                            <div>
+                                <div class="pr-title-row">
+                                    <a href="${escape(pr.html_url)}" target="_blank" class="pr-title">${escape(pr.title)}</a>
+                                    <span class="pr-number">#${pr.number}</span>
+                                    ${manual}
+                                </div>
+                                <div class="pr-meta">
+                                    <span>by ${escape(pr.user?.login || 'unknown')}</span>
+                                    <span title="${escape(new Date(pr.updated_at).toLocaleString())}">updated ${formatRelativeTime(pr.updated_at)}</span>
+                                    <span>${pr.changed_files || 0} files</span>
+                                    <span>${pr.commits || 0} commits</span>
+                                    <span>${(pr.comments || 0) + (pr.review_comments || 0)} comments</span>
+                                </div>
+                            </div>
+                            <div class="pr-actions">
+                                ${removeButton}
+                            </div>
+                        </div>
+                        <div class="branch-info">
+                            <code>${escape(pr.head?.ref || '')}</code>
+                            <span>to</span>
+                            <code>${escape(pr.base?.ref || '')}</code>
+                            <span style="margin-left:auto;">+${pr.additions || 0} -${pr.deletions || 0}</span>
+                        </div>
+                        <div class="pr-badges">
+                            ${renderStateBadge(pr)}
+                            ${renderCIStatus(pr)}
+                            ${renderApprovals(pr)}
+                            ${reviewers}
+                            ${labels}
+                        </div>
+                    </article>
+                `;
+            }).join('');
+        }
+
+        function parsePRNumber(value) {
+            const trimmed = value.trim();
+            if (/^\d+$/.test(trimmed)) return Number(trimmed);
+            const match = trimmed.match(/github\.com\/XRPLF\/rippled\/pull\/(\d+)/i) || trimmed.match(/\/pull\/(\d+)/i);
+            return match ? Number(match[1]) : null;
+        }
+
+        async function addManualPR(value) {
+            if (!releaseName.trim()) {
+                notify('Load a release before adding PRs', 'error');
+                return;
+            }
+            const number = parsePRNumber(value);
+            if (!number) {
+                notify('Enter a PR number or GitHub PR URL', 'error');
+                return;
+            }
+            const manual = getManualPRs();
+            if (!manual.includes(number)) {
+                saveManualPRs([...manual, number]);
+            }
+            document.getElementById('addPrInput').value = '';
+            notify(`Added PR #${number}`, 'success');
+            await fetchAllPRs();
+        }
+
+        function removeManualPR(number) {
+            saveManualPRs(getManualPRs().filter(existing => existing !== number));
+            prs = prs.filter(pr => !(pr.number === number && pr.releaseTrackerManual));
+            localStorage.setItem(cacheKey(), JSON.stringify(prs));
+            renderPRs();
+            notify(`Removed PR #${number}`, 'success');
+        }
+
+        async function removeFromMilestone(number) {
+            if (!getToken()) {
+                notify('GitHub token required to edit milestones', 'error');
+                return;
+            }
+            if (!releaseName.trim()) {
+                notify('Choose a milestone first', 'error');
+                return;
+            }
+
+            try {
+                await githubRequest(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${number}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ milestone: null })
+                });
+                saveManualPRs(getManualPRs().filter(existing => existing !== number));
+                prs = prs.filter(pr => pr.number !== number);
+                localStorage.setItem(cacheKey(), JSON.stringify(prs));
+                renderPRs();
+                notify(`Removed PR #${number} from ${releaseName}`, 'success');
+            } catch (error) {
+                console.error('Error removing milestone:', error);
+                notify(error.message || 'Failed to remove PR from milestone', 'error');
+            }
+        }
+
+        function clearManualPRs() {
+            if (!releaseName.trim()) {
+                notify('No release loaded', 'error');
+                return;
+            }
+            saveManualPRs([]);
+            prs = prs.filter(pr => !pr.releaseTrackerManual);
+            localStorage.setItem(cacheKey(), JSON.stringify(prs));
+            renderPRs();
+            notify('Cleared added PRs for this release', 'success');
+        }
+
+        function setupAutoRefresh() {
+            const checkbox = document.getElementById('autoRefresh');
+            if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+            if (checkbox.checked) {
+                autoRefreshTimer = setInterval(() => {
+                    if (releaseName.trim()) fetchAllPRs(true);
+                }, AUTO_REFRESH_INTERVAL);
+            }
+        }
+
+        document.getElementById('tokenStatus').textContent = getToken() ? 'Set' : 'Not set';
+
+        document.getElementById('releaseSelect').addEventListener('change', updateQueryPreview);
+        document.getElementById('releaseForm').addEventListener('submit', event => {
+            event.preventDefault();
+            fetchAllPRs();
+        });
+        document.getElementById('refreshBtn').addEventListener('click', () => fetchAllPRs());
+        document.getElementById('toggleToken').addEventListener('click', () => {
+            const container = document.getElementById('tokenContainer');
+            container.classList.toggle('visible');
+            document.getElementById('tokenInput').value = getToken();
+        });
+        document.getElementById('saveToken').addEventListener('click', () => {
+            const token = document.getElementById('tokenInput').value.trim();
+            if (token) localStorage.setItem(TOKEN_KEY, token);
+            else localStorage.removeItem(TOKEN_KEY);
+            document.getElementById('tokenContainer').classList.remove('visible');
+            document.getElementById('tokenStatus').textContent = getToken() ? 'Set' : 'Not set';
+            notify('Token saved', 'success');
+            loadMilestones();
+        });
+        document.getElementById('autoRefresh').addEventListener('change', setupAutoRefresh);
+        document.getElementById('statusFilter').addEventListener('change', renderPRs);
+        document.getElementById('sortMode').addEventListener('change', renderPRs);
+        document.getElementById('searchInput').addEventListener('input', renderPRs);
+        document.getElementById('addPrForm').addEventListener('submit', event => {
+            event.preventDefault();
+            addManualPR(document.getElementById('addPrInput').value);
+        });
+        document.getElementById('clearManualBtn').addEventListener('click', clearManualPRs);
+
+        async function initialize() {
+            await loadMilestones();
+            if (!releaseName) {
+                setupAutoRefresh();
+                return;
+            }
+
+            const cached = localStorage.getItem(cacheKey());
+            if (cached) {
+                try {
+                    prs = JSON.parse(cached);
+                    renderPRs();
+                } catch {}
+            }
+            fetchAllPRs();
+            setupAutoRefresh();
+        }
+
+        initialize();
+    </script>
+</body>
+</html>

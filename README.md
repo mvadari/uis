@@ -64,6 +64,19 @@ Track the stacked PRs for the XRPL Smart Escrow feature.
 
 ---
 
+### 🚢 rippled Release Tracker
+Track pull requests for an XRPLF/rippled release.
+
+**Features:**
+- Loads releases from open XRPLF/rippled milestones
+- Shows labels, CI status, merge state, and approval count
+- Saves manually added PRs per release
+- Shares GitHub token with PR Dashboard
+
+[**Launch rippled Release Tracker →**](https://mvadari.github.io/uis/release-tracker.html)
+
+---
+
 ### 🔍 XRPL Server Changes
 Explore proposed changes to the XRP Ledger server (rippled) in a non-technical friendly interface.
 
@@ -148,4 +161,3 @@ MIT License - feel free to use and modify as needed.
 ## Contributing
 
 Contributions are welcome! Feel free to open issues or submit pull requests. Responses are not likely to be prioritized, however, as this is mostly just a personal project.
-
