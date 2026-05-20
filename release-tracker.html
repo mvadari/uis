@@ -79,7 +79,7 @@
 
         .release-form {
             display: grid;
-            grid-template-columns: minmax(180px, 280px) 1fr auto auto;
+            grid-template-columns: minmax(180px, 280px) 1fr;
             gap: 10px;
             align-items: end;
         }
@@ -241,6 +241,17 @@
             border-left-color: #656d76;
         }
 
+        .pr-card-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(190px, 260px);
+            gap: 16px;
+            align-items: start;
+        }
+
+        .pr-main {
+            min-width: 0;
+        }
+
         .pr-header {
             display: flex;
             align-items: flex-start;
@@ -375,6 +386,55 @@
             border-color: rgba(31, 35, 40, 0.15);
         }
 
+        .review-panel {
+            background-color: #f6f8fa;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            padding: 8px;
+            min-width: 0;
+        }
+
+        .review-panel-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: #656d76;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+
+        .review-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 5px 4px;
+            font-size: 12px;
+            color: #1f2328;
+            min-width: 0;
+        }
+
+        .review-row + .review-row {
+            border-top: 1px solid #eaeef2;
+        }
+
+        .reviewer-name {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .review-status {
+            flex-shrink: 0;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .review-status.approved { color: #1a7f37; }
+        .review-status.changes_requested { color: #d1242f; }
+        .review-status.commented { color: #0969da; }
+        .review-status.requested { color: #9a6700; }
+
         .loading,
         .empty-state {
             background-color: #ffffff;
@@ -451,6 +511,10 @@
                 max-width: none;
                 width: 100%;
             }
+
+            .pr-card-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
         @media (prefers-color-scheme: dark) {
@@ -517,6 +581,23 @@
                 color: #8b949e;
                 border-color: #30363d;
             }
+
+            .review-panel {
+                background-color: #0d1117;
+                border-color: #30363d;
+            }
+
+            .review-panel-title {
+                color: #8b949e;
+            }
+
+            .review-row {
+                color: #e6edf3;
+            }
+
+            .review-row + .review-row {
+                border-top-color: #30363d;
+            }
         }
     </style>
 </head>
@@ -533,14 +614,13 @@
                 </div>
             </div>
             <div class="header-controls">
-                <a class="btn" href="github.html">PR Board</a>
                 <button class="btn" id="toggleToken" title="Configure GitHub token">Token</button>
                 <button class="btn btn-primary" id="refreshBtn">Refresh</button>
             </div>
         </div>
 
         <div class="panel">
-            <form class="release-form" id="releaseForm">
+            <div class="release-form">
                 <div class="field">
                     <label for="releaseSelect">Release Milestone</label>
                     <select id="releaseSelect">
@@ -548,9 +628,7 @@
                     </select>
                 </div>
                 <div class="query-preview" id="queryPreview"></div>
-                <button class="btn" type="submit">Load Milestone</button>
-                <button class="btn" type="button" id="clearManualBtn">Clear Added PRs</button>
-            </form>
+            </div>
             <div class="token-input-container" id="tokenContainer">
                 <input type="password" id="tokenInput" placeholder="GitHub Personal Access Token">
                 <button class="btn" id="saveToken" type="button">Save</button>
@@ -581,7 +659,7 @@
             <div class="summary-tile"><div class="summary-label">Total PRs</div><div class="summary-value" id="totalCount">0</div></div>
             <div class="summary-tile"><div class="summary-label">Open</div><div class="summary-value" id="openCount">0</div></div>
             <div class="summary-tile"><div class="summary-label">Merged</div><div class="summary-value" id="mergedCount">0</div></div>
-            <div class="summary-tile"><div class="summary-label">CI Passing</div><div class="summary-value" id="passingCount">0</div></div>
+            <div class="summary-tile"><div class="summary-label">Ready to merge</div><div class="summary-value" id="readyToMergeCount">0</div></div>
             <div class="summary-tile"><div class="summary-label">Needs Attention</div><div class="summary-value" id="attentionCount">0</div></div>
         </div>
 
@@ -605,8 +683,8 @@
                 <input type="search" id="searchInput" placeholder="Filter PRs or labels">
             </div>
             <form class="add-pr-form" id="addPrForm">
-                <input type="text" id="addPrInput" placeholder="Add PR number or GitHub URL" autocomplete="off">
-                <button class="btn btn-secondary" type="submit">Add PR</button>
+                <input type="text" id="addPrInput" placeholder="PR number or GitHub URL" autocomplete="off">
+                <button class="btn btn-secondary" type="submit">Add to Milestone</button>
             </form>
         </div>
 
@@ -623,8 +701,8 @@
         const TOKEN_KEY = 'github_token';
         const RELEASE_KEY = 'rippled_release_tracker_release';
         const CACHE_KEY = 'rippled_release_tracker_cache';
-        const MANUAL_KEY = 'rippled_release_tracker_manual_prs';
         const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000;
+        const APPROVAL_EXCLUDED_REVIEWERS = new Set(['xrplf-ai-reviewer[bot]', 'Copilot']);
 
         let prs = [];
         let milestones = [];
@@ -672,28 +750,6 @@
             return date.toLocaleDateString();
         }
 
-        function manualMap() {
-            try {
-                return JSON.parse(localStorage.getItem(MANUAL_KEY) || '{}');
-            } catch {
-                return {};
-            }
-        }
-
-        function getManualPRs() {
-            const key = releaseName.trim();
-            if (!key) return [];
-            return manualMap()[key] || [];
-        }
-
-        function saveManualPRs(numbers) {
-            const key = releaseName.trim();
-            if (!key) return;
-            const map = manualMap();
-            map[key] = [...new Set(numbers.map(Number))].sort((a, b) => b - a);
-            localStorage.setItem(MANUAL_KEY, JSON.stringify(map));
-        }
-
         function cacheKey() {
             return `${CACHE_KEY}:${releaseName.trim() || 'default'}`;
         }
@@ -710,10 +766,15 @@
             const value = normalizeRelease(document.getElementById('releaseSelect').value);
             const preview = document.getElementById('queryPreview');
             if (!value) {
-                preview.textContent = 'Release lists are defined by GitHub milestones. Added PRs are saved per milestone.';
+                preview.textContent = 'Release lists are defined by GitHub milestones.';
                 return;
             }
             preview.innerHTML = `Searching <code>milestone:"${escape(value)}"</code>.`;
+        }
+
+        function selectedMilestone() {
+            const title = normalizeRelease(document.getElementById('releaseSelect').value);
+            return milestones.find(milestone => milestone.title === title) || null;
         }
 
         async function githubRequest(url, options = {}) {
@@ -800,14 +861,11 @@
                 (data.items || []).forEach(item => found.add(item.number));
                 if (!data.items || data.items.length < 100) break;
             }
-            getManualPRs().forEach(number => found.add(number));
             return [...found].sort((a, b) => b - a);
         }
 
         async function fetchPR(number) {
-            const data = await githubRequest(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${number}`);
-            data.releaseTrackerManual = getManualPRs().includes(number);
-            return data;
+            return githubRequest(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${number}`);
         }
 
         async function fetchCIStatus(sha) {
@@ -858,20 +916,27 @@
         async function fetchReviews(prNumber) {
             try {
                 const reviews = await githubRequest(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${prNumber}/reviews`);
-                const reviewerStates = {};
+                const decisiveStates = {};
+                const latestStates = {};
                 reviews.forEach(review => {
-                    if (review.state !== 'COMMENTED' && review.state !== 'PENDING' && review.user) {
-                        reviewerStates[review.user.login] = review.state;
+                    if (review.state !== 'PENDING' && review.user) {
+                        latestStates[review.user.login] = review.state;
+                        if (review.state !== 'COMMENTED') {
+                            decisiveStates[review.user.login] = review.state;
+                        }
                     }
                 });
 
+                const countsAsApproval = user => !APPROVAL_EXCLUDED_REVIEWERS.has(user);
+
                 return {
-                    approvals: Object.entries(reviewerStates).filter(([, state]) => state === 'APPROVED').map(([user]) => user),
-                    changesRequested: Object.entries(reviewerStates).filter(([, state]) => state === 'CHANGES_REQUESTED').map(([user]) => user)
+                    approvals: Object.entries(decisiveStates).filter(([user, state]) => state === 'APPROVED' && countsAsApproval(user)).map(([user]) => user),
+                    changesRequested: Object.entries(decisiveStates).filter(([, state]) => state === 'CHANGES_REQUESTED').map(([user]) => user),
+                    reviewers: Object.entries(latestStates).map(([user, state]) => ({ user, state }))
                 };
             } catch (error) {
                 console.error('Error fetching reviews:', error);
-                return { approvals: [], changesRequested: [] };
+                return { approvals: [], changesRequested: [], reviewers: [] };
             }
         }
 
@@ -981,6 +1046,64 @@
             return badges.join('');
         }
 
+        function reviewStatusLabel(state) {
+            const labels = {
+                APPROVED: 'Approved',
+                CHANGES_REQUESTED: 'Changes requested',
+                COMMENTED: 'Commented',
+                REQUESTED: 'Requested'
+            };
+            return labels[state] || state.replace(/_/g, ' ').toLowerCase();
+        }
+
+        function reviewStatusClass(state) {
+            return state.toLowerCase();
+        }
+
+        function reviewerRows(pr) {
+            const rows = new Map();
+            (pr.reviews?.reviewers || []).forEach(review => {
+                rows.set(review.user, review.state);
+            });
+            (pr.requested_reviewers || []).forEach(user => {
+                if (!rows.has(user.login)) rows.set(user.login, 'REQUESTED');
+            });
+            (pr.requested_teams || []).forEach(team => {
+                const name = `@${team.slug}`;
+                if (!rows.has(name)) rows.set(name, 'REQUESTED');
+            });
+            return [...rows.entries()].sort(([a], [b]) => a.localeCompare(b));
+        }
+
+        function renderReviewers(pr) {
+            const rows = reviewerRows(pr);
+            if (rows.length === 0) {
+                return `
+                    <aside class="review-panel">
+                        <div class="review-panel-title">Reviewers</div>
+                        <span class="review-row">
+                            <span class="reviewer-name">No reviewers</span>
+                            <span class="review-status requested">None</span>
+                        </span>
+                    </aside>
+                `;
+            }
+
+            const list = rows.map(([user, state]) => `
+                <span class="review-row">
+                    <span class="reviewer-name">${escape(user)}</span>
+                    <span class="review-status ${reviewStatusClass(state)}">${escape(reviewStatusLabel(state))}</span>
+                </span>
+            `).join('');
+
+            return `
+                <aside class="review-panel">
+                    <div class="review-panel-title">Reviewers</div>
+                    ${list}
+                </aside>
+            `;
+        }
+
         function labelStyle(label) {
             const color = label.color || 'eaeef2';
             const red = parseInt(color.slice(0, 2), 16);
@@ -1032,13 +1155,13 @@
             const total = prs.length;
             const open = prs.filter(pr => pr.state === 'open').length;
             const merged = prs.filter(pr => pr.merged_at).length;
-            const passing = prs.filter(pr => ciState(pr) === 'success').length;
+            const readyToMerge = prs.filter(pr => (pr.labels || []).some(label => label.name === 'Ready to merge')).length;
             const attention = prs.filter(needsAttention).length;
 
             document.getElementById('totalCount').textContent = total;
             document.getElementById('openCount').textContent = open;
             document.getElementById('mergedCount').textContent = merged;
-            document.getElementById('passingCount').textContent = passing;
+            document.getElementById('readyToMergeCount').textContent = readyToMerge;
             document.getElementById('attentionCount').textContent = attention;
         }
 
@@ -1049,7 +1172,7 @@
             const items = filteredPRs();
 
             if (prs.length === 0) {
-                container.innerHTML = '<div class="empty-state">No PRs found for this release yet. Add a PR manually or try a different release name.</div>';
+                container.innerHTML = '<div class="empty-state">No PRs found for this milestone yet. Add a PR to assign it to this milestone.</div>';
                 return;
             }
 
@@ -1061,43 +1184,44 @@
             container.innerHTML = items.map(pr => {
                 const cardState = pr.merged_at ? 'merged' : pr.state === 'open' ? 'open' : 'closed';
                 const labels = (pr.labels || []).map(label => `<span class="badge label-badge" style="${labelStyle(label)}">${escape(label.name)}</span>`).join('');
-                const manual = pr.releaseTrackerManual ? '<span class="badge badge-info">Added</span>' : '';
-                const reviewers = pr.requested_reviewers?.length ? `<span class="badge badge-info">${pr.requested_reviewers.length} awaiting review</span>` : '';
                 const removeButton = `<button class="btn icon-button" title="Remove this PR from the selected GitHub milestone" onclick="removeFromMilestone(${pr.number})">x</button>`;
 
                 return `
                     <article class="pr-card ${cardState} ${pr.draft ? 'draft' : ''}">
-                        <div class="pr-header">
-                            <div>
-                                <div class="pr-title-row">
-                                    <a href="${escape(pr.html_url)}" target="_blank" class="pr-title">${escape(pr.title)}</a>
-                                    <span class="pr-number">#${pr.number}</span>
-                                    ${manual}
+                        <div class="pr-card-grid">
+                            <div class="pr-main">
+                                <div class="pr-header">
+                                    <div>
+                                        <div class="pr-title-row">
+                                            <a href="${escape(pr.html_url)}" target="_blank" class="pr-title">${escape(pr.title)}</a>
+                                            <span class="pr-number">#${pr.number}</span>
+                                        </div>
+                                        <div class="pr-meta">
+                                            <span>by ${escape(pr.user?.login || 'unknown')}</span>
+                                            <span title="${escape(new Date(pr.updated_at).toLocaleString())}">updated ${formatRelativeTime(pr.updated_at)}</span>
+                                            <span>${pr.changed_files || 0} files</span>
+                                            <span>${pr.commits || 0} commits</span>
+                                            <span>${(pr.comments || 0) + (pr.review_comments || 0)} comments</span>
+                                        </div>
+                                    </div>
+                                    <div class="pr-actions">
+                                        ${removeButton}
+                                    </div>
                                 </div>
-                                <div class="pr-meta">
-                                    <span>by ${escape(pr.user?.login || 'unknown')}</span>
-                                    <span title="${escape(new Date(pr.updated_at).toLocaleString())}">updated ${formatRelativeTime(pr.updated_at)}</span>
-                                    <span>${pr.changed_files || 0} files</span>
-                                    <span>${pr.commits || 0} commits</span>
-                                    <span>${(pr.comments || 0) + (pr.review_comments || 0)} comments</span>
+                                <div class="branch-info">
+                                    <code>${escape(pr.head?.ref || '')}</code>
+                                    <span>to</span>
+                                    <code>${escape(pr.base?.ref || '')}</code>
+                                    <span style="margin-left:auto;">+${pr.additions || 0} -${pr.deletions || 0}</span>
+                                </div>
+                                <div class="pr-badges">
+                                    ${renderStateBadge(pr)}
+                                    ${renderCIStatus(pr)}
+                                    ${renderApprovals(pr)}
+                                    ${labels}
                                 </div>
                             </div>
-                            <div class="pr-actions">
-                                ${removeButton}
-                            </div>
-                        </div>
-                        <div class="branch-info">
-                            <code>${escape(pr.head?.ref || '')}</code>
-                            <span>to</span>
-                            <code>${escape(pr.base?.ref || '')}</code>
-                            <span style="margin-left:auto;">+${pr.additions || 0} -${pr.deletions || 0}</span>
-                        </div>
-                        <div class="pr-badges">
-                            ${renderStateBadge(pr)}
-                            ${renderCIStatus(pr)}
-                            ${renderApprovals(pr)}
-                            ${reviewers}
-                            ${labels}
+                            ${renderReviewers(pr)}
                         </div>
                     </article>
                 `;
@@ -1111,9 +1235,21 @@
             return match ? Number(match[1]) : null;
         }
 
-        async function addManualPR(value) {
-            if (!releaseName.trim()) {
-                notify('Load a release before adding PRs', 'error');
+        async function addPRToMilestone(value) {
+            if (!getToken()) {
+                notify('GitHub token required to edit milestones', 'error');
+                return;
+            }
+            const release = normalizeRelease(document.getElementById('releaseSelect').value);
+            if (!release) {
+                notify('Choose a milestone before adding PRs', 'error');
+                return;
+            }
+            releaseName = release;
+            localStorage.setItem(RELEASE_KEY, releaseName);
+            const milestone = selectedMilestone();
+            if (!milestone) {
+                notify('Selected milestone is not available', 'error');
                 return;
             }
             const number = parsePRNumber(value);
@@ -1121,21 +1257,19 @@
                 notify('Enter a PR number or GitHub PR URL', 'error');
                 return;
             }
-            const manual = getManualPRs();
-            if (!manual.includes(number)) {
-                saveManualPRs([...manual, number]);
+            try {
+                await githubRequest(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${number}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ milestone: milestone.number })
+                });
+                document.getElementById('addPrInput').value = '';
+                notify(`Added PR #${number} to ${releaseName}`, 'success');
+                await fetchAllPRs();
+            } catch (error) {
+                console.error('Error adding milestone:', error);
+                notify(error.message || 'Failed to add PR to milestone', 'error');
             }
-            document.getElementById('addPrInput').value = '';
-            notify(`Added PR #${number}`, 'success');
-            await fetchAllPRs();
-        }
-
-        function removeManualPR(number) {
-            saveManualPRs(getManualPRs().filter(existing => existing !== number));
-            prs = prs.filter(pr => !(pr.number === number && pr.releaseTrackerManual));
-            localStorage.setItem(cacheKey(), JSON.stringify(prs));
-            renderPRs();
-            notify(`Removed PR #${number}`, 'success');
         }
 
         async function removeFromMilestone(number) {
@@ -1154,7 +1288,6 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ milestone: null })
                 });
-                saveManualPRs(getManualPRs().filter(existing => existing !== number));
                 prs = prs.filter(pr => pr.number !== number);
                 localStorage.setItem(cacheKey(), JSON.stringify(prs));
                 renderPRs();
@@ -1163,18 +1296,6 @@
                 console.error('Error removing milestone:', error);
                 notify(error.message || 'Failed to remove PR from milestone', 'error');
             }
-        }
-
-        function clearManualPRs() {
-            if (!releaseName.trim()) {
-                notify('No release loaded', 'error');
-                return;
-            }
-            saveManualPRs([]);
-            prs = prs.filter(pr => !pr.releaseTrackerManual);
-            localStorage.setItem(cacheKey(), JSON.stringify(prs));
-            renderPRs();
-            notify('Cleared added PRs for this release', 'success');
         }
 
         function setupAutoRefresh() {
@@ -1189,9 +1310,8 @@
 
         document.getElementById('tokenStatus').textContent = getToken() ? 'Set' : 'Not set';
 
-        document.getElementById('releaseSelect').addEventListener('change', updateQueryPreview);
-        document.getElementById('releaseForm').addEventListener('submit', event => {
-            event.preventDefault();
+        document.getElementById('releaseSelect').addEventListener('change', () => {
+            updateQueryPreview();
             fetchAllPRs();
         });
         document.getElementById('refreshBtn').addEventListener('click', () => fetchAllPRs());
@@ -1215,9 +1335,8 @@
         document.getElementById('searchInput').addEventListener('input', renderPRs);
         document.getElementById('addPrForm').addEventListener('submit', event => {
             event.preventDefault();
-            addManualPR(document.getElementById('addPrInput').value);
+            addPRToMilestone(document.getElementById('addPrInput').value);
         });
-        document.getElementById('clearManualBtn').addEventListener('click', clearManualPRs);
 
         async function initialize() {
             await loadMilestones();

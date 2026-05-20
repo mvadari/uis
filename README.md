@@ -70,7 +70,7 @@ Track pull requests for an XRPLF/rippled release.
 **Features:**
 - Loads releases from open XRPLF/rippled milestones
 - Shows labels, CI status, merge state, and approval count
-- Saves manually added PRs per release
+- Assigns and removes PRs from the selected milestone
 - Shares GitHub token with PR Dashboard
 
 [**Launch rippled Release Tracker →**](https://mvadari.github.io/uis/release-tracker.html)
