@@ -156,6 +156,16 @@
             border: 1px solid #d0d7de;
             border-radius: 6px;
             padding: 12px;
+            cursor: pointer;
+            text-align: left;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .summary-tile:hover,
+        .summary-tile:focus {
+            border-color: #0969da;
+            box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.1);
+            outline: none;
         }
 
         .summary-label {
@@ -656,11 +666,11 @@
         </div>
 
         <div class="summary-grid" id="summaryGrid">
-            <div class="summary-tile"><div class="summary-label">Total PRs</div><div class="summary-value" id="totalCount">0</div></div>
-            <div class="summary-tile"><div class="summary-label">Open</div><div class="summary-value" id="openCount">0</div></div>
-            <div class="summary-tile"><div class="summary-label">Merged</div><div class="summary-value" id="mergedCount">0</div></div>
-            <div class="summary-tile"><div class="summary-label">Ready to merge</div><div class="summary-value" id="readyToMergeCount">0</div></div>
-            <div class="summary-tile"><div class="summary-label">Needs Attention</div><div class="summary-value" id="attentionCount">0</div></div>
+            <button class="summary-tile" type="button" data-summary-filter="total"><div class="summary-label">Total PRs</div><div class="summary-value" id="totalCount">0</div></button>
+            <button class="summary-tile" type="button" data-summary-filter="open"><div class="summary-label">Open</div><div class="summary-value" id="openCount">0</div></button>
+            <button class="summary-tile" type="button" data-summary-filter="merged"><div class="summary-label">Merged</div><div class="summary-value" id="mergedCount">0</div></button>
+            <button class="summary-tile" type="button" data-summary-filter="ready"><div class="summary-label">Ready to merge</div><div class="summary-value" id="readyToMergeCount">0</div></button>
+            <button class="summary-tile" type="button" data-summary-filter="attention"><div class="summary-label">Needs Attention</div><div class="summary-value" id="attentionCount">0</div></button>
         </div>
 
         <div class="panel toolbar">
@@ -752,6 +762,68 @@
 
         function cacheKey() {
             return `${CACHE_KEY}:${releaseName.trim() || 'default'}`;
+        }
+
+        function compactPR(pr) {
+            return {
+                number: pr.number,
+                title: pr.title,
+                html_url: pr.html_url,
+                state: pr.state,
+                draft: pr.draft,
+                merged_at: pr.merged_at,
+                mergeable: pr.mergeable,
+                mergeable_state: pr.mergeable_state,
+                updated_at: pr.updated_at,
+                changed_files: pr.changed_files,
+                commits: pr.commits,
+                comments: pr.comments,
+                review_comments: pr.review_comments,
+                additions: pr.additions,
+                deletions: pr.deletions,
+                user: pr.user ? { login: pr.user.login } : null,
+                head: pr.head ? { ref: pr.head.ref, sha: pr.head.sha } : null,
+                base: pr.base ? { ref: pr.base.ref } : null,
+                labels: (pr.labels || []).map(label => ({ name: label.name, color: label.color })),
+                requested_reviewers: (pr.requested_reviewers || []).map(user => ({ login: user.login })),
+                requested_teams: (pr.requested_teams || []).map(team => ({ slug: team.slug })),
+                ciStatus: pr.ciStatus,
+                reviews: pr.reviews
+            };
+        }
+
+        function clearReleaseCaches() {
+            Object.keys(localStorage)
+                .filter(key => key.startsWith(`${CACHE_KEY}:`))
+                .forEach(key => localStorage.removeItem(key));
+        }
+
+        function savePRsToCache() {
+            const key = cacheKey();
+            const compact = JSON.stringify(prs.map(compactPR));
+            try {
+                localStorage.setItem(key, compact);
+            } catch (error) {
+                clearReleaseCaches();
+                try {
+                    localStorage.setItem(key, compact);
+                } catch (retryError) {
+                    console.warn('Release tracker cache skipped:', retryError);
+                }
+            }
+        }
+
+        function loadPRsFromCache() {
+            const cached = localStorage.getItem(cacheKey());
+            if (!cached) return false;
+            try {
+                prs = JSON.parse(cached);
+                renderPRs();
+                return true;
+            } catch {
+                localStorage.removeItem(cacheKey());
+                return false;
+            }
         }
 
         function normalizeRelease(value) {
@@ -964,7 +1036,7 @@
                 const numbers = await searchPRNumbersForRelease(releaseName);
                 if (numbers.length === 0) {
                     prs = [];
-                    localStorage.setItem(cacheKey(), JSON.stringify(prs));
+                    savePRsToCache();
                     document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
                     renderPRs();
                     return;
@@ -972,7 +1044,7 @@
 
                 const fetched = await Promise.all(numbers.map(fetchPR));
                 prs = await Promise.all(fetched.map(enrichPR));
-                localStorage.setItem(cacheKey(), JSON.stringify(prs));
+                savePRsToCache();
                 document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
                 renderPRs();
                 if (isAutoRefresh) notify('Release tracker refreshed', 'success');
@@ -981,10 +1053,7 @@
                 document.getElementById('error').textContent = error.message;
                 document.getElementById('error').style.display = 'block';
 
-                const cached = localStorage.getItem(cacheKey());
-                if (cached) {
-                    prs = JSON.parse(cached);
-                    renderPRs();
+                if (loadPRsFromCache()) {
                     notify('Showing cached release data', 'info');
                 } else {
                     document.getElementById('prList').innerHTML = '<div class="empty-state">Failed to load release PRs.</div>';
@@ -1165,6 +1234,27 @@
             document.getElementById('attentionCount').textContent = attention;
         }
 
+        function applySummaryFilter(filter) {
+            const statusFilter = document.getElementById('statusFilter');
+            const searchInput = document.getElementById('searchInput');
+            searchInput.value = '';
+
+            if (filter === 'open') {
+                statusFilter.value = 'open';
+            } else if (filter === 'merged') {
+                statusFilter.value = 'merged';
+            } else if (filter === 'attention') {
+                statusFilter.value = 'attention';
+            } else {
+                statusFilter.value = 'all';
+                if (filter === 'ready') {
+                    searchInput.value = 'Ready to merge';
+                }
+            }
+
+            renderPRs();
+        }
+
         function renderPRs() {
             renderSummary();
             document.getElementById('tokenStatus').textContent = getToken() ? 'Set' : 'Not set';
@@ -1289,7 +1379,7 @@
                     body: JSON.stringify({ milestone: null })
                 });
                 prs = prs.filter(pr => pr.number !== number);
-                localStorage.setItem(cacheKey(), JSON.stringify(prs));
+                savePRsToCache();
                 renderPRs();
                 notify(`Removed PR #${number} from ${releaseName}`, 'success');
             } catch (error) {
@@ -1333,6 +1423,9 @@
         document.getElementById('statusFilter').addEventListener('change', renderPRs);
         document.getElementById('sortMode').addEventListener('change', renderPRs);
         document.getElementById('searchInput').addEventListener('input', renderPRs);
+        document.querySelectorAll('[data-summary-filter]').forEach(tile => {
+            tile.addEventListener('click', () => applySummaryFilter(tile.dataset.summaryFilter));
+        });
         document.getElementById('addPrForm').addEventListener('submit', event => {
             event.preventDefault();
             addPRToMilestone(document.getElementById('addPrInput').value);
@@ -1345,13 +1438,7 @@
                 return;
             }
 
-            const cached = localStorage.getItem(cacheKey());
-            if (cached) {
-                try {
-                    prs = JSON.parse(cached);
-                    renderPRs();
-                } catch {}
-            }
+            loadPRsFromCache();
             fetchAllPRs();
             setupAutoRefresh();
         }
