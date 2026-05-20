@@ -711,13 +711,15 @@
         const TOKEN_KEY = 'github_token';
         const RELEASE_KEY = 'rippled_release_tracker_release';
         const CACHE_KEY = 'rippled_release_tracker_cache';
+        const CACHE_VERSION = 'open-only-v2';
         const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000;
-        const CLOSED_PR_LIMIT = 100;
         const APPROVAL_EXCLUDED_REVIEWERS = new Set(['xrplf-ai-reviewer[bot]', 'Copilot']);
+        const COPILOT_REVIEWERS = new Set(['Copilot', 'copilot-pull-request-reviewer[bot]', 'github-copilot[bot]']);
 
         let prs = [];
         let milestones = [];
         let releaseName = localStorage.getItem(RELEASE_KEY) || '';
+        let releaseCounts = null;
         let autoRefreshTimer = null;
 
         function getToken() {
@@ -762,7 +764,7 @@
         }
 
         function cacheKey() {
-            return `${CACHE_KEY}:${releaseName.trim() || 'default'}`;
+            return `${CACHE_KEY}:${CACHE_VERSION}:${releaseName.trim() || 'default'}`;
         }
 
         function compactPR(pr) {
@@ -789,7 +791,8 @@
                 requested_reviewers: (pr.requested_reviewers || []).map(user => ({ login: user.login })),
                 requested_teams: (pr.requested_teams || []).map(team => ({ slug: team.slug })),
                 ciStatus: pr.ciStatus,
-                reviews: pr.reviews
+                reviews: pr.reviews,
+                copilotReview: pr.copilotReview
             };
         }
 
@@ -835,6 +838,10 @@
             return `repo:${REPO_OWNER}/${REPO_NAME} is:pr is:${state} milestone:"${release.replace(/"/g, '\\"')}"`;
         }
 
+        function buildLabelQuery(release, label, state = 'open') {
+            return `${buildQuery(release, state)} label:"${label.replace(/"/g, '\\"')}"`;
+        }
+
         function updateQueryPreview() {
             const value = normalizeRelease(document.getElementById('releaseSelect').value);
             const preview = document.getElementById('queryPreview');
@@ -842,7 +849,7 @@
                 preview.textContent = 'Release lists are defined by GitHub milestones.';
                 return;
             }
-            preview.innerHTML = `Searching open PRs in <code>milestone:"${escape(value)}"</code>; recent closed PRs are capped at ${CLOSED_PR_LIMIT}.`;
+            preview.innerHTML = `Searching open PRs in <code>milestone:"${escape(value)}"</code>.`;
         }
 
         function selectedMilestone() {
@@ -942,11 +949,28 @@
         }
 
         async function searchPRNumbersForRelease(release) {
-            const [openNumbers, closedNumbers] = await Promise.all([
-                searchPRNumbers(release, 'open'),
-                searchPRNumbers(release, 'closed', CLOSED_PR_LIMIT)
+            return searchPRNumbers(release, 'open');
+        }
+
+        async function searchCount(query) {
+            const url = `https://api.github.com/search/issues?q=${encodeURIComponent(query)}&per_page=1`;
+            const data = await githubRequest(url);
+            return data.total_count || 0;
+        }
+
+        async function fetchReleaseCounts(release) {
+            const [open, closed, merged, readyToMerge] = await Promise.all([
+                searchCount(buildQuery(release, 'open')),
+                searchCount(buildQuery(release, 'closed')),
+                searchCount(`${buildQuery(release, 'closed')} is:merged`),
+                searchCount(buildLabelQuery(release, 'Ready to merge', 'open'))
             ]);
-            return [...new Set([...openNumbers, ...closedNumbers])].sort((a, b) => b - a);
+            return {
+                total: open + closed,
+                open,
+                merged,
+                readyToMerge
+            };
         }
 
         async function fetchPR(number) {
@@ -1003,11 +1027,20 @@
                 const reviews = await githubRequest(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${prNumber}/reviews`);
                 const decisiveStates = {};
                 const latestStates = {};
+                const copilotReviews = [];
                 reviews.forEach(review => {
                     if (review.state !== 'PENDING' && review.user) {
                         latestStates[review.user.login] = review.state;
                         if (review.state !== 'COMMENTED') {
                             decisiveStates[review.user.login] = review.state;
+                        }
+                        if (COPILOT_REVIEWERS.has(review.user.login)) {
+                            copilotReviews.push({
+                                user: review.user.login,
+                                state: review.state,
+                                commitId: review.commit_id,
+                                submittedAt: review.submitted_at
+                            });
                         }
                     }
                 });
@@ -1017,20 +1050,64 @@
                 return {
                     approvals: Object.entries(decisiveStates).filter(([user, state]) => state === 'APPROVED' && countsAsApproval(user)).map(([user]) => user),
                     changesRequested: Object.entries(decisiveStates).filter(([, state]) => state === 'CHANGES_REQUESTED').map(([user]) => user),
-                    reviewers: Object.entries(latestStates).map(([user, state]) => ({ user, state }))
+                    reviewers: Object.entries(latestStates).map(([user, state]) => ({ user, state })),
+                    copilotReviews
                 };
             } catch (error) {
                 console.error('Error fetching reviews:', error);
-                return { approvals: [], changesRequested: [], reviewers: [] };
+                return { approvals: [], changesRequested: [], reviewers: [], copilotReviews: [] };
             }
         }
 
+        async function fetchPRCommits(prNumber) {
+            const commits = [];
+            for (let page = 1; page <= 3; page++) {
+                const data = await githubRequest(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${prNumber}/commits?per_page=100&page=${page}`);
+                commits.push(...data);
+                if (data.length < 100) break;
+            }
+            return commits;
+        }
+
+        function isMergeCommit(commit) {
+            return (commit.parents || []).length > 1;
+        }
+
+        function getCopilotReviewStatus(pr, reviews, commits) {
+            const relevantCommits = commits.filter(commit => !isMergeCommit(commit));
+            const latestChange = relevantCommits[relevantCommits.length - 1] || commits[commits.length - 1] || null;
+            const copilotReviews = reviews.copilotReviews || [];
+            const latestCopilotReview = [...copilotReviews]
+                .reverse()
+                .find(review => review.commitId);
+
+            if (!latestChange) {
+                return { state: 'unknown', label: 'Copilot unknown', detail: 'Could not identify latest PR change' };
+            }
+            if (!latestCopilotReview) {
+                return { state: 'missing', label: 'No Copilot review', detail: 'No Copilot review found for PR commits' };
+            }
+            if (latestCopilotReview.commitId !== latestChange.sha) {
+                return {
+                    state: 'stale',
+                    label: 'Copilot stale',
+                    detail: `Last reviewed ${latestCopilotReview.commitId.slice(0, 7)}; latest change is ${latestChange.sha.slice(0, 7)}`
+                };
+            }
+            return {
+                state: 'current',
+                label: 'Copilot current',
+                detail: `Reviewed latest change ${latestChange.sha.slice(0, 7)}`
+            };
+        }
+
         async function enrichPR(pr) {
-            const [ciStatus, reviews] = await Promise.all([
+            const [ciStatus, reviews, commits] = await Promise.all([
                 fetchCIStatus(pr.head.sha),
-                fetchReviews(pr.number)
+                fetchReviews(pr.number),
+                fetchPRCommits(pr.number)
             ]);
-            return { ...pr, ciStatus, reviews };
+            return { ...pr, ciStatus, reviews, copilotReview: getCopilotReviewStatus(pr, reviews, commits) };
         }
 
         async function fetchAllPRs(isAutoRefresh = false) {
@@ -1046,7 +1123,11 @@
             if (!isAutoRefresh) document.getElementById('prList').innerHTML = '<div class="loading">Loading release PRs...</div>';
 
             try {
-                const numbers = await searchPRNumbersForRelease(releaseName);
+                const [numbers, counts] = await Promise.all([
+                    searchPRNumbersForRelease(releaseName),
+                    fetchReleaseCounts(releaseName)
+                ]);
+                releaseCounts = counts;
                 if (numbers.length === 0) {
                     prs = [];
                     savePRsToCache();
@@ -1085,6 +1166,8 @@
         function needsAttention(pr) {
             return pr.draft ||
                 pr.reviews?.changesRequested?.length > 0 ||
+                pr.copilotReview?.state === 'missing' ||
+                pr.copilotReview?.state === 'stale' ||
                 ciState(pr) === 'failure' ||
                 ciState(pr) === 'pending' ||
                 pr.mergeable === false ||
@@ -1112,6 +1195,20 @@
             if (ci.pendingCount > 0) return `<span class="badge badge-warning">${ci.pendingCount} pending</span>`;
             if (ci.successCount > 0) return `<span class="badge badge-success">${ci.successCount} passed</span>`;
             return '<span class="badge badge-neutral">No CI</span>';
+        }
+
+        function renderCopilotReview(pr) {
+            const status = pr.copilotReview;
+            if (!status || status.state === 'unknown') {
+                return '<span class="badge badge-neutral" title="Copilot review freshness could not be determined">Copilot unknown</span>';
+            }
+            if (status.state === 'current') {
+                return `<span class="badge badge-success" title="${escape(status.detail)}">Copilot current</span>`;
+            }
+            if (status.state === 'stale') {
+                return `<span class="badge badge-warning" title="${escape(status.detail)}">Copilot stale</span>`;
+            }
+            return `<span class="badge badge-danger" title="${escape(status.detail)}">No Copilot review</span>`;
         }
 
         function renderApprovals(pr) {
@@ -1234,10 +1331,10 @@
         }
 
         function renderSummary() {
-            const total = prs.length;
-            const open = prs.filter(pr => pr.state === 'open').length;
-            const merged = prs.filter(pr => pr.merged_at).length;
-            const readyToMerge = prs.filter(pr => !pr.merged_at && (pr.labels || []).some(label => label.name === 'Ready to merge')).length;
+            const total = releaseCounts?.total ?? prs.length;
+            const open = releaseCounts?.open ?? prs.filter(pr => pr.state === 'open').length;
+            const merged = releaseCounts?.merged ?? prs.filter(pr => pr.merged_at).length;
+            const readyToMerge = releaseCounts?.readyToMerge ?? prs.filter(pr => !pr.merged_at && (pr.labels || []).some(label => label.name === 'Ready to merge')).length;
             const attention = prs.filter(needsAttention).length;
 
             document.getElementById('totalCount').textContent = total;
@@ -1321,6 +1418,7 @@
                                     ${renderStateBadge(pr)}
                                     ${renderCIStatus(pr)}
                                     ${renderApprovals(pr)}
+                                    ${renderCopilotReview(pr)}
                                     ${labels}
                                 </div>
                             </div>
