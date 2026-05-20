@@ -711,7 +711,7 @@
         const TOKEN_KEY = 'github_token';
         const RELEASE_KEY = 'rippled_release_tracker_release';
         const CACHE_KEY = 'rippled_release_tracker_cache';
-        const CACHE_VERSION = 'open-only-v2';
+        const CACHE_VERSION = 'open-only-v4';
         const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000;
         const APPROVAL_EXCLUDED_REVIEWERS = new Set(['xrplf-ai-reviewer[bot]', 'Copilot']);
         const COPILOT_REVIEWERS = new Set(['Copilot', 'copilot-pull-request-reviewer[bot]', 'github-copilot[bot]']);
@@ -1024,7 +1024,12 @@
 
         async function fetchReviews(prNumber) {
             try {
-                const reviews = await githubRequest(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${prNumber}/reviews`);
+                const reviews = [];
+                for (let page = 1; page <= 5; page++) {
+                    const data = await githubRequest(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${prNumber}/reviews?per_page=100&page=${page}`);
+                    reviews.push(...data);
+                    if (data.length < 100) break;
+                }
                 const decisiveStates = {};
                 const latestStates = {};
                 const copilotReviews = [];
