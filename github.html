@@ -2157,6 +2157,14 @@
                             <option value="">All queries</option>
                         </select>
                     </div>
+                    <div class="repo-filter">
+                        <label for="releaseFilter">Filter by release:</label>
+                        <select id="releaseFilter">
+                            <option value="">All PRs</option>
+                            <option value="release">Release PRs</option>
+                            <option value="non-release">Non-release PRs</option>
+                        </select>
+                    </div>
                     <button id="updateAllBtn" style="display: none;">Update All Branches</button>
                 </div>
 
@@ -2246,6 +2254,7 @@
                             <li><code>assignee:@me</code> - PRs assigned to you</li>
                             <li><code>review-requested:@me</code> - PRs requesting your review</li>
                             <li><code>reviewed-by:@me</code> - PRs you've reviewed</li>
+                            <li><code>release in:title</code> - PRs with release in the title</li>
                             <li><code>author:username org:myorg</code> - PRs by user in specific org</li>
                         </ul>
                     </div>
@@ -2445,7 +2454,8 @@
             { id: 'q1', name: 'My PRs', query: 'author:@me', enabled: true },
             { id: 'q2', name: 'Assigned to me', query: 'assignee:@me', enabled: true },
             { id: 'q3', name: 'Review requested', query: 'review-requested:@me', enabled: true },
-            { id: 'q4', name: 'Reviewed by me', query: 'reviewed-by:@me', enabled: true }
+            { id: 'q4', name: 'Reviewed by me', query: 'reviewed-by:@me', enabled: true },
+            { id: 'q5', name: 'Releases', query: 'release in:title', enabled: false }
         ];
 
         let nextQueryId = 1000; // Start custom query IDs at 1000
@@ -2539,6 +2549,7 @@
         let shouldApplyAutoCollapse = false; // Flag to trigger auto-collapse on next render
         let currentRepoFilter = ''; // Track current repository filter
         let currentQueryFilter = ''; // Track current query filter
+        let currentReleaseFilter = ''; // Track current release filter
         let currentUser = null; // Cache current user login
         let tokenValid = false; // Track if token is valid
         let currentSettingsTab = 'token'; // Track current settings tab
@@ -2920,6 +2931,11 @@
                             }
                         }
                     });
+                    DEFAULT_QUERY_SETTINGS.forEach(defaultQuery => {
+                        if (!parsed.some(query => query.id === defaultQuery.id)) {
+                            parsed.push({ ...defaultQuery });
+                        }
+                    });
                     return parsed;
                 } catch (e) {
                     return [...DEFAULT_QUERY_SETTINGS];
@@ -2943,6 +2959,7 @@
             if (oldSettings.reviewedBy) {
                 newSettings.push({ id: 'q4', name: 'Reviewed by me', query: oldSettings.reviewedBy, enabled: true });
             }
+            newSettings.push({ id: 'q5', name: 'Releases', query: 'release in:title', enabled: false });
             saveQuerySettings(newSettings);
             return newSettings;
         }
@@ -2985,6 +3002,22 @@
             });
 
             return sorted;
+        }
+
+        function isReleasePR(pr) {
+            const searchableText = [
+                pr.title,
+                pr.headRef,
+                pr.baseRef,
+                pr.head?.ref,
+                pr.base?.ref,
+                ...(pr.labels || []).map(label => label.name)
+            ]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase();
+
+            return /\breleases?\b/.test(searchableText);
         }
 
         // Show notification
@@ -3646,6 +3679,14 @@
             if (currentQueryFilter) {
                 filteredPRs = filteredPRs.filter(pr => {
                     return pr._sourceQueries && pr._sourceQueries.includes(currentQueryFilter);
+                });
+            }
+
+            // Filter PRs by release status if a filter is active
+            if (currentReleaseFilter) {
+                filteredPRs = filteredPRs.filter(pr => {
+                    const isRelease = isReleasePR(pr);
+                    return currentReleaseFilter === 'release' ? isRelease : !isRelease;
                 });
             }
 
@@ -4827,6 +4868,17 @@
             currentQueryFilter = e.target.value;
             // Trigger auto-collapse when filter changes (but keep manual toggles)
             if (oldFilter !== currentQueryFilter) {
+                shouldApplyAutoCollapse = true;
+            }
+            renderPRs();
+        });
+
+        // Release filter event listener
+        document.getElementById('releaseFilter').addEventListener('change', (e) => {
+            const oldFilter = currentReleaseFilter;
+            currentReleaseFilter = e.target.value;
+            // Trigger auto-collapse when filter changes (but keep manual toggles)
+            if (oldFilter !== currentReleaseFilter) {
                 shouldApplyAutoCollapse = true;
             }
             renderPRs();
