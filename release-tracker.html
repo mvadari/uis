@@ -1082,6 +1082,7 @@
             const relevantCommits = commits.filter(commit => !isMergeCommit(commit));
             const latestChange = relevantCommits[relevantCommits.length - 1] || commits[commits.length - 1] || null;
             const copilotReviews = reviews.copilotReviews || [];
+            const hasCopilotReviewer = (reviews.reviewers || []).some(review => COPILOT_REVIEWERS.has(review.user));
             const latestCopilotReview = [...copilotReviews]
                 .reverse()
                 .find(review => review.commitId);
@@ -1089,8 +1090,11 @@
             if (!latestChange) {
                 return { state: 'unknown', label: 'Copilot unknown', detail: 'Could not identify latest PR change' };
             }
-            if (!latestCopilotReview) {
+            if (!hasCopilotReviewer) {
                 return { state: 'missing', label: 'No Copilot review', detail: 'No Copilot review found for PR commits' };
+            }
+            if (!latestCopilotReview) {
+                return { state: 'unknown', label: 'Copilot unknown', detail: 'Copilot reviewed this PR, but no review commit was available' };
             }
             if (latestCopilotReview.commitId !== latestChange.sha) {
                 return {
