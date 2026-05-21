@@ -2158,11 +2158,9 @@
                         </select>
                     </div>
                     <div class="repo-filter">
-                        <label for="releaseFilter">Filter by release:</label>
-                        <select id="releaseFilter">
-                            <option value="">All PRs</option>
-                            <option value="release">Release PRs</option>
-                            <option value="non-release">Non-release PRs</option>
+                        <label for="milestoneFilter">Filter by milestone:</label>
+                        <select id="milestoneFilter">
+                            <option value="">All milestones</option>
                         </select>
                     </div>
                     <button id="updateAllBtn" style="display: none;">Update All Branches</button>
@@ -2254,7 +2252,7 @@
                             <li><code>assignee:@me</code> - PRs assigned to you</li>
                             <li><code>review-requested:@me</code> - PRs requesting your review</li>
                             <li><code>reviewed-by:@me</code> - PRs you've reviewed</li>
-                            <li><code>release in:title</code> - PRs with release in the title</li>
+                            <li><code>milestone:"v1.0"</code> - PRs in a specific milestone</li>
                             <li><code>author:username org:myorg</code> - PRs by user in specific org</li>
                         </ul>
                     </div>
@@ -2454,8 +2452,7 @@
             { id: 'q1', name: 'My PRs', query: 'author:@me', enabled: true },
             { id: 'q2', name: 'Assigned to me', query: 'assignee:@me', enabled: true },
             { id: 'q3', name: 'Review requested', query: 'review-requested:@me', enabled: true },
-            { id: 'q4', name: 'Reviewed by me', query: 'reviewed-by:@me', enabled: true },
-            { id: 'q5', name: 'Releases', query: 'release in:title', enabled: false }
+            { id: 'q4', name: 'Reviewed by me', query: 'reviewed-by:@me', enabled: true }
         ];
 
         let nextQueryId = 1000; // Start custom query IDs at 1000
@@ -2549,7 +2546,7 @@
         let shouldApplyAutoCollapse = false; // Flag to trigger auto-collapse on next render
         let currentRepoFilter = ''; // Track current repository filter
         let currentQueryFilter = ''; // Track current query filter
-        let currentReleaseFilter = ''; // Track current release filter
+        let currentMilestoneFilter = ''; // Track current milestone filter
         let currentUser = null; // Cache current user login
         let tokenValid = false; // Track if token is valid
         let currentSettingsTab = 'token'; // Track current settings tab
@@ -2931,6 +2928,15 @@
                             }
                         }
                     });
+                    const titleBasedReleaseQueryIndex = parsed.findIndex(query =>
+                        query.id === 'q5' &&
+                        query.name === 'Releases' &&
+                        query.query === 'release in:title'
+                    );
+                    if (titleBasedReleaseQueryIndex !== -1) {
+                        parsed.splice(titleBasedReleaseQueryIndex, 1);
+                    }
+
                     DEFAULT_QUERY_SETTINGS.forEach(defaultQuery => {
                         if (!parsed.some(query => query.id === defaultQuery.id)) {
                             parsed.push({ ...defaultQuery });
@@ -2959,7 +2965,6 @@
             if (oldSettings.reviewedBy) {
                 newSettings.push({ id: 'q4', name: 'Reviewed by me', query: oldSettings.reviewedBy, enabled: true });
             }
-            newSettings.push({ id: 'q5', name: 'Releases', query: 'release in:title', enabled: false });
             saveQuerySettings(newSettings);
             return newSettings;
         }
@@ -3002,22 +3007,6 @@
             });
 
             return sorted;
-        }
-
-        function isReleasePR(pr) {
-            const searchableText = [
-                pr.title,
-                pr.headRef,
-                pr.baseRef,
-                pr.head?.ref,
-                pr.base?.ref,
-                ...(pr.labels || []).map(label => label.name)
-            ]
-                .filter(Boolean)
-                .join(' ')
-                .toLowerCase();
-
-            return /\breleases?\b/.test(searchableText);
         }
 
         // Show notification
@@ -3306,6 +3295,7 @@
                         updateLastUpdatedTime();
                         populateRepoFilter();
                         populateQueryFilter();
+                        populateMilestoneFilter();
                         renderPRs();
                         // Show loading indicator in header instead
                         document.getElementById('error').innerHTML = '<div style="color: #0969da; font-size: 12px; margin-top: 4px;">Refreshing...</div>';
@@ -3411,6 +3401,7 @@
                 updateLastUpdatedTime();
                 populateRepoFilter();
                 populateQueryFilter();
+                populateMilestoneFilter();
                 renderPRs();
 
                 // Clear the "Refreshing..." message
@@ -3635,6 +3626,37 @@
             }
         }
 
+        // Populate milestone filter dropdown
+        function populateMilestoneFilter() {
+            const milestones = new Set();
+            allPRs.forEach(pr => {
+                if (pr.milestone && pr.milestone.title) {
+                    milestones.add(pr.milestone.title);
+                }
+            });
+
+            const milestoneFilter = document.getElementById('milestoneFilter');
+            const currentValue = milestoneFilter.value;
+
+            // Clear existing options except "All milestones"
+            milestoneFilter.innerHTML = '<option value="">All milestones</option>';
+
+            // Add sorted milestone options
+            Array.from(milestones).sort().forEach(milestone => {
+                const option = document.createElement('option');
+                option.value = milestone;
+                option.textContent = milestone;
+                milestoneFilter.appendChild(option);
+            });
+
+            // Restore previous selection if it still exists
+            if (currentValue && milestones.has(currentValue)) {
+                milestoneFilter.value = currentValue;
+            } else {
+                currentMilestoneFilter = '';
+            }
+        }
+
         // Render PRs in Kanban view
         function renderPRs() {
             const prLabels = getLabels();
@@ -3682,11 +3704,10 @@
                 });
             }
 
-            // Filter PRs by release status if a filter is active
-            if (currentReleaseFilter) {
+            // Filter PRs by milestone if a filter is active
+            if (currentMilestoneFilter) {
                 filteredPRs = filteredPRs.filter(pr => {
-                    const isRelease = isReleasePR(pr);
-                    return currentReleaseFilter === 'release' ? isRelease : !isRelease;
+                    return pr.milestone && pr.milestone.title === currentMilestoneFilter;
                 });
             }
 
@@ -4873,12 +4894,12 @@
             renderPRs();
         });
 
-        // Release filter event listener
-        document.getElementById('releaseFilter').addEventListener('change', (e) => {
-            const oldFilter = currentReleaseFilter;
-            currentReleaseFilter = e.target.value;
+        // Milestone filter event listener
+        document.getElementById('milestoneFilter').addEventListener('change', (e) => {
+            const oldFilter = currentMilestoneFilter;
+            currentMilestoneFilter = e.target.value;
             // Trigger auto-collapse when filter changes (but keep manual toggles)
-            if (oldFilter !== currentReleaseFilter) {
+            if (oldFilter !== currentMilestoneFilter) {
                 shouldApplyAutoCollapse = true;
             }
             renderPRs();
