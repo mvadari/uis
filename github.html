@@ -3639,7 +3639,7 @@
             const currentValue = milestoneFilter.value;
 
             // Clear existing options except "All milestones"
-            milestoneFilter.innerHTML = '<option value="">All milestones</option>';
+            milestoneFilter.innerHTML = '<option value="">All milestones</option><option value="__none__">No milestone</option>';
 
             // Add sorted milestone options
             Array.from(milestones).sort().forEach(milestone => {
@@ -3650,7 +3650,7 @@
             });
 
             // Restore previous selection if it still exists
-            if (currentValue && milestones.has(currentValue)) {
+            if (currentValue && (currentValue === '__none__' || milestones.has(currentValue))) {
                 milestoneFilter.value = currentValue;
             } else {
                 currentMilestoneFilter = '';
@@ -3707,6 +3707,9 @@
             // Filter PRs by milestone if a filter is active
             if (currentMilestoneFilter) {
                 filteredPRs = filteredPRs.filter(pr => {
+                    if (currentMilestoneFilter === '__none__') {
+                        return !pr.milestone || !pr.milestone.title;
+                    }
                     return pr.milestone && pr.milestone.title === currentMilestoneFilter;
                 });
             }
