@@ -109,6 +109,21 @@ Visualize and navigate stacked pull requests in a repository as a DAG (Directed 
 
 ---
 
+### ▦ JSON Table Viewer
+Validate and inspect AI-generated JSON arrays as tabular data.
+
+**Features:**
+- Checks that the JSON is a top-level list of objects
+- Detects exact, close, and mismatched object key sets
+- Highlights row-level missing and extra keys
+- Renders a table using the union of all keys
+- Copies or downloads the result as CSV
+- Accepts pasted JSON, fenced JSON blocks, extracted arrays, and local `.json` files
+
+[**Launch JSON Table Viewer →**](https://mvadari.github.io/uis/json-table.html)
+
+---
+
 ## Local Development
 
 All tools are self-contained HTML files. To run locally:
@@ -129,6 +144,7 @@ All tools are self-contained HTML files. To run locally:
    open smart-escrow-prs.html
    open xrpld.html
    open stacked.html
+   open json-table.html
    ```
 
 Alternatively, use a local server:
