@@ -1153,6 +1153,7 @@
             z-index: 10000;
             min-width: 200px;
             max-width: 300px;
+            max-height: calc(100vh - 16px);
             overflow: hidden;
         }
 
@@ -1170,7 +1171,7 @@
         }
 
         .context-menu-items {
-            max-height: 400px;
+            max-height: min(400px, calc(100vh - 64px));
             overflow-y: auto;
         }
 
@@ -4129,7 +4130,43 @@
         function setupContextMenu() {
             const contextMenu = document.getElementById('prContextMenu');
             const contextMenuItems = document.getElementById('contextMenuItems');
+            if (contextMenu.dataset.initialized === 'true') return;
+            contextMenu.dataset.initialized = 'true';
             let currentPRId = null;
+
+            function positionContextMenu(anchorX, anchorY) {
+                const viewportPadding = 8;
+                const viewportWidth = document.documentElement.clientWidth;
+                const viewportHeight = document.documentElement.clientHeight;
+                const header = contextMenu.querySelector('.context-menu-header');
+
+                contextMenu.style.visibility = 'hidden';
+                contextMenu.style.left = '0px';
+                contextMenu.style.top = '0px';
+                contextMenuItems.style.maxHeight = '';
+                contextMenu.classList.add('show');
+
+                const naturalRect = contextMenu.getBoundingClientRect();
+                const spaceBelow = viewportHeight - anchorY - viewportPadding;
+                const spaceAbove = anchorY - viewportPadding;
+                const openUpward = naturalRect.height > spaceBelow && spaceAbove > spaceBelow;
+                const availableHeight = Math.max(120, openUpward ? spaceAbove : spaceBelow);
+                const headerHeight = header ? header.offsetHeight : 0;
+                const itemsMaxHeight = Math.max(80, Math.min(400, availableHeight - headerHeight));
+
+                contextMenuItems.style.maxHeight = `${itemsMaxHeight}px`;
+
+                const menuRect = contextMenu.getBoundingClientRect();
+                let left = anchorX;
+                let top = openUpward ? anchorY - menuRect.height : anchorY;
+
+                left = Math.min(Math.max(left, viewportPadding), viewportWidth - menuRect.width - viewportPadding);
+                top = Math.min(Math.max(top, viewportPadding), viewportHeight - menuRect.height - viewportPadding);
+
+                contextMenu.style.left = `${left}px`;
+                contextMenu.style.top = `${top}px`;
+                contextMenu.style.visibility = '';
+            }
 
             // Handle right-click on PR items
             document.addEventListener('contextmenu', (e) => {
@@ -4158,9 +4195,7 @@
                     }).join('');
 
                     // Position the menu
-                    contextMenu.style.left = `${e.pageX}px`;
-                    contextMenu.style.top = `${e.pageY}px`;
-                    contextMenu.classList.add('show');
+                    positionContextMenu(e.clientX, e.clientY);
                 }
             });
 
