@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Base Branch PRs</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="stylesheet" href="shared-styles.css">
+    <style>
+        :root {
+            color-scheme: light dark;
+            --color-canvas-default: #ffffff;
+            --color-canvas-subtle: #f6f8fa;
+            --color-border-default: #d0d7de;
+            --color-border-muted: #d8dee4;
+            --color-fg-default: #1f2328;
+            --color-fg-muted: #656d76;
+            --color-accent-fg: #0969da;
+            --color-accent-subtle: #ddf4ff;
+            --color-success-fg: #1a7f37;
+            --color-success-subtle: #dafbe1;
+            --color-danger-fg: #d1242f;
+            --color-danger-subtle: #ffebe9;
+            --color-attention-fg: #9a6700;
+            --color-attention-subtle: #fff8c5;
+            --color-done-fg: #8250df;
+            --color-done-subtle: #fbefff;
+        }
+
+        body {
+            background: var(--color-canvas-subtle);
+            color: var(--color-fg-default);
+        }
+
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .header {
+            background: var(--color-canvas-default);
+            border: 1px solid var(--color-border-default);
+            border-radius: 6px;
+            margin-bottom: 16px;
+        }
+
+        .header-main {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 16px;
+            border-bottom: 1px solid var(--color-border-muted);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .github-icon {
+            width: 32px;
+            height: 32px;
+            fill: var(--color-fg-default);
+            flex: 0 0 auto;
+        }
+
+        .title-block {
+            min-width: 0;
+        }
+
+        .header-title {
+            font-size: 20px;
+            font-weight: 600;
+            line-height: 1.2;
+        }
+
+        .header-subtitle {
+            color: var(--color-fg-muted);
+            font-size: 13px;
+            margin-top: 2px;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .token-pill {
+            border: 1px solid var(--color-border-default);
+            background: var(--color-canvas-subtle);
+            border-radius: 999px;
+            color: var(--color-fg-muted);
+            display: inline-flex;
+            align-items: center;
+            font-size: 12px;
+            font-weight: 600;
+            min-height: 30px;
+            padding: 4px 10px;
+            white-space: nowrap;
+        }
+
+        .token-pill.set {
+            background: var(--color-success-subtle);
+            border-color: rgba(26, 127, 55, 0.35);
+            color: var(--color-success-fg);
+        }
+
+        .search-panel {
+            display: grid;
+            grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) minmax(120px, 160px) auto;
+            gap: 12px;
+            align-items: end;
+            padding: 16px;
+        }
+
+        .field label {
+            color: var(--color-fg-default);
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .query-preview {
+            background: var(--color-canvas-subtle);
+            border-top: 1px solid var(--color-border-muted);
+            color: var(--color-fg-muted);
+            font-size: 13px;
+            padding: 10px 16px;
+            overflow-wrap: anywhere;
+        }
+
+        .query-preview code {
+            color: var(--color-fg-default);
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .summary-tile {
+            background: var(--color-canvas-default);
+            border: 1px solid var(--color-border-default);
+            border-radius: 6px;
+            padding: 14px;
+        }
+
+        .summary-label {
+            color: var(--color-fg-muted);
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .summary-value {
+            font-size: 26px;
+            font-weight: 600;
+            line-height: 1.2;
+            margin-top: 2px;
+        }
+
+        .status-line {
+            align-items: center;
+            color: var(--color-fg-muted);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            font-size: 13px;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            min-height: 28px;
+        }
+
+        .filter-box {
+            max-width: 340px;
+        }
+
+        .status-controls {
+            align-items: center;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        .btn.filter-active {
+            background: var(--color-accent-fg);
+            border-color: var(--color-accent-fg);
+            color: #ffffff;
+        }
+
+        .error-banner {
+            background: var(--color-danger-subtle);
+            border: 1px solid rgba(209, 36, 47, 0.35);
+            border-radius: 6px;
+            color: var(--color-danger-fg);
+            display: none;
+            font-size: 14px;
+            margin-bottom: 12px;
+            padding: 12px;
+        }
+
+        .pr-list {
+            display: grid;
+            gap: 12px;
+        }
+
+        .empty-state,
+        .loading-state {
+            background: var(--color-canvas-default);
+            border: 1px solid var(--color-border-default);
+            border-radius: 6px;
+            color: var(--color-fg-muted);
+            padding: 32px;
+            text-align: center;
+        }
+
+        .loading-state {
+            align-items: center;
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .pr-card {
+            background: var(--color-canvas-default);
+            border: 1px solid var(--color-border-default);
+            border-radius: 6px;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(280px, 34%);
+            gap: 16px;
+            padding: 16px;
+        }
+
+        .pr-card.draft-pr {
+            background: color-mix(in srgb, var(--color-canvas-default) 72%, var(--color-canvas-subtle));
+            border-color: var(--color-border-default);
+            opacity: 0.9;
+        }
+
+        .pr-card.draft-pr .pr-link,
+        .pr-card.draft-pr .reviewer-name {
+            color: var(--color-fg-muted);
+        }
+
+        .pr-title-row {
+            align-items: flex-start;
+            display: flex;
+            gap: 8px;
+            justify-content: space-between;
+            min-width: 0;
+        }
+
+        .pr-link {
+            color: var(--color-accent-fg);
+            font-size: 16px;
+            font-weight: 600;
+            line-height: 1.35;
+            min-width: 0;
+            text-decoration: none;
+        }
+
+        .pr-link:hover {
+            text-decoration: underline;
+        }
+
+        .pr-number {
+            color: var(--color-fg-muted);
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .pr-meta {
+            align-items: center;
+            color: var(--color-fg-muted);
+            display: flex;
+            flex-wrap: wrap;
+            font-size: 13px;
+            gap: 8px 12px;
+            margin-top: 8px;
+        }
+
+        .pr-meta a {
+            color: var(--color-accent-fg);
+            text-decoration: none;
+        }
+
+        .pr-meta a:hover {
+            text-decoration: underline;
+        }
+
+        .branch-link {
+            background: var(--color-accent-subtle);
+            border-radius: 6px;
+            color: var(--color-accent-fg);
+            display: inline-flex;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.35;
+            max-width: 260px;
+            overflow: hidden;
+            padding: 2px 6px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .branch-with-copy {
+            align-items: center;
+            display: inline-flex;
+            gap: 4px;
+            max-width: 360px;
+            vertical-align: middle;
+        }
+
+        .branch-copy {
+            background: var(--color-canvas-default);
+            border: 1px solid var(--color-border-default);
+            border-radius: 6px;
+            color: var(--color-fg-muted);
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+            line-height: 1;
+            min-height: 22px;
+            padding: 3px 6px;
+        }
+
+        .branch-copy:hover {
+            border-color: var(--color-accent-fg);
+            color: var(--color-accent-fg);
+        }
+
+        .branch-copy.copied {
+            background: var(--color-success-subtle);
+            border-color: rgba(26, 127, 55, 0.35);
+            color: var(--color-success-fg);
+        }
+
+        .branch-separator {
+            color: var(--color-fg-muted);
+        }
+
+        .pill-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 12px;
+        }
+
+        .status-pill {
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.4;
+            padding: 3px 8px;
+            white-space: nowrap;
+        }
+
+        .status-pill.ready,
+        .status-pill.clean,
+        .review-state.approved {
+            background: var(--color-success-subtle);
+            color: var(--color-success-fg);
+        }
+
+        .status-pill.draft,
+        .status-pill.pending,
+        .review-state.commented,
+        .review-state.requested {
+            background: var(--color-attention-subtle);
+            color: var(--color-attention-fg);
+        }
+
+        .status-pill.conflict,
+        .review-state.changes-requested {
+            background: var(--color-danger-subtle);
+            color: var(--color-danger-fg);
+        }
+
+        .status-pill.neutral,
+        .review-state.dismissed,
+        .review-state.none {
+            background: var(--color-canvas-subtle);
+            color: var(--color-fg-muted);
+        }
+
+        .review-panel {
+            border-left: 1px solid var(--color-border-muted);
+            padding-left: 16px;
+        }
+
+        .review-title {
+            color: var(--color-fg-muted);
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .review-grid {
+            display: grid;
+            gap: 6px;
+        }
+
+        .review-row {
+            align-items: center;
+            display: grid;
+            gap: 8px;
+            grid-template-columns: minmax(0, 1fr) auto;
+        }
+
+        .reviewer-name {
+            color: var(--color-fg-default);
+            font-size: 13px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .review-state {
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 7px;
+            white-space: nowrap;
+        }
+
+        .modal-content {
+            max-width: 560px;
+        }
+
+        .token-help {
+            background: var(--color-canvas-subtle);
+            border: 1px solid var(--color-border-muted);
+            border-radius: 6px;
+            color: var(--color-fg-muted);
+            font-size: 14px;
+            margin-bottom: 14px;
+            padding: 12px;
+        }
+
+        .token-help code {
+            color: var(--color-fg-default);
+        }
+
+        .token-input-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 8px;
+        }
+
+        @media (max-width: 860px) {
+            .container {
+                padding: 12px;
+            }
+
+            .header-main,
+            .search-panel {
+                grid-template-columns: 1fr;
+            }
+
+            .header-main {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .header-controls {
+                justify-content: flex-start;
+            }
+
+            .summary-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .pr-card {
+                grid-template-columns: 1fr;
+            }
+
+            .review-panel {
+                border-left: 0;
+                border-top: 1px solid var(--color-border-muted);
+                padding-left: 0;
+                padding-top: 12px;
+            }
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --color-canvas-default: #0d1117;
+                --color-canvas-subtle: #161b22;
+                --color-border-default: #30363d;
+                --color-border-muted: #21262d;
+                --color-fg-default: #e6edf3;
+                --color-fg-muted: #8b949e;
+                --color-accent-fg: #58a6ff;
+                --color-accent-subtle: #1c2a3d;
+                --color-success-fg: #3fb950;
+                --color-success-subtle: #1a4426;
+                --color-danger-fg: #f85149;
+                --color-danger-subtle: #3d1c1c;
+                --color-attention-fg: #e3b341;
+                --color-attention-subtle: #3d2d00;
+                --color-done-fg: #d2a8ff;
+                --color-done-subtle: #2d1d47;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-main">
+                <div class="header-left">
+                    <svg class="github-icon" viewBox="0 0 16 16" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+                    </svg>
+                    <div class="title-block">
+                        <h1 class="header-title">Base Branch PRs</h1>
+                        <div class="header-subtitle">Find open pull requests targeting a branch with GitHub search</div>
+                    </div>
+                </div>
+                <div class="header-controls">
+                    <span id="tokenStatus" class="token-pill">Token not set</span>
+                    <button class="btn" id="tokenButton" type="button">Token</button>
+                    <button class="btn btn-primary" id="refreshButton" type="button">Refresh</button>
+                </div>
+            </div>
+
+            <form class="search-panel" id="searchForm">
+                <div class="field">
+                    <label for="repoInput">Repository</label>
+                    <input type="text" id="repoInput" placeholder="owner/repo" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="field">
+                    <label for="branchInput">Base Branch</label>
+                    <input type="text" id="branchInput" placeholder="branch-name" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="field">
+                    <label for="stateInput">State</label>
+                    <select id="stateInput">
+                        <option value="open">Open</option>
+                        <option value="all">Open and closed</option>
+                        <option value="closed">Closed</option>
+                    </select>
+                </div>
+                <button class="btn btn-secondary" id="loadButton" type="submit">Load PRs</button>
+            </form>
+            <div class="query-preview" id="queryPreview">Enter a repository and base branch.</div>
+        </header>
+
+        <section class="summary-grid" aria-label="Pull request summary">
+            <div class="summary-tile">
+                <div class="summary-label">Total</div>
+                <div class="summary-value" id="totalCount">0</div>
+            </div>
+            <div class="summary-tile">
+                <div class="summary-label">Draft</div>
+                <div class="summary-value" id="draftCount">0</div>
+            </div>
+            <div class="summary-tile">
+                <div class="summary-label">Conflicts</div>
+                <div class="summary-value" id="conflictCount">0</div>
+            </div>
+            <div class="summary-tile">
+                <div class="summary-label">CI Failing</div>
+                <div class="summary-value" id="ciFailingCount">0</div>
+            </div>
+            <div class="summary-tile">
+                <div class="summary-label">Changes</div>
+                <div class="summary-value" id="changesCount">0</div>
+            </div>
+        </section>
+
+        <div class="status-line">
+            <div id="lastUpdated">Last updated: Never</div>
+            <div class="status-controls">
+                <button class="btn" id="myPrsButton" type="button">My PRs</button>
+                <input class="filter-box" type="search" id="filterInput" placeholder="Filter by PR, author, or reviewer">
+            </div>
+        </div>
+
+        <div class="error-banner" id="errorBanner"></div>
+        <main class="pr-list" id="prList">
+            <div class="empty-state">No branch loaded yet.</div>
+        </main>
+    </div>
+
+    <div class="modal" id="tokenModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">GitHub Token</h2>
+                <button class="modal-close" id="closeTokenModal" type="button">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="token-help">
+                    This uses the shared <code>github_token</code> localStorage key used by the other GitHub tools.
+                    The token is only sent to GitHub API requests.
+                </div>
+                <div class="token-input-row">
+                    <input type="password" id="tokenInput" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+                    <button class="btn" id="toggleTokenVisibility" type="button">Show</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" id="clearTokenButton" type="button">Clear</button>
+                <button class="btn btn-primary" id="saveTokenButton" type="button">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="shared-utils.js"></script>
+    <script>
+        const TOKEN_KEY = 'github_token';
+        const REPO_KEY = 'base_branch_prs_repo';
+        const BRANCH_KEY = 'base_branch_prs_branch';
+        const STATE_KEY = 'base_branch_prs_state';
+        const CACHE_KEY = 'feature_prs_cache';
+        const MY_FILTER_KEY = 'feature_prs_my_filter';
+        const API_BASE = 'https://api.github.com';
+
+        let pullRequests = [];
+        let loading = false;
+        let viewerLogin = '';
+        let showOnlyMine = localStorage.getItem(MY_FILTER_KEY) === 'true';
+        let lastSeenToken = '';
+
+        const els = {
+            repoInput: document.getElementById('repoInput'),
+            branchInput: document.getElementById('branchInput'),
+            stateInput: document.getElementById('stateInput'),
+            searchForm: document.getElementById('searchForm'),
+            refreshButton: document.getElementById('refreshButton'),
+            loadButton: document.getElementById('loadButton'),
+            tokenButton: document.getElementById('tokenButton'),
+            tokenStatus: document.getElementById('tokenStatus'),
+            tokenModal: document.getElementById('tokenModal'),
+            closeTokenModal: document.getElementById('closeTokenModal'),
+            tokenInput: document.getElementById('tokenInput'),
+            toggleTokenVisibility: document.getElementById('toggleTokenVisibility'),
+            saveTokenButton: document.getElementById('saveTokenButton'),
+            clearTokenButton: document.getElementById('clearTokenButton'),
+            queryPreview: document.getElementById('queryPreview'),
+            totalCount: document.getElementById('totalCount'),
+            draftCount: document.getElementById('draftCount'),
+            conflictCount: document.getElementById('conflictCount'),
+            ciFailingCount: document.getElementById('ciFailingCount'),
+            changesCount: document.getElementById('changesCount'),
+            lastUpdated: document.getElementById('lastUpdated'),
+            myPrsButton: document.getElementById('myPrsButton'),
+            filterInput: document.getElementById('filterInput'),
+            errorBanner: document.getElementById('errorBanner'),
+            prList: document.getElementById('prList')
+        };
+
+        function getToken() {
+            return (localStorage.getItem(TOKEN_KEY) || '').trim();
+        }
+
+        function getHeaders() {
+            const headers = {
+                'Accept': 'application/vnd.github+json',
+                'X-GitHub-Api-Version': '2022-11-28'
+            };
+            const token = getToken();
+            if (token) headers.Authorization = `token ${token}`;
+            return headers;
+        }
+
+        function escape(value) {
+            return escapeHtml(String(value ?? ''));
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        function isBotReviewer(user) {
+            const login = typeof user === 'string' ? user : user?.login;
+            const type = typeof user === 'string' ? '' : user?.type;
+            return type === 'Bot' || /\[bot\]$/i.test(login || '') || login === 'Copilot';
+        }
+
+        function normalizeRepo(value) {
+            return value.trim().replace(/^https:\/\/github\.com\//i, '').replace(/\/+$/g, '');
+        }
+
+        function parseRepo(value) {
+            const normalized = normalizeRepo(value);
+            const match = normalized.match(/^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/);
+            if (!match) return null;
+            return { owner: match[1], repo: match[2], slug: `${match[1]}/${match[2]}` };
+        }
+
+        function buildSearchQuery(repoSlug, branch, state) {
+            const parts = [`repo:${repoSlug}`, 'is:pr', `base:${branch}`];
+            if (state === 'open') parts.push('is:open');
+            if (state === 'closed') parts.push('is:closed');
+            return parts.join(' ');
+        }
+
+        function cacheScope(repoSlug, branch, state) {
+            return `${CACHE_KEY}:${repoSlug}:${branch}:${state}`;
+        }
+
+        function currentCacheScope() {
+            const repo = parseRepo(els.repoInput.value);
+            const branch = els.branchInput.value.trim();
+            if (!repo || !branch) return null;
+            return cacheScope(repo.slug, branch, els.stateInput.value);
+        }
+
+        function compactPR(pr) {
+            return {
+                number: pr.number,
+                title: pr.title,
+                html_url: pr.html_url,
+                draft: pr.draft,
+                updated_at: pr.updated_at,
+                mergeable: pr.mergeable,
+                mergeable_state: pr.mergeable_state,
+                user: pr.user ? { login: pr.user.login, html_url: pr.user.html_url } : null,
+                head: pr.head ? { ref: pr.head.ref, sha: pr.head.sha, repo: pr.head.repo ? { html_url: pr.head.repo.html_url } : null } : null,
+                base: pr.base ? { ref: pr.base.ref, repo: pr.base.repo ? { html_url: pr.base.repo.html_url } : null } : null,
+                reviewRows: pr.reviewRows || [],
+                mergeDisplay: pr.mergeDisplay || mergeState(pr),
+                ciStatus: pr.ciStatus || null
+            };
+        }
+
+        function savePRsToCache() {
+            const key = currentCacheScope();
+            if (!key) return;
+            try {
+                localStorage.setItem(key, JSON.stringify({
+                    savedAt: new Date().toISOString(),
+                    prs: pullRequests.map(compactPR)
+                }));
+            } catch (error) {
+                console.warn('Feature PR cache skipped:', error);
+            }
+        }
+
+        function loadPRsFromCache() {
+            const key = currentCacheScope();
+            if (!key) return false;
+
+            try {
+                const cached = JSON.parse(localStorage.getItem(key) || 'null');
+                if (!cached || !Array.isArray(cached.prs)) return false;
+                pullRequests = cached.prs;
+                sortPullRequests();
+                renderPRs();
+                const savedAt = cached.savedAt ? new Date(cached.savedAt).toLocaleTimeString() : 'cached';
+                els.lastUpdated.textContent = `Last updated: ${savedAt} (cached)`;
+                return true;
+            } catch (error) {
+                localStorage.removeItem(key);
+                console.warn('Feature PR cache could not be loaded:', error);
+                return false;
+            }
+        }
+
+        function updateTokenStatus() {
+            const hasToken = Boolean(getToken());
+            els.tokenStatus.textContent = hasToken ? 'Token set' : 'Token not set';
+            els.tokenStatus.classList.toggle('set', hasToken);
+        }
+
+        function syncTokenState(loadIdentity = false) {
+            const token = getToken();
+            const tokenChanged = token !== lastSeenToken;
+            lastSeenToken = token;
+
+            if (!token) {
+                viewerLogin = '';
+                showOnlyMine = false;
+                localStorage.setItem(MY_FILTER_KEY, 'false');
+            } else if (tokenChanged) {
+                viewerLogin = '';
+            }
+
+            updateTokenStatus();
+            updateMyPRsButton();
+            if ((loadIdentity || tokenChanged) && token) loadViewerLogin();
+            if (tokenChanged) renderPRs();
+        }
+
+        function updateQueryPreview() {
+            const repo = parseRepo(els.repoInput.value);
+            const branch = els.branchInput.value.trim();
+            if (!repo || !branch) {
+                els.queryPreview.textContent = 'Enter a repository and base branch.';
+                return;
+            }
+            const query = buildSearchQuery(repo.slug, branch, els.stateInput.value);
+            els.queryPreview.innerHTML = `GitHub search: <code>${escape(query)}</code>`;
+        }
+
+        function setError(message) {
+            els.errorBanner.textContent = message || '';
+            els.errorBanner.style.display = message ? 'block' : 'none';
+        }
+
+        function setLoading(isLoading) {
+            loading = isLoading;
+            els.loadButton.disabled = isLoading;
+            els.refreshButton.disabled = isLoading;
+            els.loadButton.textContent = isLoading ? 'Loading...' : 'Load PRs';
+        }
+
+        async function githubRequest(url, options = {}) {
+            const response = await fetch(url, {
+                ...options,
+                headers: {
+                    ...getHeaders(),
+                    ...(options.headers || {})
+                }
+            });
+
+            if (!response.ok) {
+                let message = `GitHub API returned ${response.status}`;
+                try {
+                    const data = await response.json();
+                    if (data.message) message = data.message;
+                } catch {}
+                throw new Error(message);
+            }
+
+            return response.json();
+        }
+
+        function updateMyPRsButton() {
+            const hasToken = Boolean(getToken());
+            els.myPrsButton.disabled = !hasToken;
+            els.myPrsButton.classList.toggle('filter-active', showOnlyMine);
+            els.myPrsButton.textContent = showOnlyMine && viewerLogin ? `My PRs: ${viewerLogin}` : 'My PRs';
+            els.myPrsButton.title = hasToken
+                ? viewerLogin ? `Show PRs authored by ${viewerLogin}` : 'Show PRs authored by the token owner'
+                : 'Add a GitHub token to filter by your PRs';
+        }
+
+        async function loadViewerLogin() {
+            if (!getToken()) {
+                viewerLogin = '';
+                showOnlyMine = false;
+                localStorage.setItem(MY_FILTER_KEY, 'false');
+                updateMyPRsButton();
+                return '';
+            }
+
+            try {
+                const viewer = await githubRequest(`${API_BASE}/user`);
+                viewerLogin = viewer.login || '';
+            } catch (error) {
+                console.error('Failed to identify GitHub user:', error);
+                viewerLogin = '';
+            }
+
+            updateMyPRsButton();
+            renderPRs();
+            return viewerLogin;
+        }
+
+        async function toggleMyPRsFilter() {
+            setError('');
+            if (!getToken()) {
+                openTokenModal();
+                return;
+            }
+            if (!viewerLogin) await loadViewerLogin();
+            if (!viewerLogin) {
+                setError('Could not identify the GitHub user for your token.');
+                return;
+            }
+
+            showOnlyMine = !showOnlyMine;
+            localStorage.setItem(MY_FILTER_KEY, String(showOnlyMine));
+            updateMyPRsButton();
+            renderPRs();
+        }
+
+        async function searchPullRequestNumbers(repoSlug, branch, state) {
+            const query = buildSearchQuery(repoSlug, branch, state);
+            const numbers = [];
+            const seen = new Set();
+
+            for (let page = 1; page <= 10; page++) {
+                const url = `${API_BASE}/search/issues?q=${encodeURIComponent(query)}&per_page=100&page=${page}&sort=updated&order=desc`;
+                const data = await githubRequest(url);
+                for (const item of data.items || []) {
+                    if (!seen.has(item.number)) {
+                        seen.add(item.number);
+                        numbers.push(item.number);
+                    }
+                }
+                if (!data.items || data.items.length < 100) break;
+            }
+
+            return numbers;
+        }
+
+        async function fetchPullRequest(owner, repo, number) {
+            let pr = null;
+            for (let attempt = 0; attempt < 4; attempt++) {
+                pr = await githubRequest(`${API_BASE}/repos/${owner}/${repo}/pulls/${number}`);
+                if (pr.mergeable !== null && pr.mergeable_state !== 'unknown') break;
+                if (attempt < 3) await sleep(700);
+            }
+            return pr;
+        }
+
+        async function fetchReviews(owner, repo, number) {
+            const reviews = [];
+            for (let page = 1; page <= 5; page++) {
+                const data = await githubRequest(`${API_BASE}/repos/${owner}/${repo}/pulls/${number}/reviews?per_page=100&page=${page}`);
+                reviews.push(...data);
+                if (data.length < 100) break;
+            }
+
+            const latestStates = new Map();
+            reviews.forEach(review => {
+                if (!review.user || review.state === 'PENDING') return;
+                if (isBotReviewer(review.user)) return;
+                latestStates.set(review.user.login, {
+                    user: review.user.login,
+                    state: review.state,
+                    submittedAt: review.submitted_at
+                });
+            });
+
+            return [...latestStates.values()].sort((a, b) => a.user.localeCompare(b.user));
+        }
+
+        async function fetchCIStatus(owner, repo, sha) {
+            if (!sha) {
+                return { state: 'unknown', label: 'CI unknown', totalCount: 0, failedChecks: [] };
+            }
+
+            try {
+                const [checksData, statusData] = await Promise.all([
+                    githubRequest(`${API_BASE}/repos/${owner}/${repo}/commits/${sha}/check-runs?per_page=100`),
+                    githubRequest(`${API_BASE}/repos/${owner}/${repo}/commits/${sha}/status`)
+                ]);
+
+                let successCount = 0;
+                let failureCount = 0;
+                let pendingCount = 0;
+                const failedChecks = [];
+
+                (checksData.check_runs || []).forEach(check => {
+                    if (check.conclusion === 'success' || check.conclusion === 'skipped' || check.conclusion === 'neutral') {
+                        successCount++;
+                    } else if (['failure', 'timed_out', 'cancelled', 'action_required'].includes(check.conclusion)) {
+                        failureCount++;
+                        failedChecks.push({ name: check.name, url: check.html_url });
+                    } else if (['in_progress', 'queued', 'waiting', 'requested'].includes(check.status)) {
+                        pendingCount++;
+                    }
+                });
+
+                (statusData.statuses || []).forEach(status => {
+                    if (status.state === 'success') {
+                        successCount++;
+                    } else if (status.state === 'failure' || status.state === 'error') {
+                        failureCount++;
+                        failedChecks.push({ name: status.context, url: status.target_url || statusData.target_url });
+                    } else if (status.state === 'pending') {
+                        pendingCount++;
+                    }
+                });
+
+                const totalCount = (checksData.total_count || 0) + (statusData.statuses || []).length;
+                if (totalCount === 0) {
+                    return { state: 'none', label: 'No CI', totalCount, successCount, failureCount, pendingCount, failedChecks };
+                }
+                if (failureCount > 0) {
+                    return { state: 'failure', label: `${failureCount} failing`, totalCount, successCount, failureCount, pendingCount, failedChecks };
+                }
+                if (pendingCount > 0) {
+                    return { state: 'pending', label: `${pendingCount} pending`, totalCount, successCount, failureCount, pendingCount, failedChecks };
+                }
+                return { state: 'success', label: 'CI passing', totalCount, successCount, failureCount, pendingCount, failedChecks };
+            } catch (error) {
+                console.error('Error fetching CI status:', error);
+                return { state: 'unknown', label: 'CI unavailable', totalCount: 0, failedChecks: [] };
+            }
+        }
+
+        function mergeReviewRows(pr, reviews) {
+            const rows = new Map();
+            reviews.forEach(review => rows.set(review.user, review.state));
+
+            (pr.requested_reviewers || []).forEach(user => {
+                if (isBotReviewer(user)) return;
+                if (!rows.has(user.login)) rows.set(user.login, 'REVIEW_REQUESTED');
+            });
+            (pr.requested_teams || []).forEach(team => {
+                const name = `@${team.slug}`;
+                if (!rows.has(name)) rows.set(name, 'REVIEW_REQUESTED');
+            });
+
+            return [...rows.entries()]
+                .map(([user, state]) => ({ user, state }))
+                .sort((a, b) => a.user.localeCompare(b.user));
+        }
+
+        function mergeState(pr) {
+            if (pr.mergeable === null || pr.mergeable_state === 'unknown') {
+                return { label: 'Checking mergeability', className: 'pending', hasConflict: false, unknown: true };
+            }
+            if (pr.mergeable_state === 'dirty' || pr.mergeable === false) {
+                return { label: 'Merge conflicts', className: 'conflict', hasConflict: true, unknown: false };
+            }
+            return { label: 'No conflicts', className: 'clean', hasConflict: false, unknown: false };
+        }
+
+        function reviewStatusLabel(state) {
+            const labels = {
+                APPROVED: 'Approved',
+                CHANGES_REQUESTED: 'Changes requested',
+                COMMENTED: 'Commented',
+                DISMISSED: 'Dismissed',
+                REVIEW_REQUESTED: 'Requested'
+            };
+            return labels[state] || state.replace(/_/g, ' ').toLowerCase();
+        }
+
+        function reviewStatusClass(state) {
+            const classes = {
+                APPROVED: 'approved',
+                CHANGES_REQUESTED: 'changes-requested',
+                COMMENTED: 'commented',
+                DISMISSED: 'dismissed',
+                REVIEW_REQUESTED: 'requested'
+            };
+            return classes[state] || 'none';
+        }
+
+        function formatRelativeTime(dateString) {
+            return timeAgo(dateString).replace(' minutes', 'm').replace(' minute', 'm')
+                .replace(' hours', 'h').replace(' hour', 'h')
+                .replace(' days', 'd').replace(' day', 'd');
+        }
+
+        function branchUrl(branch) {
+            if (!branch?.repo?.html_url || !branch?.ref) return '';
+            const encodedRef = branch.ref.split('/').map(encodeURIComponent).join('/');
+            return `${branch.repo.html_url}/tree/${encodedRef}`;
+        }
+
+        function renderBranchLink(branch) {
+            const label = branch?.ref || 'unknown';
+            const url = branchUrl(branch);
+            if (!url) return `<strong class="branch-link" title="${escape(label)}">${escape(label)}</strong>`;
+            return `<a class="branch-link" href="${escape(url)}" target="_blank" rel="noopener noreferrer" title="${escape(label)}">${escape(label)}</a>`;
+        }
+
+        function renderFeatureBranch(branch) {
+            const label = branch?.ref || 'unknown';
+            return `
+                <span class="branch-with-copy">
+                    ${renderBranchLink(branch)}
+                    <button class="branch-copy" type="button" data-copy-branch="${escape(label)}" title="Copy feature branch name" aria-label="Copy feature branch name">⧉</button>
+                </span>
+            `;
+        }
+
+        async function copyText(text) {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(text);
+                return;
+            }
+
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.setAttribute('readonly', '');
+            textarea.style.position = 'fixed';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            textarea.remove();
+        }
+
+        async function copyBranchFromButton(button) {
+            const branch = button.getAttribute('data-copy-branch') || '';
+            if (!branch) return;
+
+            try {
+                await copyText(branch);
+                const previousText = button.textContent;
+                button.textContent = '✓';
+                button.classList.add('copied');
+                setTimeout(() => {
+                    button.textContent = previousText;
+                    button.classList.remove('copied');
+                }, 1200);
+            } catch (error) {
+                console.error('Failed to copy branch name:', error);
+                setError('Could not copy branch name.');
+            }
+        }
+
+        function hasApproval(pr) {
+            return (pr.reviewRows || []).some(row => row.state === 'APPROVED');
+        }
+
+        function hasChangesRequested(pr) {
+            return (pr.reviewRows || []).some(row => row.state === 'CHANGES_REQUESTED');
+        }
+
+        function hasFailingCI(pr) {
+            return pr.ciStatus?.state === 'failure';
+        }
+
+        async function fetchPRData(repoInfo, number) {
+            const [pr, reviews] = await Promise.all([
+                fetchPullRequest(repoInfo.owner, repoInfo.repo, number),
+                fetchReviews(repoInfo.owner, repoInfo.repo, number)
+            ]);
+            pr.reviewRows = mergeReviewRows(pr, reviews);
+            pr.mergeDisplay = mergeState(pr);
+            pr.ciStatus = await fetchCIStatus(repoInfo.owner, repoInfo.repo, pr.head?.sha);
+            return pr;
+        }
+
+        async function mapWithConcurrency(items, limit, mapper) {
+            const results = new Array(items.length);
+            let nextIndex = 0;
+
+            async function worker() {
+                while (nextIndex < items.length) {
+                    const index = nextIndex++;
+                    results[index] = await mapper(items[index], index);
+                }
+            }
+
+            const workers = Array.from({ length: Math.min(limit, items.length) }, worker);
+            await Promise.all(workers);
+            return results;
+        }
+
+        async function loadPRs() {
+            if (loading) return;
+
+            const repoInfo = parseRepo(els.repoInput.value);
+            const branch = els.branchInput.value.trim();
+            const state = els.stateInput.value;
+            setError('');
+            updateQueryPreview();
+
+            if (!repoInfo) {
+                setError('Enter a repository as owner/repo.');
+                return;
+            }
+            if (!branch) {
+                setError('Enter a base branch.');
+                return;
+            }
+
+            localStorage.setItem(REPO_KEY, repoInfo.slug);
+            localStorage.setItem(BRANCH_KEY, branch);
+            localStorage.setItem(STATE_KEY, state);
+
+            setLoading(true);
+            pullRequests = [];
+            renderLoading();
+
+            try {
+                const numbers = await searchPullRequestNumbers(repoInfo.slug, branch, state);
+                if (numbers.length === 0) {
+                    pullRequests = [];
+                    renderPRs();
+                    savePRsToCache();
+                    els.lastUpdated.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+                    return;
+                }
+
+                pullRequests = await mapWithConcurrency(numbers, 6, number => fetchPRData(repoInfo, number));
+                sortPullRequests();
+                els.lastUpdated.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+                renderPRs();
+                savePRsToCache();
+            } catch (error) {
+                console.error('Failed to load PRs:', error);
+                setError(error.message);
+                els.prList.innerHTML = '<div class="empty-state">Could not load pull requests.</div>';
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function filteredPRs() {
+            const filter = els.filterInput.value.trim().toLowerCase();
+            let items = pullRequests;
+
+            if (showOnlyMine && viewerLogin) {
+                const login = viewerLogin.toLowerCase();
+                items = items.filter(pr => (pr.user?.login || '').toLowerCase() === login);
+            }
+
+            if (!filter) return items;
+            return items.filter(pr => {
+                const searchable = [
+                    pr.title,
+                    pr.number,
+                    pr.user?.login,
+                    pr.head?.ref,
+                    pr.base?.ref,
+                    pr.ciStatus?.label,
+                    ...(pr.ciStatus?.failedChecks || []).map(check => check.name),
+                    ...(pr.reviewRows || []).map(row => row.user)
+                ].join(' ').toLowerCase();
+                return searchable.includes(filter);
+            });
+        }
+
+        function sortPullRequests() {
+            pullRequests.sort((a, b) => {
+                if (a.draft !== b.draft) return a.draft ? 1 : -1;
+                return b.number - a.number;
+            });
+        }
+
+        function renderLoading() {
+            els.prList.innerHTML = `
+                <div class="loading-state">
+                    <span class="spinner"></span>
+                    <span>Loading pull requests, CI, and review state...</span>
+                </div>
+            `;
+        }
+
+        function renderSummary(items) {
+            els.totalCount.textContent = items.length;
+            els.draftCount.textContent = items.filter(pr => pr.draft).length;
+            els.conflictCount.textContent = items.filter(pr => pr.mergeDisplay?.hasConflict).length;
+            els.ciFailingCount.textContent = items.filter(hasFailingCI).length;
+            els.changesCount.textContent = items.filter(hasChangesRequested).length;
+        }
+
+        function renderReviewers(pr) {
+            const rows = pr.reviewRows || [];
+            if (rows.length === 0) {
+                return `
+                    <aside class="review-panel">
+                        <div class="review-title">Reviewers</div>
+                        <div class="review-grid">
+                            <div class="review-row">
+                                <span class="reviewer-name">No reviewers</span>
+                                <span class="review-state none">None</span>
+                            </div>
+                        </div>
+                    </aside>
+                `;
+            }
+
+            return `
+                <aside class="review-panel">
+                    <div class="review-title">Reviewers</div>
+                    <div class="review-grid">
+                        ${rows.map(row => `
+                            <div class="review-row">
+                                <span class="reviewer-name" title="${escape(row.user)}">${escape(row.user)}</span>
+                                <span class="review-state ${reviewStatusClass(row.state)}">${escape(reviewStatusLabel(row.state))}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </aside>
+            `;
+        }
+
+        function renderPRCard(pr) {
+            const draftClass = pr.draft ? 'draft' : 'ready';
+            const draftText = pr.draft ? 'Draft' : 'Ready for review';
+            const merge = pr.mergeDisplay || mergeState(pr);
+            const author = pr.user?.login || 'unknown';
+            const authorUrl = pr.user?.html_url || `https://github.com/${author}`;
+            const ci = pr.ciStatus || { state: 'unknown', label: 'CI unknown', failedChecks: [] };
+            const ciClass = ci.state === 'success' ? 'clean' : ci.state === 'failure' ? 'conflict' : ci.state === 'pending' ? 'pending' : 'neutral';
+            const failedChecks = (ci.failedChecks || []).slice(0, 4);
+
+            return `
+                <article class="pr-card ${pr.draft ? 'draft-pr' : ''}">
+                    <section>
+                        <div class="pr-title-row">
+                            <a class="pr-link" href="${escape(pr.html_url)}" target="_blank" rel="noopener noreferrer">
+                                ${escape(pr.title)}
+                                <span class="pr-number">#${escape(pr.number)}</span>
+                            </a>
+                        </div>
+                        <div class="pr-meta">
+                            <span>Author <a href="${escape(authorUrl)}" target="_blank" rel="noopener noreferrer">${escape(author)}</a></span>
+                            <span>${renderFeatureBranch(pr.head)} <span class="branch-separator">into</span> ${renderBranchLink(pr.base)}</span>
+                            <span>Updated ${escape(formatRelativeTime(pr.updated_at))}</span>
+                        </div>
+                        <div class="pill-row">
+                            <span class="status-pill ${draftClass}">${draftText}</span>
+                            <span class="status-pill ${merge.className}">${escape(merge.label)}</span>
+                            <span class="status-pill ${ciClass}">${escape(ci.label)}</span>
+                            ${hasApproval(pr) ? '<span class="status-pill clean">Approved</span>' : ''}
+                            ${hasChangesRequested(pr) ? '<span class="status-pill conflict">Changes requested</span>' : ''}
+                        </div>
+                        ${failedChecks.length > 0 ? `
+                            <div class="pr-meta">
+                                <span>Failed checks:</span>
+                                ${failedChecks.map(check => `
+                                    <a href="${escape(check.url || pr.html_url)}" target="_blank" rel="noopener noreferrer">${escape(check.name)}</a>
+                                `).join('')}
+                                ${(ci.failedChecks || []).length > failedChecks.length ? `<span>+${(ci.failedChecks || []).length - failedChecks.length} more</span>` : ''}
+                            </div>
+                        ` : ''}
+                    </section>
+                    ${renderReviewers(pr)}
+                </article>
+            `;
+        }
+
+        function renderPRs() {
+            const items = filteredPRs();
+            renderSummary(items);
+
+            if (pullRequests.length === 0) {
+                els.prList.innerHTML = '<div class="empty-state">No pull requests found for that base branch.</div>';
+                return;
+            }
+
+            if (items.length === 0) {
+                els.prList.innerHTML = '<div class="empty-state">No pull requests match the filter.</div>';
+                return;
+            }
+
+            els.prList.innerHTML = items.map(renderPRCard).join('');
+        }
+
+        function openTokenModal() {
+            els.tokenInput.value = getToken();
+            els.tokenInput.type = 'password';
+            els.toggleTokenVisibility.textContent = 'Show';
+            Modal.open('tokenModal');
+        }
+
+        function saveToken() {
+            const token = els.tokenInput.value.trim();
+            if (token) localStorage.setItem(TOKEN_KEY, token);
+            else localStorage.removeItem(TOKEN_KEY);
+            syncTokenState(true);
+            Modal.close('tokenModal');
+        }
+
+        function clearToken() {
+            localStorage.removeItem(TOKEN_KEY);
+            els.tokenInput.value = '';
+            syncTokenState();
+        }
+
+        function init() {
+            els.repoInput.value = localStorage.getItem(REPO_KEY) || 'XRPLF/rippled';
+            els.branchInput.value = localStorage.getItem(BRANCH_KEY) || '';
+            els.stateInput.value = localStorage.getItem(STATE_KEY) || 'open';
+            syncTokenState(true);
+            updateQueryPreview();
+            loadPRsFromCache();
+
+            els.searchForm.addEventListener('submit', event => {
+                event.preventDefault();
+                loadPRs();
+            });
+            els.refreshButton.addEventListener('click', loadPRs);
+            els.myPrsButton.addEventListener('click', toggleMyPRsFilter);
+            els.filterInput.addEventListener('input', renderPRs);
+            els.prList.addEventListener('click', event => {
+                const button = event.target.closest('.branch-copy');
+                if (!button) return;
+                copyBranchFromButton(button);
+            });
+            els.repoInput.addEventListener('input', updateQueryPreview);
+            els.branchInput.addEventListener('input', updateQueryPreview);
+            els.stateInput.addEventListener('change', updateQueryPreview);
+            els.tokenButton.addEventListener('click', openTokenModal);
+            els.closeTokenModal.addEventListener('click', () => Modal.close('tokenModal'));
+            els.saveTokenButton.addEventListener('click', saveToken);
+            els.clearTokenButton.addEventListener('click', clearToken);
+            els.toggleTokenVisibility.addEventListener('click', () => {
+                const showing = els.tokenInput.type === 'text';
+                els.tokenInput.type = showing ? 'password' : 'text';
+                els.toggleTokenVisibility.textContent = showing ? 'Show' : 'Hide';
+            });
+            window.addEventListener('focus', () => syncTokenState(true));
+            window.addEventListener('pageshow', () => syncTokenState(true));
+            window.addEventListener('storage', event => {
+                if (event.key === TOKEN_KEY) syncTokenState(true);
+            });
+        }
+
+        init();
+    </script>
+</body>
+</html>

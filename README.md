@@ -77,6 +77,21 @@ Track pull requests for an XRPLF/rippled release.
 
 ---
 
+### 🧭 Base Branch PRs
+Find pull requests targeting a specific base branch in any repository.
+
+**Features:**
+- Search by `owner/repo` and `base:branch_name`
+- Shows PR title, number, link, draft state, author, and branch details
+- Flags merge conflicts using GitHub PR mergeability
+- Shows CI status from check runs and commit statuses, with failed check links
+- Lists reviewers, requested reviewers, approvals, and requested changes
+- Shares GitHub token with the other GitHub tools
+
+[**Launch Base Branch PRs →**](https://mvadari.github.io/uis/feature-prs.html)
+
+---
+
 ### 🔍 XRPL Server Changes
 Explore proposed changes to the XRP Ledger server (rippled) in a non-technical friendly interface.
 
