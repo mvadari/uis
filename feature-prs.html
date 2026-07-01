@@ -1192,13 +1192,13 @@
                 ? reviewers.map(formatReviewerForReport).join(', ')
                 : 'None';
 
-            return `#${pr.number}: ${pr.title}\n    Author: ${author}${conflictNote}\n    Reviewers: ${reviewerText}`;
+            return `* #${pr.number}: ${pr.title}\n   * Author: ${author}${conflictNote}\n   * Reviewers: ${reviewerText}`;
         }
 
         function buildReportMarkdown() {
             const items = filteredPRs();
             if (items.length === 0) return 'No pull requests to report.';
-            return items.map(buildReportPREntry).join('\n\n');
+            return items.map(buildReportPREntry).join('\n');
         }
 
         function openReportModal() {
