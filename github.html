@@ -715,6 +715,82 @@
             border-color: #0969da;
         }
 
+        .multiselect {
+            position: relative;
+        }
+
+        .multiselect-btn {
+            background-color: #f6f8fa;
+            color: #24292f;
+            border: 1px solid #d0d7de;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            max-width: 220px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .multiselect-btn:focus,
+        .multiselect-btn.open {
+            outline: none;
+            border-color: #0969da;
+        }
+
+        .multiselect-panel {
+            display: none;
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            z-index: 50;
+            min-width: 240px;
+            max-height: 280px;
+            overflow-y: auto;
+            background-color: #ffffff;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            box-shadow: 0 8px 24px rgba(140, 149, 159, 0.2);
+            padding: 4px;
+        }
+
+        .multiselect-panel.show {
+            display: block;
+        }
+
+        .multiselect-option {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #24292f;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .multiselect-option:hover {
+            background-color: #f6f8fa;
+        }
+
+        .multiselect-option input[type="checkbox"] {
+            cursor: pointer;
+        }
+
+        .multiselect-divider {
+            height: 1px;
+            background-color: #d0d7de;
+            margin: 4px 0;
+        }
+
+        .multiselect-empty {
+            padding: 6px 8px;
+            font-size: 12px;
+            color: #57606a;
+        }
+
         .notification {
             position: fixed;
             top: 20px;
@@ -1850,6 +1926,28 @@
                 color: #e6edf3;
                 border-color: #30363d;
             }
+            .multiselect-btn {
+                background-color: #21262d;
+                color: #e6edf3;
+                border-color: #30363d;
+            }
+            .multiselect-panel {
+                background-color: #161b22;
+                border-color: #30363d;
+                box-shadow: 0 8px 24px rgba(1, 4, 9, 0.5);
+            }
+            .multiselect-option {
+                color: #e6edf3;
+            }
+            .multiselect-option:hover {
+                background-color: #21262d;
+            }
+            .multiselect-divider {
+                background-color: #30363d;
+            }
+            .multiselect-empty {
+                color: #8b949e;
+            }
             .notification {
                 background-color: #1f6feb;
             }
@@ -2153,10 +2251,11 @@
                         </select>
                     </div>
                     <div class="repo-filter">
-                        <label for="queryFilter">Filter by query:</label>
-                        <select id="queryFilter">
-                            <option value="">All queries</option>
-                        </select>
+                        <label id="queryFilterLabel">Filter by query:</label>
+                        <div class="multiselect" id="queryFilterMultiselect">
+                            <button type="button" class="multiselect-btn" id="queryFilterBtn" aria-haspopup="true" aria-expanded="false">All queries</button>
+                            <div class="multiselect-panel" id="queryFilterPanel"></div>
+                        </div>
                     </div>
                     <div class="repo-filter">
                         <label for="milestoneFilter">Filter by milestone:</label>
@@ -2546,7 +2645,7 @@
         let manuallyToggledColumns = new Set(); // Track which columns user manually toggled
         let columnItemCounts = {}; // Track last-known item count per column, to detect zero-crossings
         let currentRepoFilter = ''; // Track current repository filter
-        let currentQueryFilter = ''; // Track current query filter
+        let currentQueryFilters = new Set(); // Track currently selected query filters (empty = all queries)
         let currentMilestoneFilter = ''; // Track current milestone filter
         let currentUser = null; // Cache current user login
         let tokenValid = false; // Track if token is valid
@@ -3600,31 +3699,99 @@
             }
         }
 
-        // Populate query filter dropdown
+        // Populate query filter dropdown (supports selecting multiple queries at once)
         function populateQueryFilter() {
             const querySettings = getQuerySettings();
             const enabledQueries = querySettings.filter(q => q.enabled && q.query.trim());
 
-            const queryFilter = document.getElementById('queryFilter');
-            const currentValue = queryFilter.value;
-
-            // Clear existing options except "All queries"
-            queryFilter.innerHTML = '<option value="">All queries</option>';
-
-            // Add enabled query options
-            enabledQueries.forEach(query => {
-                const option = document.createElement('option');
-                option.value = query.id;
-                option.textContent = query.name;
-                queryFilter.appendChild(option);
+            // Drop any selected filters whose query no longer exists/is enabled
+            const enabledIds = new Set(enabledQueries.map(q => q.id));
+            Array.from(currentQueryFilters).forEach(id => {
+                if (!enabledIds.has(id)) currentQueryFilters.delete(id);
             });
 
-            // Restore previous selection if it still exists
-            if (currentValue && enabledQueries.some(q => q.id === currentValue)) {
-                queryFilter.value = currentValue;
+            const panel = document.getElementById('queryFilterPanel');
+            if (enabledQueries.length === 0) {
+                panel.innerHTML = '<div class="multiselect-empty">No queries configured</div>';
             } else {
-                currentQueryFilter = '';
+                panel.innerHTML = enabledQueries.map(query => `
+                    <label class="multiselect-option">
+                        <input type="checkbox" data-query-id="${query.id}" ${currentQueryFilters.has(query.id) ? 'checked' : ''}>
+                        <span>${escapeHtml(query.name)}</span>
+                    </label>
+                `).join('');
             }
+
+            updateQueryFilterButtonLabel();
+        }
+
+        // Update the summary text on the query filter button to reflect current selection
+        function updateQueryFilterButtonLabel() {
+            const btn = document.getElementById('queryFilterBtn');
+            if (!btn) return;
+
+            if (currentQueryFilters.size === 0) {
+                btn.textContent = 'All queries';
+                return;
+            }
+
+            const querySettings = getQuerySettings();
+            const selectedNames = Array.from(currentQueryFilters)
+                .map(id => querySettings.find(q => q.id === id))
+                .filter(Boolean)
+                .map(q => q.name);
+
+            btn.textContent = selectedNames.length === 1
+                ? selectedNames[0]
+                : `${selectedNames.length} queries selected`;
+        }
+
+        // Setup the query filter multiselect dropdown (open/close, checkbox toggling)
+        function setupQueryFilterMultiselect() {
+            const wrapper = document.getElementById('queryFilterMultiselect');
+            const btn = document.getElementById('queryFilterBtn');
+            const panel = document.getElementById('queryFilterPanel');
+
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isOpen = panel.classList.toggle('show');
+                btn.classList.toggle('open', isOpen);
+                btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            });
+
+            panel.addEventListener('click', (e) => {
+                // Keep the panel open while checking/unchecking options
+                e.stopPropagation();
+            });
+
+            panel.addEventListener('change', (e) => {
+                const checkbox = e.target.closest('input[type="checkbox"][data-query-id]');
+                if (!checkbox) return;
+
+                const queryId = checkbox.dataset.queryId;
+                if (checkbox.checked) {
+                    currentQueryFilters.add(queryId);
+                } else {
+                    currentQueryFilters.delete(queryId);
+                }
+
+                updateQueryFilterButtonLabel();
+                renderPRs();
+            });
+
+            document.addEventListener('click', () => {
+                panel.classList.remove('show');
+                btn.classList.remove('open');
+                btn.setAttribute('aria-expanded', 'false');
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && panel.classList.contains('show')) {
+                    panel.classList.remove('show');
+                    btn.classList.remove('open');
+                    btn.setAttribute('aria-expanded', 'false');
+                }
+            });
         }
 
         // Populate milestone filter dropdown
@@ -3722,10 +3889,10 @@
                 });
             }
 
-            // Filter PRs by query if a filter is active
-            if (currentQueryFilter) {
+            // Filter PRs by query if one or more filters are selected (PRs matching ANY of them are shown)
+            if (currentQueryFilters.size > 0) {
                 filteredPRs = filteredPRs.filter(pr => {
-                    return pr._sourceQueries && pr._sourceQueries.includes(currentQueryFilter);
+                    return pr._sourceQueries && pr._sourceQueries.some(q => currentQueryFilters.has(q));
                 });
             }
 
@@ -4933,11 +5100,8 @@
             renderPRs();
         });
 
-        // Query filter event listener
-        document.getElementById('queryFilter').addEventListener('change', (e) => {
-            currentQueryFilter = e.target.value;
-            renderPRs();
-        });
+        // Query filter multiselect setup (checkbox toggling triggers its own re-render)
+        setupQueryFilterMultiselect();
 
         // Milestone filter event listener
         document.getElementById('milestoneFilter').addEventListener('change', (e) => {
