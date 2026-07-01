@@ -347,6 +347,10 @@
             color: var(--color-success-fg);
         }
 
+        .link-copy {
+            flex: 0 0 auto;
+        }
+
         .branch-separator {
             color: var(--color-fg-muted);
         }
@@ -681,6 +685,10 @@
 
         function escape(value) {
             return escapeHtml(String(value ?? ''));
+        }
+
+        function escapeAttribute(value) {
+            return escape(value).replace(/"/g, '&quot;');
         }
 
         function sleep(ms) {
@@ -1073,9 +1081,13 @@
             return `
                 <span class="branch-with-copy">
                     ${renderBranchLink(branch)}
-                    <button class="branch-copy" type="button" data-copy-branch="${escape(label)}" title="Copy feature branch name" aria-label="Copy feature branch name">⧉</button>
+                    ${renderCopyButton(label, 'Copy feature branch name')}
                 </span>
             `;
+        }
+
+        function renderCopyButton(value, label, className = '') {
+            return `<button class="branch-copy ${className}" type="button" data-copy-value="${escapeAttribute(value)}" title="${escapeAttribute(label)}" aria-label="${escapeAttribute(label)}">⧉</button>`;
         }
 
         async function copyText(text) {
@@ -1095,12 +1107,12 @@
             textarea.remove();
         }
 
-        async function copyBranchFromButton(button) {
-            const branch = button.getAttribute('data-copy-branch') || '';
-            if (!branch) return;
+        async function copyFromButton(button) {
+            const value = button.getAttribute('data-copy-value') || '';
+            if (!value) return;
 
             try {
-                await copyText(branch);
+                await copyText(value);
                 const previousText = button.textContent;
                 button.textContent = '✓';
                 button.classList.add('copied');
@@ -1109,8 +1121,8 @@
                     button.classList.remove('copied');
                 }, 1200);
             } catch (error) {
-                console.error('Failed to copy branch name:', error);
-                setError('Could not copy branch name.');
+                console.error('Failed to copy value:', error);
+                setError('Could not copy to clipboard.');
             }
         }
 
@@ -1301,6 +1313,7 @@
                                 ${escape(pr.title)}
                                 <span class="pr-number">#${escape(pr.number)}</span>
                             </a>
+                            ${renderCopyButton(pr.html_url, 'Copy PR link', 'link-copy')}
                         </div>
                         <div class="pr-meta">
                             <span>Author <a href="${escape(authorUrl)}" target="_blank" rel="noopener noreferrer">${escape(author)}</a></span>
@@ -1367,6 +1380,10 @@
             syncTokenState();
         }
 
+        function hasLoadableInputs() {
+            return Boolean(parseRepo(els.repoInput.value) && els.branchInput.value.trim());
+        }
+
         function init() {
             els.repoInput.value = localStorage.getItem(REPO_KEY) || 'XRPLF/rippled';
             els.branchInput.value = localStorage.getItem(BRANCH_KEY) || '';
@@ -1385,7 +1402,7 @@
             els.prList.addEventListener('click', event => {
                 const button = event.target.closest('.branch-copy');
                 if (!button) return;
-                copyBranchFromButton(button);
+                copyFromButton(button);
             });
             els.repoInput.addEventListener('input', updateQueryPreview);
             els.branchInput.addEventListener('input', updateQueryPreview);
@@ -1404,6 +1421,8 @@
             window.addEventListener('storage', event => {
                 if (event.key === TOKEN_KEY) syncTokenState(true);
             });
+
+            if (hasLoadableInputs()) loadPRs();
         }
 
         init();
