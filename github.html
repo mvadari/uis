@@ -2544,7 +2544,7 @@
         let columnSortModes = {}; // Track sort mode per column
         let minimizedColumns = new Set(); // Track minimized columns
         let manuallyToggledColumns = new Set(); // Track which columns user manually toggled
-        let shouldApplyAutoCollapse = false; // Flag to trigger auto-collapse on next render
+        let columnItemCounts = {}; // Track last-known item count per column, to detect zero-crossings
         let currentRepoFilter = ''; // Track current repository filter
         let currentQueryFilter = ''; // Track current query filter
         let currentMilestoneFilter = ''; // Track current milestone filter
@@ -3658,6 +3658,30 @@
             }
         }
 
+        // Update minimized/manually-toggled state for a column based on whether its item
+        // count just crossed the zero boundary. Crossing zero always wins over any manual
+        // toggle; counts that stay on the same side of zero leave the current state alone.
+        function applyAutoCollapseState(labelId, newCount) {
+            const previousCount = columnItemCounts[labelId];
+            if (previousCount !== undefined && previousCount !== newCount) {
+                if (newCount === 0) {
+                    minimizedColumns.add(labelId);
+                    manuallyToggledColumns.delete(labelId);
+                } else if (previousCount === 0) {
+                    minimizedColumns.delete(labelId);
+                    manuallyToggledColumns.delete(labelId);
+                }
+            }
+            columnItemCounts[labelId] = newCount;
+        }
+
+        // Sync a column's DOM 'minimized' class with the current minimizedColumns state
+        function applyColumnMinimizedState(labelId) {
+            const column = document.querySelector(`.kanban-column[data-label="${labelId}"]`);
+            if (!column) return;
+            column.classList.toggle('minimized', minimizedColumns.has(labelId));
+        }
+
         // Render PRs in Kanban view
         function renderPRs() {
             const prLabels = getLabels();
@@ -3752,24 +3776,13 @@
                 columns[label.id] = sortPRs(columns[label.id], mode, label.id);
             });
 
-            // Auto-collapse/expand columns based on content when filters change
-            if (shouldApplyAutoCollapse) {
-                LABELS.forEach(label => {
-                    const count = columns[label.id].length;
-                    const wasManuallyToggled = manuallyToggledColumns.has(label.id);
-
-                    if (!wasManuallyToggled) {
-                        // Auto-collapse if empty, auto-expand if has items
-                        if (count === 0) {
-                            minimizedColumns.add(label.id);
-                        } else {
-                            minimizedColumns.delete(label.id);
-                        }
-                    }
-                    // If manually toggled, respect the user's choice completely
-                });
-                shouldApplyAutoCollapse = false; // Reset flag
-            }
+            // Auto-collapse columns that just became empty, auto-expand columns that just
+            // received their first item - always, regardless of manual toggle history.
+            LABELS.forEach(label => {
+                applyAutoCollapseState(label.id, columns[label.id].length);
+            });
+            saveMinimizedColumns();
+            saveManuallyToggledColumns();
 
             // Generate Kanban HTML
             const kanbanHTML = LABELS.map(label => {
@@ -4045,13 +4058,6 @@
                             const newLabel = column.dataset.label;
                             const sortMode = columnSortModes[newLabel] || 'updated';
 
-                            // Auto-expand destination column if not manually toggled
-                            if (!manuallyToggledColumns.has(newLabel)) {
-                                minimizedColumns.delete(newLabel);
-                                column.classList.remove('minimized');
-                                saveMinimizedColumns();
-                            }
-
                             // Get the content element
                             const contentElement = element.classList.contains('kanban-content')
                                 ? element
@@ -4227,6 +4233,7 @@
 
                             // Remember source column to update its count and possibly show empty state
                             const sourceContent = prItem.closest('.kanban-content');
+                            const sourceLabel = sourceContent ? sourceContent.dataset.label : null;
 
                             // Move the card
                             targetContent.appendChild(prItem);
@@ -4234,6 +4241,16 @@
                             // Update column header counts
                             updateColumnHeaderCount(sourceContent);
                             updateColumnHeaderCount(targetContent);
+
+                            // Auto-collapse/expand columns that just crossed the zero-item boundary
+                            if (sourceLabel) {
+                                applyAutoCollapseState(sourceLabel, sourceContent.querySelectorAll('.pr-item').length);
+                                applyColumnMinimizedState(sourceLabel);
+                            }
+                            applyAutoCollapseState(newLabel, targetContent.querySelectorAll('.pr-item').length);
+                            applyColumnMinimizedState(newLabel);
+                            saveMinimizedColumns();
+                            saveManuallyToggledColumns();
                         }
                     }
 
@@ -4912,34 +4929,19 @@
 
         // Repository filter event listener
         document.getElementById('repoFilter').addEventListener('change', (e) => {
-            const oldFilter = currentRepoFilter;
             currentRepoFilter = e.target.value;
-            // Trigger auto-collapse when filter changes (but keep manual toggles)
-            if (oldFilter !== currentRepoFilter) {
-                shouldApplyAutoCollapse = true;
-            }
             renderPRs();
         });
 
         // Query filter event listener
         document.getElementById('queryFilter').addEventListener('change', (e) => {
-            const oldFilter = currentQueryFilter;
             currentQueryFilter = e.target.value;
-            // Trigger auto-collapse when filter changes (but keep manual toggles)
-            if (oldFilter !== currentQueryFilter) {
-                shouldApplyAutoCollapse = true;
-            }
             renderPRs();
         });
 
         // Milestone filter event listener
         document.getElementById('milestoneFilter').addEventListener('change', (e) => {
-            const oldFilter = currentMilestoneFilter;
             currentMilestoneFilter = e.target.value;
-            // Trigger auto-collapse when filter changes (but keep manual toggles)
-            if (oldFilter !== currentMilestoneFilter) {
-                shouldApplyAutoCollapse = true;
-            }
             renderPRs();
         });
 

@@ -446,6 +446,25 @@
             max-width: 560px;
         }
 
+        .report-modal-content {
+            max-width: 640px;
+        }
+
+        .report-output {
+            background: var(--color-canvas-subtle);
+            border: 1px solid var(--color-border-default);
+            border-radius: 6px;
+            color: var(--color-fg-default);
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            min-height: 360px;
+            padding: 12px;
+            resize: vertical;
+            white-space: pre;
+            width: 100%;
+        }
+
         .token-help {
             background: var(--color-canvas-subtle);
             border: 1px solid var(--color-border-muted);
@@ -539,6 +558,7 @@
                 <div class="header-controls">
                     <span id="tokenStatus" class="token-pill">Token not set</span>
                     <button class="btn" id="tokenButton" type="button">Token</button>
+                    <button class="btn" id="reportButton" type="button">Report</button>
                     <button class="btn btn-primary" id="refreshButton" type="button">Refresh</button>
                 </div>
             </div>
@@ -625,6 +645,21 @@
         </div>
     </div>
 
+    <div class="modal" id="reportModal">
+        <div class="modal-content report-modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">PR Report</h2>
+                <button class="modal-close" id="closeReportModal" type="button">&times;</button>
+            </div>
+            <div class="modal-body">
+                <textarea id="reportOutput" class="report-output" readonly spellcheck="false"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" id="copyReportButton" type="button">Copy to clipboard</button>
+            </div>
+        </div>
+    </div>
+
     <script src="shared-utils.js"></script>
     <script>
         const TOKEN_KEY = 'github_token';
@@ -650,6 +685,11 @@
             loadButton: document.getElementById('loadButton'),
             tokenButton: document.getElementById('tokenButton'),
             tokenStatus: document.getElementById('tokenStatus'),
+            reportButton: document.getElementById('reportButton'),
+            reportModal: document.getElementById('reportModal'),
+            closeReportModal: document.getElementById('closeReportModal'),
+            reportOutput: document.getElementById('reportOutput'),
+            copyReportButton: document.getElementById('copyReportButton'),
             tokenModal: document.getElementById('tokenModal'),
             closeTokenModal: document.getElementById('closeTokenModal'),
             tokenInput: document.getElementById('tokenInput'),
@@ -1138,6 +1178,48 @@
             return pr.ciStatus?.state === 'failure';
         }
 
+        function formatReviewerForReport(row) {
+            if (row.state === 'APPROVED') return `${row.user} ✅`;
+            if (row.state === 'CHANGES_REQUESTED') return `${row.user} ❌`;
+            return row.user;
+        }
+
+        function buildReportPREntry(pr) {
+            const author = pr.user?.login || 'unknown';
+            const conflictNote = pr.mergeDisplay?.hasConflict ? ' (needs to update to fix merge conflicts)' : '';
+            const reviewers = pr.reviewRows || [];
+            const reviewerText = reviewers.length
+                ? reviewers.map(formatReviewerForReport).join(', ')
+                : 'None';
+
+            return `* #${pr.number}: ${pr.title}\n   * Author: ${author}${conflictNote}\n   * Reviewers: ${reviewerText}`;
+        }
+
+        function buildReportMarkdown() {
+            const items = filteredPRs();
+            if (items.length === 0) return 'No pull requests to report.';
+            return items.map(buildReportPREntry).join('\n');
+        }
+
+        function openReportModal() {
+            els.reportOutput.value = buildReportMarkdown();
+            Modal.open('reportModal');
+        }
+
+        async function copyReport() {
+            try {
+                await copyText(els.reportOutput.value);
+                const previousText = els.copyReportButton.textContent;
+                els.copyReportButton.textContent = 'Copied!';
+                setTimeout(() => {
+                    els.copyReportButton.textContent = previousText;
+                }, 1200);
+            } catch (error) {
+                console.error('Failed to copy report:', error);
+                setError('Could not copy report to clipboard.');
+            }
+        }
+
         async function fetchPRData(repoInfo, number) {
             const [pr, reviews] = await Promise.all([
                 fetchPullRequest(repoInfo.owner, repoInfo.repo, number),
@@ -1411,6 +1493,9 @@
             els.closeTokenModal.addEventListener('click', () => Modal.close('tokenModal'));
             els.saveTokenButton.addEventListener('click', saveToken);
             els.clearTokenButton.addEventListener('click', clearToken);
+            els.reportButton.addEventListener('click', openReportModal);
+            els.closeReportModal.addEventListener('click', () => Modal.close('reportModal'));
+            els.copyReportButton.addEventListener('click', copyReport);
             els.toggleTokenVisibility.addEventListener('click', () => {
                 const showing = els.tokenInput.type === 'text';
                 els.tokenInput.type = showing ? 'password' : 'text';
