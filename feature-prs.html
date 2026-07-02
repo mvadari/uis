@@ -143,7 +143,7 @@
 
         .summary-grid {
             display: grid;
-            grid-template-columns: repeat(5, minmax(0, 1fr));
+            grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: 12px;
             margin-bottom: 16px;
         }
@@ -620,10 +620,6 @@
                 <div class="summary-value" id="totalCount">0</div>
             </div>
             <div class="summary-tile">
-                <div class="summary-label">Draft</div>
-                <div class="summary-value" id="draftCount">0</div>
-            </div>
-            <div class="summary-tile">
                 <div class="summary-label">Conflicts</div>
                 <div class="summary-value" id="conflictCount">0</div>
             </div>
@@ -727,7 +723,6 @@
             clearTokenButton: document.getElementById('clearTokenButton'),
             queryPreview: document.getElementById('queryPreview'),
             totalCount: document.getElementById('totalCount'),
-            draftCount: document.getElementById('draftCount'),
             conflictCount: document.getElementById('conflictCount'),
             ciFailingCount: document.getElementById('ciFailingCount'),
             changesCount: document.getElementById('changesCount'),
@@ -1224,8 +1219,12 @@
             return `* #${pr.number}: ${pr.title}\n   * Author: ${author}${conflictNote}\n   * Reviewers: ${reviewerText}`;
         }
 
+        function reportItems() {
+            return filteredPRs().filter(pr => !pr.draft);
+        }
+
         function buildReportMarkdown() {
-            const items = filteredPRs();
+            const items = reportItems();
             if (items.length === 0) return 'No pull requests to report.';
             return items.map(buildReportPREntry).join('\n');
         }
@@ -1247,7 +1246,7 @@
         }
 
         function buildReportHtml() {
-            const items = filteredPRs();
+            const items = reportItems();
             if (items.length === 0) return '<p>No pull requests to report.</p>';
             return `<ul>${items.map(buildReportHtmlEntry).join('')}</ul>`;
         }
@@ -1403,11 +1402,11 @@
         }
 
         function renderSummary(items) {
-            els.totalCount.textContent = items.length;
-            els.draftCount.textContent = items.filter(pr => pr.draft).length;
-            els.conflictCount.textContent = items.filter(pr => pr.mergeDisplay?.hasConflict).length;
-            els.ciFailingCount.textContent = items.filter(hasFailingCI).length;
-            els.changesCount.textContent = items.filter(hasChangesRequested).length;
+            const nonDraft = items.filter(pr => !pr.draft);
+            els.totalCount.textContent = nonDraft.length;
+            els.conflictCount.textContent = nonDraft.filter(pr => pr.mergeDisplay?.hasConflict).length;
+            els.ciFailingCount.textContent = nonDraft.filter(hasFailingCI).length;
+            els.changesCount.textContent = nonDraft.filter(hasChangesRequested).length;
         }
 
         function renderReviewers(pr) {
