@@ -1201,14 +1201,49 @@
             return items.map(buildReportPREntry).join('\n');
         }
 
+        function titleToHtml(title) {
+            return escape(title).replace(/`([^`]+)`/g, '<code>$1</code>');
+        }
+
+        function buildReportHtmlEntry(pr) {
+            const author = pr.user?.login || 'unknown';
+            const conflictNote = pr.mergeDisplay?.hasConflict ? ' (needs to update to fix merge conflicts)' : '';
+            const reviewers = pr.reviewRows || [];
+            const reviewerText = reviewers.length
+                ? reviewers.map(formatReviewerForReport).join(', ')
+                : 'None';
+            const numberLink = `<a href="${escapeAttribute(pr.html_url)}">#${pr.number}</a>`;
+
+            return `<li>${numberLink}: ${titleToHtml(pr.title)}<ul><li>Author: ${escape(author)}${escape(conflictNote)}</li><li>Reviewers: ${escape(reviewerText)}</li></ul></li>`;
+        }
+
+        function buildReportHtml() {
+            const items = filteredPRs();
+            if (items.length === 0) return '<p>No pull requests to report.</p>';
+            return `<ul>${items.map(buildReportHtmlEntry).join('')}</ul>`;
+        }
+
         function openReportModal() {
             els.reportOutput.value = buildReportMarkdown();
             Modal.open('reportModal');
         }
 
         async function copyReport() {
+            const plainText = els.reportOutput.value;
+
             try {
-                await copyText(els.reportOutput.value);
+                if (window.ClipboardItem && navigator.clipboard?.write) {
+                    const html = buildReportHtml();
+                    await navigator.clipboard.write([
+                        new ClipboardItem({
+                            'text/plain': new Blob([plainText], { type: 'text/plain' }),
+                            'text/html': new Blob([html], { type: 'text/html' })
+                        })
+                    ]);
+                } else {
+                    await copyText(plainText);
+                }
+
                 const previousText = els.copyReportButton.textContent;
                 els.copyReportButton.textContent = 'Copied!';
                 setTimeout(() => {
