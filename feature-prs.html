@@ -451,18 +451,47 @@
         }
 
         .report-output {
-            background: var(--color-canvas-subtle);
+            background: var(--color-canvas-default);
             border: 1px solid var(--color-border-default);
             border-radius: 6px;
             color: var(--color-fg-default);
+            font-size: 14px;
+            line-height: 1.6;
+            max-height: 420px;
+            min-height: 120px;
+            overflow-y: auto;
+            padding: 16px;
+            width: 100%;
+        }
+
+        .report-output ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .report-output li {
+            margin-bottom: 4px;
+        }
+
+        .report-output li ul {
+            margin-top: 4px;
+        }
+
+        .report-output a {
+            color: var(--color-accent-fg);
+            text-decoration: none;
+        }
+
+        .report-output a:hover {
+            text-decoration: underline;
+        }
+
+        .report-output code {
+            background: var(--color-canvas-subtle);
+            border-radius: 4px;
             font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
             font-size: 12px;
-            line-height: 1.5;
-            min-height: 360px;
-            padding: 12px;
-            resize: vertical;
-            white-space: pre;
-            width: 100%;
+            padding: 1px 5px;
         }
 
         .token-help {
@@ -652,7 +681,7 @@
                 <button class="modal-close" id="closeReportModal" type="button">&times;</button>
             </div>
             <div class="modal-body">
-                <textarea id="reportOutput" class="report-output" readonly spellcheck="false"></textarea>
+                <div id="reportOutput" class="report-output"></div>
             </div>
             <div class="modal-footer">
                 <button class="btn" id="copyReportButton" type="button">Copy to clipboard</button>
@@ -1224,16 +1253,16 @@
         }
 
         function openReportModal() {
-            els.reportOutput.value = buildReportMarkdown();
+            els.reportOutput.innerHTML = buildReportHtml();
             Modal.open('reportModal');
         }
 
         async function copyReport() {
-            const plainText = els.reportOutput.value;
+            const plainText = buildReportMarkdown();
 
             try {
                 if (window.ClipboardItem && navigator.clipboard?.write) {
-                    const html = buildReportHtml();
+                    const html = els.reportOutput.innerHTML;
                     await navigator.clipboard.write([
                         new ClipboardItem({
                             'text/plain': new Blob([plainText], { type: 'text/plain' }),
