@@ -302,11 +302,17 @@
 
         .section-title {
             align-items: center;
+            background: var(--color-canvas-subtle);
             display: flex;
             font-size: 15px;
             font-weight: 600;
             gap: 8px;
+            height: 40px;
             margin-bottom: 12px;
+            padding: 8px 0;
+            position: sticky;
+            top: 0;
+            z-index: 3;
         }
 
         .section-count {
@@ -334,6 +340,9 @@
             font-weight: 600;
             gap: 8px;
             padding: 8px 12px;
+            position: sticky;
+            top: 40px;
+            z-index: 2;
         }
 
         .file-group-count {
@@ -582,9 +591,64 @@
         }
 
         .comment-actions {
+            align-items: center;
             display: flex;
-            justify-content: flex-end;
+            gap: 8px;
+            justify-content: space-between;
             padding: 0 0 12px;
+        }
+
+        .comment-actions-right {
+            align-items: center;
+            display: flex;
+            gap: 8px;
+        }
+
+        .select-check {
+            align-items: center;
+            color: var(--color-fg-muted);
+            cursor: pointer;
+            display: inline-flex;
+            font-size: 12px;
+            gap: 6px;
+            user-select: none;
+        }
+
+        .select-check input {
+            cursor: pointer;
+            margin: 0;
+        }
+
+        .bulk-bar {
+            align-items: center;
+            background: var(--color-canvas-default);
+            border: 1px solid var(--color-border-default);
+            border-radius: 6px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding: 8px 12px;
+        }
+
+        .bulk-side {
+            align-items: center;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .bulk-side #bulkCount {
+            color: var(--color-fg-muted);
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .bulk-reason {
+            width: auto;
+            padding: 4px 8px;
+            font-size: 13px;
         }
 
         .hide-wrap {
@@ -721,6 +785,19 @@
             </div>
         </div>
 
+        <div class="bulk-bar" id="bulkBar" style="display:none;">
+            <div class="bulk-side">
+                <span id="bulkCount">0 selected</span>
+                <button class="btn btn-small" id="bulkSelectAll" type="button">Select all shown</button>
+                <button class="btn btn-small" id="bulkClear" type="button">Clear</button>
+            </div>
+            <div class="bulk-side">
+                <select id="bulkReason" class="bulk-reason" aria-label="Hide reason"></select>
+                <button class="btn btn-small" id="bulkHide" type="button">Hide selected</button>
+                <button class="btn btn-small" id="bulkUnhide" type="button">Unhide selected</button>
+            </div>
+        </div>
+
         <div class="error-banner" id="errorBanner"></div>
         <main id="content">
             <div class="empty-state">No pull request loaded yet.</div>
@@ -769,6 +846,7 @@
         let readOnly = false;
         let showResolved = localStorage.getItem(SHOW_RESOLVED_KEY) === 'true';
         let outdatedFilter = localStorage.getItem(OUTDATED_FILTER_KEY) || 'all'; // 'all' | 'hide' | 'only'
+        let selectedIds = new Set();
         const REST_BASE = 'https://api.github.com';
 
         const els = {
@@ -789,6 +867,13 @@
             lastUpdated: document.getElementById('lastUpdated'),
             toggleResolvedButton: document.getElementById('toggleResolvedButton'),
             outdatedFilterButton: document.getElementById('outdatedFilterButton'),
+            bulkBar: document.getElementById('bulkBar'),
+            bulkCount: document.getElementById('bulkCount'),
+            bulkSelectAll: document.getElementById('bulkSelectAll'),
+            bulkClear: document.getElementById('bulkClear'),
+            bulkReason: document.getElementById('bulkReason'),
+            bulkHide: document.getElementById('bulkHide'),
+            bulkUnhide: document.getElementById('bulkUnhide'),
             filterInput: document.getElementById('filterInput'),
             errorBanner: document.getElementById('errorBanner'),
             content: document.getElementById('content'),
@@ -1286,7 +1371,15 @@
                                 `<button class="hide-reason" type="button" data-classifier="${classifier}">${label}</button>`).join('')}
                         </div>
                    </div>`;
-            return `<div class="comment-actions">${actions}</div>`;
+            const checked = selectedIds.has(item.id) ? 'checked' : '';
+            return `
+                <div class="comment-actions">
+                    <label class="select-check">
+                        <input type="checkbox" class="bulk-check" data-comment-id="${escapeAttribute(item.id)}" ${checked}>
+                        Select
+                    </label>
+                    <div class="comment-actions-right">${actions}</div>
+                </div>`;
         }
 
         function renderConversationComment(c) {
@@ -1410,6 +1503,22 @@
             els.reviewCount.textContent = reviews.filter(r => !r.isMinimized).length;
         }
 
+        function matchesFilter(item, filter) {
+            if (!filter) return true;
+            return [((item.author && item.author.login) || ''), (item.body || '')]
+                .join(' ').toLowerCase().includes(filter);
+        }
+
+        function visibleConversation() {
+            const filter = els.filterInput.value.trim().toLowerCase();
+            return conversation.filter(c => (showResolved || !c.isMinimized) && matchesFilter(c, filter));
+        }
+
+        function visibleReviewList() {
+            const filter = els.filterInput.value.trim().toLowerCase();
+            return reviews.filter(r => (showResolved || !r.isMinimized) && matchesFilter(r, filter));
+        }
+
         function renderContent() {
             if (!prMeta) {
                 els.content.innerHTML = '<div class="empty-state">No pull request loaded yet.</div>';
@@ -1417,7 +1526,6 @@
             }
 
             const visibleThreads = filteredThreads();
-            const filter = els.filterInput.value.trim().toLowerCase();
 
             const parts = [];
 
@@ -1451,33 +1559,26 @@
                     </section>`);
             }
 
-            let visibleConversation = conversation.filter(c => showResolved || !c.isMinimized);
-            if (filter) {
-                visibleConversation = visibleConversation.filter(c =>
-                    [((c.author && c.author.login) || ''), (c.body || '')].join(' ').toLowerCase().includes(filter));
-            }
-            if (visibleConversation.length > 0) {
+            const conv = visibleConversation();
+            if (conv.length > 0) {
                 parts.push(`
                     <section class="section">
-                        <div class="section-title">Conversation <span class="section-count">${visibleConversation.length}</span></div>
-                        ${visibleConversation.map(renderConversationComment).join('')}
+                        <div class="section-title">Conversation <span class="section-count">${conv.length}</span></div>
+                        ${conv.map(renderConversationComment).join('')}
                     </section>`);
             }
 
-            let visibleReviews = reviews.filter(r => showResolved || !r.isMinimized);
-            if (filter) {
-                visibleReviews = visibleReviews.filter(r =>
-                    [((r.author && r.author.login) || ''), (r.body || '')].join(' ').toLowerCase().includes(filter));
-            }
-            if (visibleReviews.length > 0) {
+            const revs = visibleReviewList();
+            if (revs.length > 0) {
                 parts.push(`
                     <section class="section">
-                        <div class="section-title">Review summaries <span class="section-count">${visibleReviews.length}</span></div>
-                        ${visibleReviews.map(renderReview).join('')}
+                        <div class="section-title">Review summaries <span class="section-count">${revs.length}</span></div>
+                        ${revs.map(renderReview).join('')}
                     </section>`);
             }
 
             els.content.innerHTML = parts.join('');
+            updateBulkBar();
         }
 
         function renderAll() {
@@ -1576,6 +1677,92 @@
             }
         }
 
+        // ---------- Bulk hide ----------
+
+        function updateBulkBar() {
+            const hasHideable = Boolean(prMeta) && !readOnly && (conversation.length + reviews.length) > 0;
+            els.bulkBar.style.display = hasHideable ? 'flex' : 'none';
+            const n = selectedIds.size;
+            els.bulkCount.textContent = `${n} selected`;
+            els.bulkHide.disabled = n === 0;
+            els.bulkUnhide.disabled = n === 0;
+        }
+
+        function setBulkBusy(busy) {
+            els.bulkHide.disabled = busy || selectedIds.size === 0;
+            els.bulkUnhide.disabled = busy || selectedIds.size === 0;
+            els.bulkSelectAll.disabled = busy;
+            els.bulkClear.disabled = busy;
+        }
+
+        function selectAllShown() {
+            visibleConversation().forEach(c => selectedIds.add(c.id));
+            visibleReviewList().forEach(r => selectedIds.add(r.id));
+            renderContent();
+        }
+
+        function clearSelection() {
+            selectedIds.clear();
+            renderContent();
+        }
+
+        async function bulkHide() {
+            const classifier = els.bulkReason.value;
+            const targets = [...selectedIds].map(findMinimizable).filter(item => item && !item.isMinimized);
+            if (targets.length === 0) {
+                showToast('No un-hidden comments selected', 'info');
+                return;
+            }
+            setError('');
+            setBulkBusy(true);
+            const label = els.bulkHide.textContent;
+            els.bulkHide.textContent = 'Hiding...';
+            let done = 0;
+            for (const item of targets) {
+                try {
+                    await graphql(MINIMIZE_MUTATION, { id: item.id, classifier });
+                    item.isMinimized = true;
+                    item.minimizedReason = classifier.toLowerCase().replace(/_/g, ' ');
+                    done++;
+                } catch (error) {
+                    console.error('Bulk hide failed for', item.id, error);
+                    setError(error.message);
+                }
+            }
+            selectedIds.clear();
+            els.bulkHide.textContent = label;
+            showToast(`Hid ${done} comment${done === 1 ? '' : 's'}`, done ? 'success' : 'error');
+            renderAll();
+        }
+
+        async function bulkUnhide() {
+            const targets = [...selectedIds].map(findMinimizable).filter(item => item && item.isMinimized);
+            if (targets.length === 0) {
+                showToast('No hidden comments selected', 'info');
+                return;
+            }
+            setError('');
+            setBulkBusy(true);
+            const label = els.bulkUnhide.textContent;
+            els.bulkUnhide.textContent = 'Unhiding...';
+            let done = 0;
+            for (const item of targets) {
+                try {
+                    await graphql(UNMINIMIZE_MUTATION, { id: item.id });
+                    item.isMinimized = false;
+                    item.minimizedReason = null;
+                    done++;
+                } catch (error) {
+                    console.error('Bulk unhide failed for', item.id, error);
+                    setError(error.message);
+                }
+            }
+            selectedIds.clear();
+            els.bulkUnhide.textContent = label;
+            showToast(`Unhid ${done} comment${done === 1 ? '' : 's'}`, done ? 'success' : 'error');
+            renderAll();
+        }
+
         // ---------- Load ----------
 
         async function loadPR() {
@@ -1591,6 +1778,7 @@
 
             readOnly = !getToken();
             updateReadOnlyUI();
+            selectedIds.clear();
 
             localStorage.setItem(LAST_PR_KEY, parsed.param);
             setQueryParam('pr', parsed.param);
@@ -1671,6 +1859,8 @@
         function updateReadOnlyUI() {
             // The resolved/hidden toggle only makes sense when authenticated (REST can't report that state).
             els.toggleResolvedButton.style.display = readOnly ? 'none' : '';
+            if (readOnly) selectedIds.clear();
+            updateBulkBar();
         }
 
         // ---------- Init ----------
@@ -1689,6 +1879,8 @@
             updateResolvedButton();
             updateOutdatedButton();
             updateReadOnlyUI();
+            els.bulkReason.innerHTML = HIDE_REASONS
+                .map(([classifier, label]) => `<option value="${classifier}">${label}</option>`).join('');
 
             els.searchForm.addEventListener('submit', event => {
                 event.preventDefault();
@@ -1754,6 +1946,19 @@
                     toggleResolve(article.dataset.threadId, resolveBtn);
                 }
             });
+
+            els.content.addEventListener('change', event => {
+                const check = event.target.closest('.bulk-check');
+                if (!check) return;
+                const id = check.dataset.commentId;
+                if (check.checked) selectedIds.add(id);
+                else selectedIds.delete(id);
+                updateBulkBar();
+            });
+            els.bulkSelectAll.addEventListener('click', selectAllShown);
+            els.bulkClear.addEventListener('click', clearSelection);
+            els.bulkHide.addEventListener('click', bulkHide);
+            els.bulkUnhide.addEventListener('click', bulkUnhide);
 
             els.tokenButton.addEventListener('click', openTokenModal);
             els.closeTokenModal.addEventListener('click', () => Modal.close('tokenModal'));
