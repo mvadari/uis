@@ -431,6 +431,40 @@
             padding: 12px 0;
         }
 
+        .comment.reply {
+            border-left: 2px solid var(--color-border-default);
+            margin-left: 10px;
+            padding-left: 14px;
+        }
+
+        .reply-tag {
+            background: var(--color-canvas-subtle);
+            border: 1px solid var(--color-border-default);
+            border-radius: 999px;
+            color: var(--color-fg-muted);
+            font-size: 10px;
+            font-weight: 600;
+            padding: 1px 6px;
+            text-transform: uppercase;
+        }
+
+        .readonly-notice {
+            align-items: center;
+            background: var(--color-attention-subtle);
+            border: 1px solid rgba(154, 103, 0, 0.35);
+            border-radius: 6px;
+            color: var(--color-attention-fg);
+            display: flex;
+            flex-wrap: wrap;
+            font-size: 13px;
+            gap: 10px;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            padding: 12px;
+        }
+
+        .readonly-notice span { min-width: 0; }
+
         .comment:last-child {
             border-bottom: 0;
         }
@@ -543,6 +577,56 @@
             padding: 4px 16px;
         }
 
+        .conversation-card.minimized {
+            opacity: 0.7;
+        }
+
+        .comment-actions {
+            display: flex;
+            justify-content: flex-end;
+            padding: 0 0 12px;
+        }
+
+        .hide-wrap {
+            position: relative;
+        }
+
+        .hide-menu {
+            background: var(--color-canvas-default);
+            border: 1px solid var(--color-border-default);
+            border-radius: 6px;
+            bottom: 100%;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+            display: none;
+            margin-bottom: 6px;
+            min-width: 160px;
+            padding: 4px;
+            position: absolute;
+            right: 0;
+            z-index: 50;
+        }
+
+        .hide-wrap.open .hide-menu {
+            display: block;
+        }
+
+        .hide-menu button {
+            background: none;
+            border: 0;
+            border-radius: 4px;
+            color: var(--color-fg-default);
+            cursor: pointer;
+            display: block;
+            font-size: 13px;
+            padding: 6px 10px;
+            text-align: left;
+            width: 100%;
+        }
+
+        .hide-menu button:hover {
+            background: var(--color-canvas-subtle);
+        }
+
         @media (max-width: 860px) {
             .container { padding: 12px; }
             .header-main,
@@ -615,7 +699,7 @@
 
         <section class="summary-grid" aria-label="Comment summary" id="summaryGrid" style="display:none;">
             <div class="summary-tile">
-                <div class="summary-label">Unresolved Threads</div>
+                <div class="summary-label" id="threadCountLabel">Unresolved Threads</div>
                 <div class="summary-value" id="threadCount">0</div>
             </div>
             <div class="summary-tile">
@@ -631,6 +715,7 @@
         <div class="status-line" id="statusLine" style="display:none;">
             <div id="lastUpdated">Last updated: Never</div>
             <div class="status-controls">
+                <button class="btn" id="outdatedFilterButton" type="button">Outdated: all</button>
                 <button class="btn" id="toggleResolvedButton" type="button">Show resolved</button>
                 <input class="filter-box" type="search" id="filterInput" placeholder="Filter by file, author, or text">
             </div>
@@ -651,9 +736,10 @@
             <div class="modal-body">
                 <div class="token-help" style="background:var(--color-canvas-subtle);border:1px solid var(--color-border-muted);border-radius:6px;color:var(--color-fg-muted);font-size:14px;margin-bottom:14px;padding:12px;">
                     This uses the shared <code>github_token</code> localStorage key used by the other GitHub tools.
-                    The token is only sent to GitHub API requests. A token is <strong>required</strong> because the
-                    GraphQL API (needed to read unresolved threads and reply/resolve) does not allow anonymous access.
-                    Use a token with <code>repo</code> scope to reply and resolve.
+                    The token is only sent to GitHub API requests. <strong>Without a token</strong> the page loads a
+                    read-only view of public PRs (all threads shown; resolved/hidden state and reply/resolve/hide are
+                    unavailable). <strong>With a token</strong> it uses the GraphQL API to show unresolved state and lets
+                    you reply, resolve, and hide — use a token with <code>repo</code> scope for those actions.
                 </div>
                 <div class="token-input-row" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;">
                     <input type="password" id="tokenInput" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
@@ -672,6 +758,7 @@
         const TOKEN_KEY = 'github_token';
         const LAST_PR_KEY = 'pr_comments_last';
         const SHOW_RESOLVED_KEY = 'pr_comments_show_resolved';
+        const OUTDATED_FILTER_KEY = 'pr_comments_outdated_filter';
         const GRAPHQL_URL = 'https://api.github.com/graphql';
 
         let prMeta = null;
@@ -679,7 +766,10 @@
         let conversation = [];
         let reviews = [];
         let loading = false;
+        let readOnly = false;
         let showResolved = localStorage.getItem(SHOW_RESOLVED_KEY) === 'true';
+        let outdatedFilter = localStorage.getItem(OUTDATED_FILTER_KEY) || 'all'; // 'all' | 'hide' | 'only'
+        const REST_BASE = 'https://api.github.com';
 
         const els = {
             prInput: document.getElementById('prInput'),
@@ -693,10 +783,12 @@
             summaryGrid: document.getElementById('summaryGrid'),
             statusLine: document.getElementById('statusLine'),
             threadCount: document.getElementById('threadCount'),
+            threadCountLabel: document.getElementById('threadCountLabel'),
             conversationCount: document.getElementById('conversationCount'),
             reviewCount: document.getElementById('reviewCount'),
             lastUpdated: document.getElementById('lastUpdated'),
             toggleResolvedButton: document.getElementById('toggleResolvedButton'),
+            outdatedFilterButton: document.getElementById('outdatedFilterButton'),
             filterInput: document.getElementById('filterInput'),
             errorBanner: document.getElementById('errorBanner'),
             content: document.getElementById('content'),
@@ -821,7 +913,7 @@
                   }
                   comments(first:50) {
                     pageInfo { hasNextPage endCursor }
-                    nodes { id ${AUTHOR_FRAGMENT} bodyHTML body createdAt url }
+                    nodes { id ${AUTHOR_FRAGMENT} bodyHTML body createdAt url isMinimized minimizedReason }
                   }
                   reviews(first:50) {
                     pageInfo { hasNextPage endCursor }
@@ -854,7 +946,7 @@
                 pullRequest(number:$number) {
                   comments(first:50, after:$cursor) {
                     pageInfo { hasNextPage endCursor }
-                    nodes { id ${AUTHOR_FRAGMENT} bodyHTML body createdAt url }
+                    nodes { id ${AUTHOR_FRAGMENT} bodyHTML body createdAt url isMinimized minimizedReason }
                   }
                 }
               }
@@ -888,6 +980,30 @@
                 comment { id ${AUTHOR_FRAGMENT} bodyHTML body createdAt url diffHunk path }
               }
             }`;
+
+        const MINIMIZE_MUTATION = `
+            mutation($id:ID!, $classifier:ReportedContentClassifiers!) {
+              minimizeComment(input:{subjectId:$id, classifier:$classifier}) {
+                minimizedComment { isMinimized minimizedReason }
+              }
+            }`;
+
+        const UNMINIMIZE_MUTATION = `
+            mutation($id:ID!) {
+              unminimizeComment(input:{subjectId:$id}) {
+                unminimizedComment { isMinimized }
+              }
+            }`;
+
+        const HIDE_REASONS = [
+            ['SPAM', 'Spam'],
+            ['ABUSE', 'Abuse'],
+            ['OFF_TOPIC', 'Off Topic'],
+            ['OUTDATED', 'Outdated'],
+            ['DUPLICATE', 'Duplicate'],
+            ['RESOLVED', 'Resolved'],
+            ['LOW_QUALITY', 'Low Quality']
+        ];
 
         async function fetchPR(owner, repo, number) {
             const data = await graphql(PR_QUERY, { owner, repo, number });
@@ -937,10 +1053,152 @@
                     isOutdated: t.isOutdated,
                     path: t.path,
                     line: t.line,
-                    comments: (t.comments.nodes || [])
+                    comments: (t.comments.nodes || []).slice().sort(byCreatedAt)
                 })),
-                comments: commentNodes,
-                reviews: reviewNodes.filter(r => (r.body || '').trim())
+                comments: commentNodes.slice().sort(byCreatedAt),
+                reviews: reviewNodes.filter(r => (r.body || '').trim()).slice().sort(byCreatedAt)
+            };
+        }
+
+        function byCreatedAt(a, b) {
+            return new Date(a.createdAt) - new Date(b.createdAt);
+        }
+
+        // ---------- REST fallback (read-only, no token) ----------
+
+        function restHeaders() {
+            const headers = {
+                'Accept': 'application/vnd.github.full+json',
+                'X-GitHub-Api-Version': '2022-11-28'
+            };
+            const token = getToken();
+            if (token) headers.Authorization = `token ${token}`;
+            return headers;
+        }
+
+        async function restGet(url) {
+            const response = await fetch(url, { headers: restHeaders() });
+            if (!response.ok) {
+                let message = `GitHub API returned ${response.status}`;
+                try {
+                    const data = await response.json();
+                    if (data.message) message = data.message;
+                } catch {}
+                if (response.status === 403 && !getToken()) {
+                    message += ' — unauthenticated requests are rate-limited; add a token.';
+                }
+                throw new Error(message);
+            }
+            return response.json();
+        }
+
+        async function restGetAll(url) {
+            const results = [];
+            for (let page = 1; page <= 10; page++) {
+                const sep = url.includes('?') ? '&' : '?';
+                const data = await restGet(`${url}${sep}per_page=100&page=${page}`);
+                if (!Array.isArray(data)) return data;
+                results.push(...data);
+                if (data.length < 100) break;
+            }
+            return results;
+        }
+
+        function mapRestUser(user) {
+            if (!user) return null;
+            return { login: user.login, url: user.html_url, avatarUrl: user.avatar_url };
+        }
+
+        function mapRestReviewComment(c) {
+            return {
+                id: `rest-${c.id}`,
+                author: mapRestUser(c.user),
+                bodyHTML: c.body_html || '',
+                body: c.body || '',
+                createdAt: c.created_at,
+                url: c.html_url,
+                diffHunk: c.diff_hunk,
+                path: c.path
+            };
+        }
+
+        function mapRestIssueComment(c) {
+            return {
+                id: `rest-${c.id}`,
+                author: mapRestUser(c.user),
+                bodyHTML: c.body_html || '',
+                body: c.body || '',
+                createdAt: c.created_at,
+                url: c.html_url,
+                isMinimized: false
+            };
+        }
+
+        function mapRestReview(r) {
+            return {
+                id: `rest-${r.id}`,
+                author: mapRestUser(r.user),
+                bodyHTML: r.body_html || '',
+                body: r.body || '',
+                state: r.state,
+                createdAt: r.submitted_at,
+                url: r.html_url
+            };
+        }
+
+        async function fetchPRRest(owner, repo, number) {
+            const base = `${REST_BASE}/repos/${owner}/${repo}`;
+            const [pr, reviewComments, issueComments, reviewList] = await Promise.all([
+                restGet(`${base}/pulls/${number}`),
+                restGetAll(`${base}/pulls/${number}/comments`),
+                restGetAll(`${base}/issues/${number}/comments`),
+                restGetAll(`${base}/pulls/${number}/reviews`)
+            ]);
+
+            // Rebuild review threads from flat comments using in_reply_to_id chains.
+            const byId = new Map();
+            reviewComments.forEach(c => byId.set(c.id, c));
+            const rootId = c => {
+                let cur = c;
+                const seen = new Set();
+                while (cur.in_reply_to_id && byId.has(cur.in_reply_to_id) && !seen.has(cur.id)) {
+                    seen.add(cur.id);
+                    cur = byId.get(cur.in_reply_to_id);
+                }
+                return cur.id;
+            };
+            const threadMap = new Map();
+            reviewComments.forEach(c => {
+                const rid = rootId(c);
+                if (!threadMap.has(rid)) threadMap.set(rid, []);
+                threadMap.get(rid).push(c);
+            });
+            const threads = [...threadMap.entries()].map(([rid, comments]) => {
+                const root = byId.get(rid) || comments[0];
+                return {
+                    id: `rest-${rid}`,
+                    isResolved: false,
+                    resolutionUnknown: true,
+                    isOutdated: root.position === null || root.position === undefined,
+                    path: root.path,
+                    line: root.line != null ? root.line : root.original_line,
+                    comments: comments.map(mapRestReviewComment).sort(byCreatedAt)
+                };
+            });
+
+            return {
+                meta: {
+                    id: pr.node_id,
+                    number: pr.number,
+                    title: pr.title,
+                    url: pr.html_url,
+                    state: pr.merged_at ? 'MERGED' : (pr.state === 'closed' ? 'CLOSED' : 'OPEN'),
+                    isDraft: pr.draft,
+                    author: mapRestUser(pr.user)
+                },
+                threads,
+                comments: issueComments.map(mapRestIssueComment).sort(byCreatedAt),
+                reviews: reviewList.filter(r => (r.body || '').trim()).map(mapRestReview).sort(byCreatedAt)
             };
         }
 
@@ -989,47 +1247,84 @@
             return `<pre class="diff-hunk">${rows.join('')}</pre>`;
         }
 
-        function renderComment(c) {
+        function renderComment(c, badgeHtml = '', isReply = false) {
             const login = c.author && c.author.login ? c.author.login : 'ghost';
             const authorUrl = c.author && c.author.url ? c.author.url : `https://github.com/${login}`;
             const avatar = c.author && c.author.avatarUrl
                 ? `<img class="avatar" src="${escapeAttribute(c.author.avatarUrl)}" alt="" loading="lazy">`
                 : '';
             const body = c.bodyHTML ? c.bodyHTML : `<p>${escape(c.body || '')}</p>`;
+            const replyTag = isReply ? '<span class="reply-tag">reply</span>' : '';
             return `
-                <div class="comment">
+                <div class="comment ${isReply ? 'reply' : ''}">
                     <div class="comment-head">
                         ${avatar}
                         <a class="comment-author" href="${escapeAttribute(authorUrl)}" target="_blank" rel="noopener noreferrer">${escape(login)}</a>
+                        ${replyTag}
                         <span class="comment-time">${escape(formatRelative(c.createdAt))}</span>
+                        ${badgeHtml}
                         <a class="comment-link" href="${escapeAttribute(c.url || prMeta.url)}" target="_blank" rel="noopener noreferrer" title="View on GitHub">↗</a>
                     </div>
                     <div class="comment-body">${body}</div>
                 </div>`;
         }
 
+        function renderConversationComment(c) {
+            const badge = c.isMinimized
+                ? `<span class="tag tag-resolved">Hidden${c.minimizedReason ? `: ${escape(c.minimizedReason)}` : ''}</span>`
+                : '';
+            let actionsHtml = '';
+            if (!readOnly) {
+                const actions = c.isMinimized
+                    ? `<button class="btn btn-small unhide-btn" type="button">Unhide</button>`
+                    : `<div class="hide-wrap">
+                            <button class="btn btn-small hide-toggle" type="button">Hide ▾</button>
+                            <div class="hide-menu">
+                                ${HIDE_REASONS.map(([classifier, label]) =>
+                                    `<button class="hide-reason" type="button" data-classifier="${classifier}">${label}</button>`).join('')}
+                            </div>
+                       </div>`;
+                actionsHtml = `<div class="comment-actions">${actions}</div>`;
+            }
+            return `
+                <div class="conversation-card ${c.isMinimized ? 'minimized' : ''}" data-comment-id="${escapeAttribute(c.id)}">
+                    ${renderComment(c, badge)}
+                    ${actionsHtml}
+                </div>`;
+        }
+
         function renderThread(t) {
-            const first = t.comments[0] || {};
+            const comments = t.comments || [];
+            const first = comments[0] || {};
             const loc = t.line ? `:${t.line}` : '';
+            const count = comments.length;
+            const countLabel = `${count} comment${count === 1 ? '' : 's'}`;
             const badges = [];
             if (t.isOutdated) badges.push('<span class="tag tag-outdated">Outdated</span>');
-            if (t.isResolved) badges.push('<span class="tag tag-resolved">Resolved</span>');
+            if (!t.resolutionUnknown && t.isResolved) badges.push('<span class="tag tag-resolved">Resolved</span>');
+
+            const commentsHtml = comments.map((c, i) => renderComment(c, '', i > 0)).join('');
+
+            const actions = readOnly
+                ? `<div class="thread-buttons">
+                        <a class="btn btn-small" href="${escapeAttribute(first.url || prMeta.url)}" target="_blank" rel="noopener noreferrer">View on GitHub</a>
+                   </div>`
+                : `<textarea class="reply-input" placeholder="Reply to this thread..."></textarea>
+                   <div class="thread-buttons">
+                        <a class="btn btn-small" href="${escapeAttribute(first.url || prMeta.url)}" target="_blank" rel="noopener noreferrer">GitHub</a>
+                        <button class="btn btn-small resolve-btn" type="button">${t.isResolved ? 'Unresolve' : 'Resolve'}</button>
+                        <button class="btn btn-small btn-primary reply-btn" type="button">Reply</button>
+                   </div>`;
+
             return `
                 <article class="thread ${t.isOutdated ? 'outdated' : ''}" data-thread-id="${escapeAttribute(t.id)}">
                     <div class="thread-head">
-                        <span class="thread-loc">${loc || 'thread'}</span>
+                        <span class="thread-loc">${loc || 'thread'} · ${countLabel}</span>
                         <span class="thread-badges">${badges.join('')}</span>
                     </div>
                     ${renderDiffHunk(first.diffHunk)}
-                    <div class="thread-comments">${t.comments.map(renderComment).join('')}</div>
-                    <div class="thread-actions">
-                        <textarea class="reply-input" placeholder="Reply to this thread..."></textarea>
-                        <div class="thread-buttons">
-                            <a class="btn btn-small" href="${escapeAttribute(first.url || prMeta.url)}" target="_blank" rel="noopener noreferrer">GitHub</a>
-                            <button class="btn btn-small resolve-btn" type="button">${t.isResolved ? 'Unresolve' : 'Resolve'}</button>
-                            <button class="btn btn-small btn-primary reply-btn" type="button">Reply</button>
-                        </div>
-                    </div>
+                    <div class="thread-comments">${commentsHtml}</div>
+                    <div class="thread-actions">${actions}</div>
                 </article>`;
         }
 
@@ -1089,6 +1384,8 @@
         function filteredThreads() {
             const filter = els.filterInput.value.trim().toLowerCase();
             let list = threads.filter(t => showResolved || !t.isResolved);
+            if (outdatedFilter === 'hide') list = list.filter(t => !t.isOutdated);
+            else if (outdatedFilter === 'only') list = list.filter(t => t.isOutdated);
             if (!filter) return list;
             return list.filter(t => {
                 const searchable = [
@@ -1102,7 +1399,8 @@
 
         function updateSummary() {
             els.threadCount.textContent = threads.filter(t => !t.isResolved).length;
-            els.conversationCount.textContent = conversation.length;
+            els.threadCountLabel.textContent = readOnly ? 'Review Threads' : 'Unresolved Threads';
+            els.conversationCount.textContent = conversation.filter(c => !c.isMinimized).length;
             els.reviewCount.textContent = reviews.length;
         }
 
@@ -1117,7 +1415,19 @@
 
             const parts = [];
 
-            const threadsTitle = showResolved ? 'Review threads' : 'Unresolved review threads';
+            if (readOnly) {
+                parts.push(`
+                    <div class="readonly-notice">
+                        <span><strong>Read-only view.</strong> No GitHub token set, so this uses the unauthenticated REST API:
+                        all review threads are shown (GitHub only reports resolved/hidden state to authenticated requests),
+                        reply/resolve/hide are disabled, and requests are rate-limited.</span>
+                        <button class="btn btn-small notice-token-btn" type="button">Add token</button>
+                    </div>`);
+            }
+
+            const threadsTitle = readOnly
+                ? 'Review threads'
+                : showResolved ? 'Review threads' : 'Unresolved review threads';
             if (visibleThreads.length > 0) {
                 parts.push(`
                     <section class="section">
@@ -1127,7 +1437,7 @@
             } else {
                 const msg = threads.length === 0
                     ? 'No review threads on this pull request.'
-                    : showResolved ? 'No review threads match the filter.' : 'No unresolved review threads. 🎉';
+                    : (readOnly || showResolved) ? 'No review threads match the filter.' : 'No unresolved review threads. 🎉';
                 parts.push(`
                     <section class="section">
                         <div class="section-title">${threadsTitle} <span class="section-count">0</span></div>
@@ -1135,14 +1445,16 @@
                     </section>`);
             }
 
-            const visibleConversation = filter
-                ? conversation.filter(c => [((c.author && c.author.login) || ''), (c.body || '')].join(' ').toLowerCase().includes(filter))
-                : conversation;
+            let visibleConversation = conversation.filter(c => showResolved || !c.isMinimized);
+            if (filter) {
+                visibleConversation = visibleConversation.filter(c =>
+                    [((c.author && c.author.login) || ''), (c.body || '')].join(' ').toLowerCase().includes(filter));
+            }
             if (visibleConversation.length > 0) {
                 parts.push(`
                     <section class="section">
                         <div class="section-title">Conversation <span class="section-count">${visibleConversation.length}</span></div>
-                        ${visibleConversation.map(c => `<div class="conversation-card">${renderComment(c)}</div>`).join('')}
+                        ${visibleConversation.map(renderConversationComment).join('')}
                     </section>`);
             }
 
@@ -1213,6 +1525,44 @@
             }
         }
 
+        async function minimizeConversationComment(commentId, classifier, button) {
+            setError('');
+            if (button) button.disabled = true;
+            try {
+                await graphql(MINIMIZE_MUTATION, { id: commentId, classifier });
+                const comment = conversation.find(c => c.id === commentId);
+                if (comment) {
+                    comment.isMinimized = true;
+                    comment.minimizedReason = classifier.toLowerCase().replace(/_/g, ' ');
+                }
+                showToast('Comment hidden', 'success');
+                renderAll();
+            } catch (error) {
+                console.error('Failed to hide comment:', error);
+                setError(error.message);
+                if (button) button.disabled = false;
+            }
+        }
+
+        async function unminimizeConversationComment(commentId, button) {
+            setError('');
+            if (button) button.disabled = true;
+            try {
+                await graphql(UNMINIMIZE_MUTATION, { id: commentId });
+                const comment = conversation.find(c => c.id === commentId);
+                if (comment) {
+                    comment.isMinimized = false;
+                    comment.minimizedReason = null;
+                }
+                showToast('Comment shown', 'success');
+                renderAll();
+            } catch (error) {
+                console.error('Failed to show comment:', error);
+                setError(error.message);
+                if (button) button.disabled = false;
+            }
+        }
+
         // ---------- Load ----------
 
         async function loadPR() {
@@ -1225,11 +1575,9 @@
                 setError('Enter a pull request as owner/repo#number or a GitHub PR URL.');
                 return;
             }
-            if (!getToken()) {
-                setError('A GitHub token is required. Click "Token" to add one.');
-                openTokenModal();
-                return;
-            }
+
+            readOnly = !getToken();
+            updateReadOnlyUI();
 
             localStorage.setItem(LAST_PR_KEY, parsed.param);
             setQueryParam('pr', parsed.param);
@@ -1238,18 +1586,20 @@
             els.content.innerHTML = `
                 <div class="loading-state">
                     <span class="spinner"></span>
-                    <span>Loading pull request conversation...</span>
+                    <span>Loading pull request conversation${readOnly ? ' (read-only)' : ''}...</span>
                 </div>`;
 
             try {
-                const result = await fetchPR(parsed.owner, parsed.repo, parsed.number);
+                const result = readOnly
+                    ? await fetchPRRest(parsed.owner, parsed.repo, parsed.number)
+                    : await fetchPR(parsed.owner, parsed.repo, parsed.number);
                 prMeta = result.meta;
                 threads = result.threads;
                 conversation = result.comments;
                 reviews = result.reviews;
                 els.summaryGrid.style.display = '';
                 els.statusLine.style.display = '';
-                els.lastUpdated.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+                els.lastUpdated.textContent = `Last updated: ${new Date().toLocaleTimeString()}${readOnly ? ' (read-only)' : ''}`;
                 renderAll();
             } catch (error) {
                 console.error('Failed to load PR:', error);
@@ -1281,18 +1631,33 @@
             if (token) localStorage.setItem(TOKEN_KEY, token);
             else localStorage.removeItem(TOKEN_KEY);
             updateTokenStatus();
+            updateReadOnlyUI();
             Modal.close('tokenModal');
+            // Reloading switches between the read-only REST view and the full GraphQL view.
+            if (prMeta && parsePRInput(els.prInput.value)) loadPR();
         }
 
         function clearToken() {
             localStorage.removeItem(TOKEN_KEY);
             els.tokenInput.value = '';
             updateTokenStatus();
+            updateReadOnlyUI();
         }
 
         function updateResolvedButton() {
             els.toggleResolvedButton.classList.toggle('filter-active', showResolved);
-            els.toggleResolvedButton.textContent = showResolved ? 'Hide resolved' : 'Show resolved';
+            els.toggleResolvedButton.textContent = showResolved ? 'Hide resolved & hidden' : 'Show resolved & hidden';
+        }
+
+        function updateOutdatedButton() {
+            const labels = { all: 'Outdated: all', hide: 'Outdated: hidden', only: 'Outdated: only' };
+            els.outdatedFilterButton.textContent = labels[outdatedFilter] || labels.all;
+            els.outdatedFilterButton.classList.toggle('filter-active', outdatedFilter !== 'all');
+        }
+
+        function updateReadOnlyUI() {
+            // The resolved/hidden toggle only makes sense when authenticated (REST can't report that state).
+            els.toggleResolvedButton.style.display = readOnly ? 'none' : '';
         }
 
         // ---------- Init ----------
@@ -1305,9 +1670,12 @@
                 const parsed = parsePRInput(initial);
                 els.prInput.value = parsed ? parsed.slug : initial;
             }
+            readOnly = !getToken();
             updateTokenStatus();
             updateQueryPreview();
             updateResolvedButton();
+            updateOutdatedButton();
+            updateReadOnlyUI();
 
             els.searchForm.addEventListener('submit', event => {
                 event.preventDefault();
@@ -1322,8 +1690,44 @@
                 updateResolvedButton();
                 renderContent();
             });
+            els.outdatedFilterButton.addEventListener('click', () => {
+                const order = ['all', 'hide', 'only'];
+                outdatedFilter = order[(order.indexOf(outdatedFilter) + 1) % order.length];
+                localStorage.setItem(OUTDATED_FILTER_KEY, outdatedFilter);
+                updateOutdatedButton();
+                renderContent();
+            });
 
             els.content.addEventListener('click', event => {
+                const noticeTokenBtn = event.target.closest('.notice-token-btn');
+                if (noticeTokenBtn) {
+                    openTokenModal();
+                    return;
+                }
+
+                const inMenu = event.target.closest('.hide-wrap');
+                document.querySelectorAll('.hide-wrap.open').forEach(wrap => {
+                    if (wrap !== inMenu) wrap.classList.remove('open');
+                });
+
+                const hideToggle = event.target.closest('.hide-toggle');
+                if (hideToggle) {
+                    hideToggle.closest('.hide-wrap').classList.toggle('open');
+                    return;
+                }
+                const reasonBtn = event.target.closest('.hide-reason');
+                if (reasonBtn) {
+                    const card = reasonBtn.closest('.conversation-card');
+                    minimizeConversationComment(card.dataset.commentId, reasonBtn.dataset.classifier, reasonBtn);
+                    return;
+                }
+                const unhideBtn = event.target.closest('.unhide-btn');
+                if (unhideBtn) {
+                    const card = unhideBtn.closest('.conversation-card');
+                    unminimizeConversationComment(card.dataset.commentId, unhideBtn);
+                    return;
+                }
+
                 const replyBtn = event.target.closest('.reply-btn');
                 if (replyBtn) {
                     const article = replyBtn.closest('.thread');
@@ -1348,10 +1752,19 @@
                 els.toggleTokenVisibility.textContent = showing ? 'Show' : 'Hide';
             });
             window.addEventListener('storage', event => {
-                if (event.key === TOKEN_KEY) updateTokenStatus();
+                if (event.key === TOKEN_KEY) {
+                    updateTokenStatus();
+                    readOnly = !getToken();
+                    updateReadOnlyUI();
+                }
+            });
+            document.addEventListener('click', event => {
+                if (!event.target.closest('.hide-wrap')) {
+                    document.querySelectorAll('.hide-wrap.open').forEach(wrap => wrap.classList.remove('open'));
+                }
             });
 
-            if (initial && getToken()) loadPR();
+            if (initial && parsePRInput(initial)) loadPR();
         }
 
         init();

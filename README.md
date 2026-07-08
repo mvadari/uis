@@ -56,9 +56,12 @@ A clean, focused view of a single pull request's unresolved conversation.
 - Load any PR by URL or `owner/repo#number` (shareable via `?pr=` link)
 - Shows unresolved inline review threads grouped by file, with code context
 - Includes top-level conversation comments and review summaries
+- Groups each thread's sub-comments (root + replies) in chronological order
 - Reply to threads and mark them resolved/unresolved directly from the view
-- Filter by file, author, or text; toggle resolved threads
-- Uses the GitHub GraphQL API and shares the GitHub token with the other tools
+- Hide top-level comments with a reason (spam, off topic, resolved, etc.)
+- Filter by file, author, or text; toggle resolved/hidden items
+- Works read-only without a token (public PRs via REST); a token adds resolved-state and reply/resolve/hide via GraphQL
+- Shares the GitHub token with the other tools
 
 [**Launch PR Comments →**](https://mvadari.github.io/uis/pr.html)
 
