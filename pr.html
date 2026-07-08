@@ -917,7 +917,7 @@
                   }
                   reviews(first:50) {
                     pageInfo { hasNextPage endCursor }
-                    nodes { id ${AUTHOR_FRAGMENT} bodyHTML body state createdAt url }
+                    nodes { id ${AUTHOR_FRAGMENT} bodyHTML body state createdAt url isMinimized minimizedReason }
                   }
                 }
               }
@@ -958,7 +958,7 @@
                 pullRequest(number:$number) {
                   reviews(first:50, after:$cursor) {
                     pageInfo { hasNextPage endCursor }
-                    nodes { id ${AUTHOR_FRAGMENT} bodyHTML body state createdAt url }
+                    nodes { id ${AUTHOR_FRAGMENT} bodyHTML body state createdAt url isMinimized minimizedReason }
                   }
                 }
               }
@@ -1142,7 +1142,8 @@
                 body: r.body || '',
                 state: r.state,
                 createdAt: r.submitted_at,
-                url: r.html_url
+                url: r.html_url,
+                isMinimized: false
             };
         }
 
@@ -1269,27 +1270,30 @@
                 </div>`;
         }
 
+        function hiddenBadgeHtml(item) {
+            if (!item.isMinimized) return '';
+            return `<span class="tag tag-resolved">Hidden${item.minimizedReason ? `: ${escape(item.minimizedReason)}` : ''}</span>`;
+        }
+
+        function hideActionsHtml(item) {
+            if (readOnly) return '';
+            const actions = item.isMinimized
+                ? `<button class="btn btn-small unhide-btn" type="button">Unhide</button>`
+                : `<div class="hide-wrap">
+                        <button class="btn btn-small hide-toggle" type="button">Hide ▾</button>
+                        <div class="hide-menu">
+                            ${HIDE_REASONS.map(([classifier, label]) =>
+                                `<button class="hide-reason" type="button" data-classifier="${classifier}">${label}</button>`).join('')}
+                        </div>
+                   </div>`;
+            return `<div class="comment-actions">${actions}</div>`;
+        }
+
         function renderConversationComment(c) {
-            const badge = c.isMinimized
-                ? `<span class="tag tag-resolved">Hidden${c.minimizedReason ? `: ${escape(c.minimizedReason)}` : ''}</span>`
-                : '';
-            let actionsHtml = '';
-            if (!readOnly) {
-                const actions = c.isMinimized
-                    ? `<button class="btn btn-small unhide-btn" type="button">Unhide</button>`
-                    : `<div class="hide-wrap">
-                            <button class="btn btn-small hide-toggle" type="button">Hide ▾</button>
-                            <div class="hide-menu">
-                                ${HIDE_REASONS.map(([classifier, label]) =>
-                                    `<button class="hide-reason" type="button" data-classifier="${classifier}">${label}</button>`).join('')}
-                            </div>
-                       </div>`;
-                actionsHtml = `<div class="comment-actions">${actions}</div>`;
-            }
             return `
                 <div class="conversation-card ${c.isMinimized ? 'minimized' : ''}" data-comment-id="${escapeAttribute(c.id)}">
-                    ${renderComment(c, badge)}
-                    ${actionsHtml}
+                    ${renderComment(c, hiddenBadgeHtml(c))}
+                    ${hideActionsHtml(c)}
                 </div>`;
         }
 
@@ -1367,17 +1371,19 @@
             const st = reviewStateInfo(r.state);
             const body = r.bodyHTML ? r.bodyHTML : `<p>${escape(r.body || '')}</p>`;
             return `
-                <div class="conversation-card">
+                <div class="conversation-card ${r.isMinimized ? 'minimized' : ''}" data-comment-id="${escapeAttribute(r.id)}">
                     <div class="comment" style="border-bottom:0;">
                         <div class="comment-head">
                             ${avatar}
                             <a class="comment-author" href="${escapeAttribute(authorUrl)}" target="_blank" rel="noopener noreferrer">${escape(login)}</a>
                             <span class="review-state-tag ${st.cls}">${escape(st.label)}</span>
                             <span class="comment-time">${escape(formatRelative(r.createdAt))}</span>
+                            ${hiddenBadgeHtml(r)}
                             <a class="comment-link" href="${escapeAttribute(r.url || prMeta.url)}" target="_blank" rel="noopener noreferrer" title="View on GitHub">↗</a>
                         </div>
                         <div class="comment-body">${body}</div>
                     </div>
+                    ${hideActionsHtml(r)}
                 </div>`;
         }
 
@@ -1401,7 +1407,7 @@
             els.threadCount.textContent = threads.filter(t => !t.isResolved).length;
             els.threadCountLabel.textContent = readOnly ? 'Review Threads' : 'Unresolved Threads';
             els.conversationCount.textContent = conversation.filter(c => !c.isMinimized).length;
-            els.reviewCount.textContent = reviews.length;
+            els.reviewCount.textContent = reviews.filter(r => !r.isMinimized).length;
         }
 
         function renderContent() {
@@ -1458,9 +1464,11 @@
                     </section>`);
             }
 
-            const visibleReviews = filter
-                ? reviews.filter(r => [((r.author && r.author.login) || ''), (r.body || '')].join(' ').toLowerCase().includes(filter))
-                : reviews;
+            let visibleReviews = reviews.filter(r => showResolved || !r.isMinimized);
+            if (filter) {
+                visibleReviews = visibleReviews.filter(r =>
+                    [((r.author && r.author.login) || ''), (r.body || '')].join(' ').toLowerCase().includes(filter));
+            }
             if (visibleReviews.length > 0) {
                 parts.push(`
                     <section class="section">
@@ -1525,15 +1533,20 @@
             }
         }
 
-        async function minimizeConversationComment(commentId, classifier, button) {
+        // Conversation comments and review summaries are both Minimizable; look up in either list.
+        function findMinimizable(id) {
+            return conversation.find(c => c.id === id) || reviews.find(r => r.id === id) || null;
+        }
+
+        async function hideItem(id, classifier, button) {
             setError('');
             if (button) button.disabled = true;
             try {
-                await graphql(MINIMIZE_MUTATION, { id: commentId, classifier });
-                const comment = conversation.find(c => c.id === commentId);
-                if (comment) {
-                    comment.isMinimized = true;
-                    comment.minimizedReason = classifier.toLowerCase().replace(/_/g, ' ');
+                await graphql(MINIMIZE_MUTATION, { id, classifier });
+                const item = findMinimizable(id);
+                if (item) {
+                    item.isMinimized = true;
+                    item.minimizedReason = classifier.toLowerCase().replace(/_/g, ' ');
                 }
                 showToast('Comment hidden', 'success');
                 renderAll();
@@ -1544,15 +1557,15 @@
             }
         }
 
-        async function unminimizeConversationComment(commentId, button) {
+        async function unhideItem(id, button) {
             setError('');
             if (button) button.disabled = true;
             try {
-                await graphql(UNMINIMIZE_MUTATION, { id: commentId });
-                const comment = conversation.find(c => c.id === commentId);
-                if (comment) {
-                    comment.isMinimized = false;
-                    comment.minimizedReason = null;
+                await graphql(UNMINIMIZE_MUTATION, { id });
+                const item = findMinimizable(id);
+                if (item) {
+                    item.isMinimized = false;
+                    item.minimizedReason = null;
                 }
                 showToast('Comment shown', 'success');
                 renderAll();
@@ -1718,13 +1731,13 @@
                 const reasonBtn = event.target.closest('.hide-reason');
                 if (reasonBtn) {
                     const card = reasonBtn.closest('.conversation-card');
-                    minimizeConversationComment(card.dataset.commentId, reasonBtn.dataset.classifier, reasonBtn);
+                    hideItem(card.dataset.commentId, reasonBtn.dataset.classifier, reasonBtn);
                     return;
                 }
                 const unhideBtn = event.target.closest('.unhide-btn');
                 if (unhideBtn) {
                     const card = unhideBtn.closest('.conversation-card');
-                    unminimizeConversationComment(card.dataset.commentId, unhideBtn);
+                    unhideItem(card.dataset.commentId, unhideBtn);
                     return;
                 }
 
