@@ -49,6 +49,21 @@ Kanban-style dashboard for managing GitHub pull requests.
 
 ---
 
+### 💬 PR Comments
+A clean, focused view of a single pull request's unresolved conversation.
+
+**Features:**
+- Load any PR by URL or `owner/repo#number` (shareable via `?pr=` link)
+- Shows unresolved inline review threads grouped by file, with code context
+- Includes top-level conversation comments and review summaries
+- Reply to threads and mark them resolved/unresolved directly from the view
+- Filter by file, author, or text; toggle resolved threads
+- Uses the GitHub GraphQL API and shares the GitHub token with the other tools
+
+[**Launch PR Comments →**](https://mvadari.github.io/uis/pr.html)
+
+---
+
 ### 🔀 Smart Escrow PR Tracker
 Track the stacked PRs for the XRPL Smart Escrow feature.
 

@@ -1,0 +1,1360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PR Comments</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="stylesheet" href="shared-styles.css">
+    <style>
+        :root {
+            color-scheme: light dark;
+            --color-canvas-default: #ffffff;
+            --color-canvas-subtle: #f6f8fa;
+            --color-border-default: #d0d7de;
+            --color-border-muted: #d8dee4;
+            --color-fg-default: #1f2328;
+            --color-fg-muted: #656d76;
+            --color-accent-fg: #0969da;
+            --color-accent-subtle: #ddf4ff;
+            --color-success-fg: #1a7f37;
+            --color-success-subtle: #dafbe1;
+            --color-danger-fg: #d1242f;
+            --color-danger-subtle: #ffebe9;
+            --color-attention-fg: #9a6700;
+            --color-attention-subtle: #fff8c5;
+            --color-done-fg: #8250df;
+            --color-done-subtle: #fbefff;
+            --color-diff-add-bg: #e6ffec;
+            --color-diff-add-fg: #1a7f37;
+            --color-diff-del-bg: #ffebe9;
+            --color-diff-del-fg: #d1242f;
+        }
+
+        body {
+            background: var(--color-canvas-subtle);
+            color: var(--color-fg-default);
+        }
+
+        .container {
+            max-width: 1080px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .header {
+            background: var(--color-canvas-default);
+            border: 1px solid var(--color-border-default);
+            border-radius: 6px;
+            margin-bottom: 16px;
+        }
+
+        .header-main {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 16px;
+            border-bottom: 1px solid var(--color-border-muted);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .github-icon {
+            width: 32px;
+            height: 32px;
+            fill: var(--color-fg-default);
+            flex: 0 0 auto;
+        }
+
+        .title-block {
+            min-width: 0;
+        }
+
+        .header-title {
+            font-size: 20px;
+            font-weight: 600;
+            line-height: 1.2;
+        }
+
+        .header-subtitle {
+            color: var(--color-fg-muted);
+            font-size: 13px;
+            margin-top: 2px;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .token-pill {
+            border: 1px solid var(--color-border-default);
+            background: var(--color-canvas-subtle);
+            border-radius: 999px;
+            color: var(--color-fg-muted);
+            display: inline-flex;
+            align-items: center;
+            font-size: 12px;
+            font-weight: 600;
+            min-height: 30px;
+            padding: 4px 10px;
+            white-space: nowrap;
+        }
+
+        .token-pill.set {
+            background: var(--color-success-subtle);
+            border-color: rgba(26, 127, 55, 0.35);
+            color: var(--color-success-fg);
+        }
+
+        .search-panel {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 12px;
+            align-items: end;
+            padding: 16px;
+        }
+
+        .field label {
+            color: var(--color-fg-default);
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .query-preview {
+            background: var(--color-canvas-subtle);
+            border-top: 1px solid var(--color-border-muted);
+            color: var(--color-fg-muted);
+            font-size: 13px;
+            padding: 10px 16px;
+            overflow-wrap: anywhere;
+        }
+
+        .query-preview code {
+            color: var(--color-fg-default);
+        }
+
+        /* PR header card */
+        .pr-header {
+            background: var(--color-canvas-default);
+            border: 1px solid var(--color-border-default);
+            border-radius: 6px;
+            margin-bottom: 16px;
+            padding: 16px;
+        }
+
+        .pr-header-title {
+            font-size: 18px;
+            font-weight: 600;
+            line-height: 1.35;
+        }
+
+        .pr-header-title a {
+            color: var(--color-fg-default);
+            text-decoration: none;
+        }
+
+        .pr-header-title a:hover {
+            color: var(--color-accent-fg);
+        }
+
+        .pr-header-title .pr-number {
+            color: var(--color-fg-muted);
+            font-weight: 500;
+        }
+
+        .pr-header-meta {
+            align-items: center;
+            color: var(--color-fg-muted);
+            display: flex;
+            flex-wrap: wrap;
+            font-size: 13px;
+            gap: 8px 12px;
+            margin-top: 8px;
+        }
+
+        .pr-header-meta a {
+            color: var(--color-accent-fg);
+            text-decoration: none;
+        }
+
+        .pr-header-meta a:hover {
+            text-decoration: underline;
+        }
+
+        .state-pill {
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.4;
+            padding: 3px 10px;
+            white-space: nowrap;
+        }
+
+        .state-pill.open { background: var(--color-success-subtle); color: var(--color-success-fg); }
+        .state-pill.merged { background: var(--color-done-subtle); color: var(--color-done-fg); }
+        .state-pill.closed { background: var(--color-danger-subtle); color: var(--color-danger-fg); }
+        .state-pill.draft { background: var(--color-canvas-subtle); color: var(--color-fg-muted); }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .summary-tile {
+            background: var(--color-canvas-default);
+            border: 1px solid var(--color-border-default);
+            border-radius: 6px;
+            padding: 14px;
+        }
+
+        .summary-label {
+            color: var(--color-fg-muted);
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .summary-value {
+            font-size: 26px;
+            font-weight: 600;
+            line-height: 1.2;
+            margin-top: 2px;
+        }
+
+        .status-line {
+            align-items: center;
+            color: var(--color-fg-muted);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            font-size: 13px;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            min-height: 28px;
+        }
+
+        .filter-box {
+            max-width: 340px;
+        }
+
+        .status-controls {
+            align-items: center;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        .btn.filter-active {
+            background: var(--color-accent-fg);
+            border-color: var(--color-accent-fg);
+            color: #ffffff;
+        }
+
+        .error-banner {
+            background: var(--color-danger-subtle);
+            border: 1px solid rgba(209, 36, 47, 0.35);
+            border-radius: 6px;
+            color: var(--color-danger-fg);
+            display: none;
+            font-size: 14px;
+            margin-bottom: 12px;
+            padding: 12px;
+        }
+
+        .empty-state,
+        .loading-state {
+            background: var(--color-canvas-default);
+            border: 1px solid var(--color-border-default);
+            border-radius: 6px;
+            color: var(--color-fg-muted);
+            padding: 32px;
+            text-align: center;
+        }
+
+        .loading-state {
+            align-items: center;
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        /* Sections */
+        .section {
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            align-items: center;
+            display: flex;
+            font-size: 15px;
+            font-weight: 600;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .section-count {
+            background: var(--color-canvas-subtle);
+            border: 1px solid var(--color-border-default);
+            border-radius: 999px;
+            color: var(--color-fg-muted);
+            font-size: 12px;
+            font-weight: 600;
+            padding: 1px 8px;
+        }
+
+        .file-group {
+            margin-bottom: 16px;
+        }
+
+        .file-group-head {
+            align-items: center;
+            background: var(--color-canvas-subtle);
+            border: 1px solid var(--color-border-default);
+            border-radius: 6px 6px 0 0;
+            display: flex;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 13px;
+            font-weight: 600;
+            gap: 8px;
+            padding: 8px 12px;
+        }
+
+        .file-group-count {
+            background: var(--color-canvas-default);
+            border: 1px solid var(--color-border-default);
+            border-radius: 999px;
+            color: var(--color-fg-muted);
+            font-family: inherit;
+            font-size: 11px;
+            padding: 0 7px;
+        }
+
+        .file-group .thread:first-of-type {
+            border-top: 0;
+            border-radius: 0;
+        }
+
+        .file-group .thread:last-of-type {
+            border-radius: 0 0 6px 6px;
+        }
+
+        .thread {
+            background: var(--color-canvas-default);
+            border: 1px solid var(--color-border-default);
+            padding: 0;
+        }
+
+        .thread + .thread {
+            border-top: 0;
+        }
+
+        .thread.outdated {
+            opacity: 0.85;
+        }
+
+        .thread-head {
+            align-items: center;
+            display: flex;
+            gap: 8px;
+            justify-content: space-between;
+            padding: 8px 12px;
+        }
+
+        .thread-loc {
+            color: var(--color-fg-muted);
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 12px;
+        }
+
+        .thread-badges {
+            display: flex;
+            gap: 6px;
+        }
+
+        .tag {
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            white-space: nowrap;
+        }
+
+        .tag-outdated { background: var(--color-attention-subtle); color: var(--color-attention-fg); }
+        .tag-resolved { background: var(--color-done-subtle); color: var(--color-done-fg); }
+
+        .diff-hunk {
+            background: var(--color-canvas-subtle);
+            border-top: 1px solid var(--color-border-muted);
+            border-bottom: 1px solid var(--color-border-muted);
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            margin: 0;
+            overflow-x: auto;
+            padding: 8px 0;
+        }
+
+        .diff-line {
+            display: block;
+            padding: 0 12px;
+            white-space: pre;
+        }
+
+        .diff-add { background: var(--color-diff-add-bg); color: var(--color-diff-add-fg); }
+        .diff-del { background: var(--color-diff-del-bg); color: var(--color-diff-del-fg); }
+        .diff-hunk-head { color: var(--color-accent-fg); }
+        .diff-ctx { color: var(--color-fg-muted); }
+
+        .thread-comments {
+            padding: 4px 12px;
+        }
+
+        .comment {
+            border-bottom: 1px solid var(--color-border-muted);
+            padding: 12px 0;
+        }
+
+        .comment:last-child {
+            border-bottom: 0;
+        }
+
+        .comment-head {
+            align-items: center;
+            display: flex;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .avatar {
+            border-radius: 50%;
+            height: 20px;
+            width: 20px;
+            flex: 0 0 auto;
+        }
+
+        .comment-author {
+            color: var(--color-fg-default);
+            font-size: 13px;
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .comment-author:hover { color: var(--color-accent-fg); }
+
+        .comment-time {
+            color: var(--color-fg-muted);
+            font-size: 12px;
+        }
+
+        .comment-link {
+            color: var(--color-fg-muted);
+            margin-left: auto;
+            text-decoration: none;
+            font-size: 12px;
+        }
+
+        .comment-link:hover { color: var(--color-accent-fg); }
+
+        .review-state-tag {
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 1px 7px;
+        }
+
+        .review-state-tag.approved { background: var(--color-success-subtle); color: var(--color-success-fg); }
+        .review-state-tag.changes_requested { background: var(--color-danger-subtle); color: var(--color-danger-fg); }
+        .review-state-tag.commented { background: var(--color-canvas-subtle); color: var(--color-fg-muted); }
+
+        .comment-body {
+            font-size: 14px;
+            line-height: 1.6;
+            overflow-wrap: anywhere;
+        }
+
+        .comment-body p { margin: 0 0 8px; }
+        .comment-body p:last-child { margin-bottom: 0; }
+        .comment-body pre {
+            background: var(--color-canvas-subtle);
+            border-radius: 6px;
+            overflow-x: auto;
+            padding: 10px 12px;
+        }
+        .comment-body code {
+            background: var(--color-canvas-subtle);
+            border-radius: 4px;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 85%;
+            padding: 1px 5px;
+        }
+        .comment-body pre code { background: none; padding: 0; }
+        .comment-body img { max-width: 100%; }
+        .comment-body a { color: var(--color-accent-fg); }
+        .comment-body blockquote {
+            border-left: 3px solid var(--color-border-default);
+            color: var(--color-fg-muted);
+            margin: 0 0 8px;
+            padding-left: 12px;
+        }
+        .comment-body ul, .comment-body ol { margin: 0 0 8px; padding-left: 22px; }
+
+        .thread-actions {
+            border-top: 1px solid var(--color-border-muted);
+            padding: 12px;
+        }
+
+        .reply-input {
+            font-family: inherit;
+            min-height: 60px;
+            resize: vertical;
+        }
+
+        .thread-buttons {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            margin-top: 8px;
+        }
+
+        .thread-buttons a.btn { text-decoration: none; }
+
+        .conversation-card {
+            background: var(--color-canvas-default);
+            border: 1px solid var(--color-border-default);
+            border-radius: 6px;
+            margin-bottom: 12px;
+            padding: 4px 16px;
+        }
+
+        @media (max-width: 860px) {
+            .container { padding: 12px; }
+            .header-main,
+            .search-panel { grid-template-columns: 1fr; }
+            .header-main {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+            .header-controls { justify-content: flex-start; }
+            .summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --color-canvas-default: #0d1117;
+                --color-canvas-subtle: #161b22;
+                --color-border-default: #30363d;
+                --color-border-muted: #21262d;
+                --color-fg-default: #e6edf3;
+                --color-fg-muted: #8b949e;
+                --color-accent-fg: #58a6ff;
+                --color-accent-subtle: #1c2a3d;
+                --color-success-fg: #3fb950;
+                --color-success-subtle: #1a4426;
+                --color-danger-fg: #f85149;
+                --color-danger-subtle: #3d1c1c;
+                --color-attention-fg: #e3b341;
+                --color-attention-subtle: #3d2d00;
+                --color-done-fg: #d2a8ff;
+                --color-done-subtle: #2d1d47;
+                --color-diff-add-bg: #12261e;
+                --color-diff-add-fg: #3fb950;
+                --color-diff-del-bg: #25171c;
+                --color-diff-del-fg: #f85149;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-main">
+                <div class="header-left">
+                    <svg class="github-icon" viewBox="0 0 16 16" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+                    </svg>
+                    <div class="title-block">
+                        <h1 class="header-title">PR Comments</h1>
+                        <div class="header-subtitle">A clean view of a pull request's unresolved conversation</div>
+                    </div>
+                </div>
+                <div class="header-controls">
+                    <span id="tokenStatus" class="token-pill">Token not set</span>
+                    <button class="btn" id="tokenButton" type="button">Token</button>
+                    <button class="btn btn-primary" id="refreshButton" type="button">Refresh</button>
+                </div>
+            </div>
+
+            <form class="search-panel" id="searchForm">
+                <div class="field">
+                    <label for="prInput">Pull Request</label>
+                    <input type="text" id="prInput" placeholder="owner/repo#123 or https://github.com/owner/repo/pull/123" autocomplete="off" spellcheck="false">
+                </div>
+                <button class="btn btn-secondary" id="loadButton" type="submit">Load</button>
+            </form>
+            <div class="query-preview" id="queryPreview">Enter a pull request URL or owner/repo#number.</div>
+        </header>
+
+        <div id="prHeader"></div>
+
+        <section class="summary-grid" aria-label="Comment summary" id="summaryGrid" style="display:none;">
+            <div class="summary-tile">
+                <div class="summary-label">Unresolved Threads</div>
+                <div class="summary-value" id="threadCount">0</div>
+            </div>
+            <div class="summary-tile">
+                <div class="summary-label">Conversation</div>
+                <div class="summary-value" id="conversationCount">0</div>
+            </div>
+            <div class="summary-tile">
+                <div class="summary-label">Review Summaries</div>
+                <div class="summary-value" id="reviewCount">0</div>
+            </div>
+        </section>
+
+        <div class="status-line" id="statusLine" style="display:none;">
+            <div id="lastUpdated">Last updated: Never</div>
+            <div class="status-controls">
+                <button class="btn" id="toggleResolvedButton" type="button">Show resolved</button>
+                <input class="filter-box" type="search" id="filterInput" placeholder="Filter by file, author, or text">
+            </div>
+        </div>
+
+        <div class="error-banner" id="errorBanner"></div>
+        <main id="content">
+            <div class="empty-state">No pull request loaded yet.</div>
+        </main>
+    </div>
+
+    <div class="modal" id="tokenModal">
+        <div class="modal-content" style="max-width:560px;">
+            <div class="modal-header">
+                <h2 class="modal-title">GitHub Token</h2>
+                <button class="modal-close" id="closeTokenModal" type="button">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="token-help" style="background:var(--color-canvas-subtle);border:1px solid var(--color-border-muted);border-radius:6px;color:var(--color-fg-muted);font-size:14px;margin-bottom:14px;padding:12px;">
+                    This uses the shared <code>github_token</code> localStorage key used by the other GitHub tools.
+                    The token is only sent to GitHub API requests. A token is <strong>required</strong> because the
+                    GraphQL API (needed to read unresolved threads and reply/resolve) does not allow anonymous access.
+                    Use a token with <code>repo</code> scope to reply and resolve.
+                </div>
+                <div class="token-input-row" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;">
+                    <input type="password" id="tokenInput" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+                    <button class="btn" id="toggleTokenVisibility" type="button">Show</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" id="clearTokenButton" type="button">Clear</button>
+                <button class="btn btn-primary" id="saveTokenButton" type="button">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="shared-utils.js"></script>
+    <script>
+        const TOKEN_KEY = 'github_token';
+        const LAST_PR_KEY = 'pr_comments_last';
+        const SHOW_RESOLVED_KEY = 'pr_comments_show_resolved';
+        const GRAPHQL_URL = 'https://api.github.com/graphql';
+
+        let prMeta = null;
+        let threads = [];
+        let conversation = [];
+        let reviews = [];
+        let loading = false;
+        let showResolved = localStorage.getItem(SHOW_RESOLVED_KEY) === 'true';
+
+        const els = {
+            prInput: document.getElementById('prInput'),
+            searchForm: document.getElementById('searchForm'),
+            loadButton: document.getElementById('loadButton'),
+            refreshButton: document.getElementById('refreshButton'),
+            tokenButton: document.getElementById('tokenButton'),
+            tokenStatus: document.getElementById('tokenStatus'),
+            queryPreview: document.getElementById('queryPreview'),
+            prHeader: document.getElementById('prHeader'),
+            summaryGrid: document.getElementById('summaryGrid'),
+            statusLine: document.getElementById('statusLine'),
+            threadCount: document.getElementById('threadCount'),
+            conversationCount: document.getElementById('conversationCount'),
+            reviewCount: document.getElementById('reviewCount'),
+            lastUpdated: document.getElementById('lastUpdated'),
+            toggleResolvedButton: document.getElementById('toggleResolvedButton'),
+            filterInput: document.getElementById('filterInput'),
+            errorBanner: document.getElementById('errorBanner'),
+            content: document.getElementById('content'),
+            tokenModal: document.getElementById('tokenModal'),
+            closeTokenModal: document.getElementById('closeTokenModal'),
+            tokenInput: document.getElementById('tokenInput'),
+            toggleTokenVisibility: document.getElementById('toggleTokenVisibility'),
+            saveTokenButton: document.getElementById('saveTokenButton'),
+            clearTokenButton: document.getElementById('clearTokenButton')
+        };
+
+        // ---------- Helpers ----------
+
+        function getToken() {
+            return (localStorage.getItem(TOKEN_KEY) || '').trim();
+        }
+
+        function escape(value) {
+            return escapeHtml(String(value ?? ''));
+        }
+
+        function escapeAttribute(value) {
+            return escape(value).replace(/"/g, '&quot;');
+        }
+
+        function setError(message) {
+            els.errorBanner.textContent = message || '';
+            els.errorBanner.style.display = message ? 'block' : 'none';
+        }
+
+        function setLoading(isLoading) {
+            loading = isLoading;
+            els.loadButton.disabled = isLoading;
+            els.refreshButton.disabled = isLoading;
+            els.loadButton.textContent = isLoading ? 'Loading...' : 'Load';
+        }
+
+        function updateTokenStatus() {
+            const hasToken = Boolean(getToken());
+            els.tokenStatus.textContent = hasToken ? 'Token set' : 'Token not set';
+            els.tokenStatus.classList.toggle('set', hasToken);
+        }
+
+        function parsePRInput(value) {
+            const v = (value || '').trim();
+            if (!v) return null;
+            const make = (owner, repo, number) => ({
+                owner,
+                repo: repo.replace(/\.git$/, ''),
+                number: parseInt(number, 10),
+                slug: `${owner}/${repo.replace(/\.git$/, '')}#${number}`,
+                param: `${owner}/${repo.replace(/\.git$/, '')}/${number}`
+            });
+            let m = v.match(/github\.com\/([^\/\s]+)\/([^\/\s]+)\/pull\/(\d+)/i);
+            if (m) return make(m[1], m[2], m[3]);
+            m = v.match(/^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?:\/pull\/|\/|#)(\d+)$/);
+            if (m) return make(m[1], m[2], m[3]);
+            return null;
+        }
+
+        function updateQueryPreview() {
+            const parsed = parsePRInput(els.prInput.value);
+            if (!parsed) {
+                els.queryPreview.textContent = 'Enter a pull request URL or owner/repo#number.';
+                return;
+            }
+            els.queryPreview.innerHTML = `Pull request: <code>${escape(parsed.slug)}</code>`;
+        }
+
+        function formatRelative(dateString) {
+            if (!dateString) return '';
+            return timeAgo(dateString);
+        }
+
+        // ---------- GraphQL ----------
+
+        async function graphql(query, variables) {
+            const token = getToken();
+            if (!token) throw new Error('A GitHub token is required. Click "Token" to add one.');
+
+            const response = await fetch(GRAPHQL_URL, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ query, variables })
+            });
+
+            let payload;
+            try {
+                payload = await response.json();
+            } catch {
+                throw new Error(`GitHub GraphQL returned ${response.status}`);
+            }
+
+            if (!response.ok) {
+                throw new Error(payload.message || `GitHub GraphQL returned ${response.status}`);
+            }
+            if (payload.errors && payload.errors.length) {
+                throw new Error(payload.errors.map(e => e.message).join('; '));
+            }
+            return payload.data;
+        }
+
+        const AUTHOR_FRAGMENT = 'author { login url avatarUrl }';
+
+        const PR_QUERY = `
+            query($owner:String!, $repo:String!, $number:Int!) {
+              repository(owner:$owner, name:$repo) {
+                pullRequest(number:$number) {
+                  id number title url state isDraft
+                  ${AUTHOR_FRAGMENT}
+                  reviewThreads(first:50) {
+                    pageInfo { hasNextPage endCursor }
+                    nodes {
+                      id isResolved isOutdated path line
+                      comments(first:50) {
+                        nodes { id ${AUTHOR_FRAGMENT} bodyHTML body createdAt url diffHunk path }
+                      }
+                    }
+                  }
+                  comments(first:50) {
+                    pageInfo { hasNextPage endCursor }
+                    nodes { id ${AUTHOR_FRAGMENT} bodyHTML body createdAt url }
+                  }
+                  reviews(first:50) {
+                    pageInfo { hasNextPage endCursor }
+                    nodes { id ${AUTHOR_FRAGMENT} bodyHTML body state createdAt url }
+                  }
+                }
+              }
+            }`;
+
+        const THREADS_PAGE_QUERY = `
+            query($owner:String!, $repo:String!, $number:Int!, $cursor:String!) {
+              repository(owner:$owner, name:$repo) {
+                pullRequest(number:$number) {
+                  reviewThreads(first:50, after:$cursor) {
+                    pageInfo { hasNextPage endCursor }
+                    nodes {
+                      id isResolved isOutdated path line
+                      comments(first:50) {
+                        nodes { id ${AUTHOR_FRAGMENT} bodyHTML body createdAt url diffHunk path }
+                      }
+                    }
+                  }
+                }
+              }
+            }`;
+
+        const COMMENTS_PAGE_QUERY = `
+            query($owner:String!, $repo:String!, $number:Int!, $cursor:String!) {
+              repository(owner:$owner, name:$repo) {
+                pullRequest(number:$number) {
+                  comments(first:50, after:$cursor) {
+                    pageInfo { hasNextPage endCursor }
+                    nodes { id ${AUTHOR_FRAGMENT} bodyHTML body createdAt url }
+                  }
+                }
+              }
+            }`;
+
+        const REVIEWS_PAGE_QUERY = `
+            query($owner:String!, $repo:String!, $number:Int!, $cursor:String!) {
+              repository(owner:$owner, name:$repo) {
+                pullRequest(number:$number) {
+                  reviews(first:50, after:$cursor) {
+                    pageInfo { hasNextPage endCursor }
+                    nodes { id ${AUTHOR_FRAGMENT} bodyHTML body state createdAt url }
+                  }
+                }
+              }
+            }`;
+
+        const RESOLVE_MUTATION = `
+            mutation($threadId:ID!) {
+              resolveReviewThread(input:{threadId:$threadId}) { thread { id isResolved } }
+            }`;
+
+        const UNRESOLVE_MUTATION = `
+            mutation($threadId:ID!) {
+              unresolveReviewThread(input:{threadId:$threadId}) { thread { id isResolved } }
+            }`;
+
+        const REPLY_MUTATION = `
+            mutation($threadId:ID!, $body:String!) {
+              addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$threadId, body:$body}) {
+                comment { id ${AUTHOR_FRAGMENT} bodyHTML body createdAt url diffHunk path }
+              }
+            }`;
+
+        async function fetchPR(owner, repo, number) {
+            const data = await graphql(PR_QUERY, { owner, repo, number });
+            const p = data.repository && data.repository.pullRequest;
+            if (!p) throw new Error('Pull request not found. Check the owner, repo, and number.');
+
+            const threadNodes = [...p.reviewThreads.nodes];
+            let ti = p.reviewThreads.pageInfo;
+            while (ti.hasNextPage) {
+                const d = await graphql(THREADS_PAGE_QUERY, { owner, repo, number, cursor: ti.endCursor });
+                const rt = d.repository.pullRequest.reviewThreads;
+                threadNodes.push(...rt.nodes);
+                ti = rt.pageInfo;
+            }
+
+            const commentNodes = [...p.comments.nodes];
+            let ci = p.comments.pageInfo;
+            while (ci.hasNextPage) {
+                const d = await graphql(COMMENTS_PAGE_QUERY, { owner, repo, number, cursor: ci.endCursor });
+                const c = d.repository.pullRequest.comments;
+                commentNodes.push(...c.nodes);
+                ci = c.pageInfo;
+            }
+
+            const reviewNodes = [...p.reviews.nodes];
+            let ri = p.reviews.pageInfo;
+            while (ri.hasNextPage) {
+                const d = await graphql(REVIEWS_PAGE_QUERY, { owner, repo, number, cursor: ri.endCursor });
+                const rv = d.repository.pullRequest.reviews;
+                reviewNodes.push(...rv.nodes);
+                ri = rv.pageInfo;
+            }
+
+            return {
+                meta: {
+                    id: p.id,
+                    number: p.number,
+                    title: p.title,
+                    url: p.url,
+                    state: p.state,
+                    isDraft: p.isDraft,
+                    author: p.author
+                },
+                threads: threadNodes.map(t => ({
+                    id: t.id,
+                    isResolved: t.isResolved,
+                    isOutdated: t.isOutdated,
+                    path: t.path,
+                    line: t.line,
+                    comments: (t.comments.nodes || [])
+                })),
+                comments: commentNodes,
+                reviews: reviewNodes.filter(r => (r.body || '').trim())
+            };
+        }
+
+        // ---------- Rendering ----------
+
+        function stateInfo(meta) {
+            if (meta.isDraft && meta.state === 'OPEN') return { cls: 'draft', label: 'Draft' };
+            if (meta.state === 'MERGED') return { cls: 'merged', label: 'Merged' };
+            if (meta.state === 'CLOSED') return { cls: 'closed', label: 'Closed' };
+            return { cls: 'open', label: 'Open' };
+        }
+
+        function renderPRHeader() {
+            if (!prMeta) {
+                els.prHeader.innerHTML = '';
+                return;
+            }
+            const st = stateInfo(prMeta);
+            const login = prMeta.author && prMeta.author.login ? prMeta.author.login : 'ghost';
+            const authorUrl = prMeta.author && prMeta.author.url ? prMeta.author.url : `https://github.com/${login}`;
+            els.prHeader.innerHTML = `
+                <div class="pr-header">
+                    <div class="pr-header-title">
+                        <a href="${escapeAttribute(prMeta.url)}" target="_blank" rel="noopener noreferrer">
+                            ${escape(prMeta.title)} <span class="pr-number">#${escape(prMeta.number)}</span>
+                        </a>
+                    </div>
+                    <div class="pr-header-meta">
+                        <span class="state-pill ${st.cls}">${st.label}</span>
+                        <span>by <a href="${escapeAttribute(authorUrl)}" target="_blank" rel="noopener noreferrer">${escape(login)}</a></span>
+                        <a href="${escapeAttribute(prMeta.url)}" target="_blank" rel="noopener noreferrer">View on GitHub</a>
+                    </div>
+                </div>`;
+        }
+
+        function renderDiffHunk(hunk) {
+            if (!hunk) return '';
+            const lines = hunk.split('\n').slice(-12);
+            const rows = lines.map(line => {
+                let cls = 'diff-ctx';
+                if (line.startsWith('@@')) cls = 'diff-hunk-head';
+                else if (line.startsWith('+')) cls = 'diff-add';
+                else if (line.startsWith('-')) cls = 'diff-del';
+                return `<span class="diff-line ${cls}">${escape(line) || '&nbsp;'}</span>`;
+            });
+            return `<pre class="diff-hunk">${rows.join('')}</pre>`;
+        }
+
+        function renderComment(c) {
+            const login = c.author && c.author.login ? c.author.login : 'ghost';
+            const authorUrl = c.author && c.author.url ? c.author.url : `https://github.com/${login}`;
+            const avatar = c.author && c.author.avatarUrl
+                ? `<img class="avatar" src="${escapeAttribute(c.author.avatarUrl)}" alt="" loading="lazy">`
+                : '';
+            const body = c.bodyHTML ? c.bodyHTML : `<p>${escape(c.body || '')}</p>`;
+            return `
+                <div class="comment">
+                    <div class="comment-head">
+                        ${avatar}
+                        <a class="comment-author" href="${escapeAttribute(authorUrl)}" target="_blank" rel="noopener noreferrer">${escape(login)}</a>
+                        <span class="comment-time">${escape(formatRelative(c.createdAt))}</span>
+                        <a class="comment-link" href="${escapeAttribute(c.url || prMeta.url)}" target="_blank" rel="noopener noreferrer" title="View on GitHub">↗</a>
+                    </div>
+                    <div class="comment-body">${body}</div>
+                </div>`;
+        }
+
+        function renderThread(t) {
+            const first = t.comments[0] || {};
+            const loc = t.line ? `:${t.line}` : '';
+            const badges = [];
+            if (t.isOutdated) badges.push('<span class="tag tag-outdated">Outdated</span>');
+            if (t.isResolved) badges.push('<span class="tag tag-resolved">Resolved</span>');
+            return `
+                <article class="thread ${t.isOutdated ? 'outdated' : ''}" data-thread-id="${escapeAttribute(t.id)}">
+                    <div class="thread-head">
+                        <span class="thread-loc">${loc || 'thread'}</span>
+                        <span class="thread-badges">${badges.join('')}</span>
+                    </div>
+                    ${renderDiffHunk(first.diffHunk)}
+                    <div class="thread-comments">${t.comments.map(renderComment).join('')}</div>
+                    <div class="thread-actions">
+                        <textarea class="reply-input" placeholder="Reply to this thread..."></textarea>
+                        <div class="thread-buttons">
+                            <a class="btn btn-small" href="${escapeAttribute(first.url || prMeta.url)}" target="_blank" rel="noopener noreferrer">GitHub</a>
+                            <button class="btn btn-small resolve-btn" type="button">${t.isResolved ? 'Unresolve' : 'Resolve'}</button>
+                            <button class="btn btn-small btn-primary reply-btn" type="button">Reply</button>
+                        </div>
+                    </div>
+                </article>`;
+        }
+
+        function renderThreadGroups(list) {
+            const groups = new Map();
+            list.forEach(t => {
+                const key = t.path || 'General discussion';
+                if (!groups.has(key)) groups.set(key, []);
+                groups.get(key).push(t);
+            });
+            return [...groups.entries()]
+                .sort((a, b) => a[0].localeCompare(b[0]))
+                .map(([path, ts]) => `
+                    <div class="file-group">
+                        <div class="file-group-head">
+                            <span>${escape(path)}</span>
+                            <span class="file-group-count">${ts.length}</span>
+                        </div>
+                        ${ts.sort((a, b) => (a.line || 0) - (b.line || 0)).map(renderThread).join('')}
+                    </div>`)
+                .join('');
+        }
+
+        function reviewStateInfo(state) {
+            const map = {
+                APPROVED: { cls: 'approved', label: 'Approved' },
+                CHANGES_REQUESTED: { cls: 'changes_requested', label: 'Changes requested' },
+                COMMENTED: { cls: 'commented', label: 'Commented' },
+                DISMISSED: { cls: 'commented', label: 'Dismissed' }
+            };
+            return map[state] || { cls: 'commented', label: state };
+        }
+
+        function renderReview(r) {
+            const login = r.author && r.author.login ? r.author.login : 'ghost';
+            const authorUrl = r.author && r.author.url ? r.author.url : `https://github.com/${login}`;
+            const avatar = r.author && r.author.avatarUrl
+                ? `<img class="avatar" src="${escapeAttribute(r.author.avatarUrl)}" alt="" loading="lazy">`
+                : '';
+            const st = reviewStateInfo(r.state);
+            const body = r.bodyHTML ? r.bodyHTML : `<p>${escape(r.body || '')}</p>`;
+            return `
+                <div class="conversation-card">
+                    <div class="comment" style="border-bottom:0;">
+                        <div class="comment-head">
+                            ${avatar}
+                            <a class="comment-author" href="${escapeAttribute(authorUrl)}" target="_blank" rel="noopener noreferrer">${escape(login)}</a>
+                            <span class="review-state-tag ${st.cls}">${escape(st.label)}</span>
+                            <span class="comment-time">${escape(formatRelative(r.createdAt))}</span>
+                            <a class="comment-link" href="${escapeAttribute(r.url || prMeta.url)}" target="_blank" rel="noopener noreferrer" title="View on GitHub">↗</a>
+                        </div>
+                        <div class="comment-body">${body}</div>
+                    </div>
+                </div>`;
+        }
+
+        function filteredThreads() {
+            const filter = els.filterInput.value.trim().toLowerCase();
+            let list = threads.filter(t => showResolved || !t.isResolved);
+            if (!filter) return list;
+            return list.filter(t => {
+                const searchable = [
+                    t.path,
+                    ...t.comments.map(c => (c.author && c.author.login) || ''),
+                    ...t.comments.map(c => c.body || '')
+                ].join(' ').toLowerCase();
+                return searchable.includes(filter);
+            });
+        }
+
+        function updateSummary() {
+            els.threadCount.textContent = threads.filter(t => !t.isResolved).length;
+            els.conversationCount.textContent = conversation.length;
+            els.reviewCount.textContent = reviews.length;
+        }
+
+        function renderContent() {
+            if (!prMeta) {
+                els.content.innerHTML = '<div class="empty-state">No pull request loaded yet.</div>';
+                return;
+            }
+
+            const visibleThreads = filteredThreads();
+            const filter = els.filterInput.value.trim().toLowerCase();
+
+            const parts = [];
+
+            const threadsTitle = showResolved ? 'Review threads' : 'Unresolved review threads';
+            if (visibleThreads.length > 0) {
+                parts.push(`
+                    <section class="section">
+                        <div class="section-title">${threadsTitle} <span class="section-count">${visibleThreads.length}</span></div>
+                        ${renderThreadGroups(visibleThreads)}
+                    </section>`);
+            } else {
+                const msg = threads.length === 0
+                    ? 'No review threads on this pull request.'
+                    : showResolved ? 'No review threads match the filter.' : 'No unresolved review threads. 🎉';
+                parts.push(`
+                    <section class="section">
+                        <div class="section-title">${threadsTitle} <span class="section-count">0</span></div>
+                        <div class="empty-state">${msg}</div>
+                    </section>`);
+            }
+
+            const visibleConversation = filter
+                ? conversation.filter(c => [((c.author && c.author.login) || ''), (c.body || '')].join(' ').toLowerCase().includes(filter))
+                : conversation;
+            if (visibleConversation.length > 0) {
+                parts.push(`
+                    <section class="section">
+                        <div class="section-title">Conversation <span class="section-count">${visibleConversation.length}</span></div>
+                        ${visibleConversation.map(c => `<div class="conversation-card">${renderComment(c)}</div>`).join('')}
+                    </section>`);
+            }
+
+            const visibleReviews = filter
+                ? reviews.filter(r => [((r.author && r.author.login) || ''), (r.body || '')].join(' ').toLowerCase().includes(filter))
+                : reviews;
+            if (visibleReviews.length > 0) {
+                parts.push(`
+                    <section class="section">
+                        <div class="section-title">Review summaries <span class="section-count">${visibleReviews.length}</span></div>
+                        ${visibleReviews.map(renderReview).join('')}
+                    </section>`);
+            }
+
+            els.content.innerHTML = parts.join('');
+        }
+
+        function renderAll() {
+            renderPRHeader();
+            updateSummary();
+            renderContent();
+        }
+
+        // ---------- Actions ----------
+
+        async function submitReply(threadId, textarea, button) {
+            const body = textarea.value.trim();
+            if (!body) {
+                textarea.focus();
+                return;
+            }
+            setError('');
+            button.disabled = true;
+            const previous = button.textContent;
+            button.textContent = 'Replying...';
+            try {
+                const data = await graphql(REPLY_MUTATION, { threadId, body });
+                const comment = data.addPullRequestReviewThreadReply.comment;
+                const thread = threads.find(t => t.id === threadId);
+                if (thread) thread.comments.push(comment);
+                showToast('Reply posted', 'success');
+                renderAll();
+            } catch (error) {
+                console.error('Failed to post reply:', error);
+                setError(error.message);
+                button.disabled = false;
+                button.textContent = previous;
+            }
+        }
+
+        async function toggleResolve(threadId, button) {
+            const thread = threads.find(t => t.id === threadId);
+            if (!thread) return;
+            const resolving = !thread.isResolved;
+            setError('');
+            button.disabled = true;
+            button.textContent = resolving ? 'Resolving...' : 'Unresolving...';
+            try {
+                await graphql(resolving ? RESOLVE_MUTATION : UNRESOLVE_MUTATION, { threadId });
+                thread.isResolved = resolving;
+                showToast(resolving ? 'Thread resolved' : 'Thread reopened', 'success');
+                renderAll();
+            } catch (error) {
+                console.error('Failed to update thread:', error);
+                setError(error.message);
+                button.disabled = false;
+                button.textContent = resolving ? 'Resolve' : 'Unresolve';
+            }
+        }
+
+        // ---------- Load ----------
+
+        async function loadPR() {
+            if (loading) return;
+            const parsed = parsePRInput(els.prInput.value);
+            setError('');
+            updateQueryPreview();
+
+            if (!parsed) {
+                setError('Enter a pull request as owner/repo#number or a GitHub PR URL.');
+                return;
+            }
+            if (!getToken()) {
+                setError('A GitHub token is required. Click "Token" to add one.');
+                openTokenModal();
+                return;
+            }
+
+            localStorage.setItem(LAST_PR_KEY, parsed.param);
+            setQueryParam('pr', parsed.param);
+
+            setLoading(true);
+            els.content.innerHTML = `
+                <div class="loading-state">
+                    <span class="spinner"></span>
+                    <span>Loading pull request conversation...</span>
+                </div>`;
+
+            try {
+                const result = await fetchPR(parsed.owner, parsed.repo, parsed.number);
+                prMeta = result.meta;
+                threads = result.threads;
+                conversation = result.comments;
+                reviews = result.reviews;
+                els.summaryGrid.style.display = '';
+                els.statusLine.style.display = '';
+                els.lastUpdated.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+                renderAll();
+            } catch (error) {
+                console.error('Failed to load PR:', error);
+                setError(error.message);
+                prMeta = null;
+                threads = [];
+                conversation = [];
+                reviews = [];
+                els.prHeader.innerHTML = '';
+                els.summaryGrid.style.display = 'none';
+                els.statusLine.style.display = 'none';
+                els.content.innerHTML = '<div class="empty-state">Could not load this pull request.</div>';
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // ---------- Token modal ----------
+
+        function openTokenModal() {
+            els.tokenInput.value = getToken();
+            els.tokenInput.type = 'password';
+            els.toggleTokenVisibility.textContent = 'Show';
+            Modal.open('tokenModal');
+        }
+
+        function saveToken() {
+            const token = els.tokenInput.value.trim();
+            if (token) localStorage.setItem(TOKEN_KEY, token);
+            else localStorage.removeItem(TOKEN_KEY);
+            updateTokenStatus();
+            Modal.close('tokenModal');
+        }
+
+        function clearToken() {
+            localStorage.removeItem(TOKEN_KEY);
+            els.tokenInput.value = '';
+            updateTokenStatus();
+        }
+
+        function updateResolvedButton() {
+            els.toggleResolvedButton.classList.toggle('filter-active', showResolved);
+            els.toggleResolvedButton.textContent = showResolved ? 'Hide resolved' : 'Show resolved';
+        }
+
+        // ---------- Init ----------
+
+        function init() {
+            const fromUrl = getQueryParam('pr');
+            const fromStorage = localStorage.getItem(LAST_PR_KEY);
+            const initial = fromUrl || fromStorage || '';
+            if (initial) {
+                const parsed = parsePRInput(initial);
+                els.prInput.value = parsed ? parsed.slug : initial;
+            }
+            updateTokenStatus();
+            updateQueryPreview();
+            updateResolvedButton();
+
+            els.searchForm.addEventListener('submit', event => {
+                event.preventDefault();
+                loadPR();
+            });
+            els.refreshButton.addEventListener('click', loadPR);
+            els.prInput.addEventListener('input', updateQueryPreview);
+            els.filterInput.addEventListener('input', renderContent);
+            els.toggleResolvedButton.addEventListener('click', () => {
+                showResolved = !showResolved;
+                localStorage.setItem(SHOW_RESOLVED_KEY, String(showResolved));
+                updateResolvedButton();
+                renderContent();
+            });
+
+            els.content.addEventListener('click', event => {
+                const replyBtn = event.target.closest('.reply-btn');
+                if (replyBtn) {
+                    const article = replyBtn.closest('.thread');
+                    const textarea = article.querySelector('.reply-input');
+                    submitReply(article.dataset.threadId, textarea, replyBtn);
+                    return;
+                }
+                const resolveBtn = event.target.closest('.resolve-btn');
+                if (resolveBtn) {
+                    const article = resolveBtn.closest('.thread');
+                    toggleResolve(article.dataset.threadId, resolveBtn);
+                }
+            });
+
+            els.tokenButton.addEventListener('click', openTokenModal);
+            els.closeTokenModal.addEventListener('click', () => Modal.close('tokenModal'));
+            els.saveTokenButton.addEventListener('click', saveToken);
+            els.clearTokenButton.addEventListener('click', clearToken);
+            els.toggleTokenVisibility.addEventListener('click', () => {
+                const showing = els.tokenInput.type === 'text';
+                els.tokenInput.type = showing ? 'password' : 'text';
+                els.toggleTokenVisibility.textContent = showing ? 'Show' : 'Hide';
+            });
+            window.addEventListener('storage', event => {
+                if (event.key === TOKEN_KEY) updateTokenStatus();
+            });
+
+            if (initial && getToken()) loadPR();
+        }
+
+        init();
+    </script>
+</body>
+</html>
