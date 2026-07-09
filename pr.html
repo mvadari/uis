@@ -430,6 +430,36 @@
         .diff-del { background: var(--color-diff-del-bg); color: var(--color-diff-del-fg); }
         .diff-hunk-head { color: var(--color-accent-fg); }
         .diff-ctx { color: var(--color-fg-muted); }
+        .diff-anchor { background: var(--color-attention-subtle); color: var(--color-fg-default); }
+
+        .code-ln {
+            color: var(--color-fg-muted);
+            display: inline-block;
+            margin-right: 12px;
+            min-width: 3ch;
+            text-align: right;
+            user-select: none;
+        }
+
+        .code-panel-head {
+            background: var(--color-canvas-subtle);
+            border-top: 1px solid var(--color-border-muted);
+            color: var(--color-fg-muted);
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            padding: 4px 12px;
+            text-transform: uppercase;
+        }
+
+        .code-note {
+            align-items: center;
+            color: var(--color-fg-muted);
+            display: flex;
+            font-size: 13px;
+            gap: 8px;
+            padding: 10px 12px;
+        }
 
         .thread-comments {
             padding: 4px 12px;
@@ -985,12 +1015,12 @@
             query($owner:String!, $repo:String!, $number:Int!) {
               repository(owner:$owner, name:$repo) {
                 pullRequest(number:$number) {
-                  id number title url state isDraft
+                  id number title url state isDraft headRefOid
                   ${AUTHOR_FRAGMENT}
                   reviewThreads(first:50) {
                     pageInfo { hasNextPage endCursor }
                     nodes {
-                      id isResolved isOutdated path line
+                      id isResolved isOutdated path line originalLine
                       comments(first:50) {
                         nodes { id ${AUTHOR_FRAGMENT} bodyHTML body createdAt url diffHunk path }
                       }
@@ -1015,7 +1045,7 @@
                   reviewThreads(first:50, after:$cursor) {
                     pageInfo { hasNextPage endCursor }
                     nodes {
-                      id isResolved isOutdated path line
+                      id isResolved isOutdated path line originalLine
                       comments(first:50) {
                         nodes { id ${AUTHOR_FRAGMENT} bodyHTML body createdAt url diffHunk path }
                       }
@@ -1130,6 +1160,7 @@
                     url: p.url,
                     state: p.state,
                     isDraft: p.isDraft,
+                    headSha: p.headRefOid,
                     author: p.author
                 },
                 threads: threadNodes.map(t => ({
@@ -1138,6 +1169,7 @@
                     isOutdated: t.isOutdated,
                     path: t.path,
                     line: t.line,
+                    originalLine: t.originalLine,
                     comments: (t.comments.nodes || []).slice().sort(byCreatedAt)
                 })),
                 comments: commentNodes.slice().sort(byCreatedAt),
@@ -1268,6 +1300,7 @@
                     isOutdated: root.position === null || root.position === undefined,
                     path: root.path,
                     line: root.line != null ? root.line : root.original_line,
+                    originalLine: root.original_line,
                     comments: comments.map(mapRestReviewComment).sort(byCreatedAt)
                 };
             });
@@ -1280,12 +1313,114 @@
                     url: pr.html_url,
                     state: pr.merged_at ? 'MERGED' : (pr.state === 'closed' ? 'CLOSED' : 'OPEN'),
                     isDraft: pr.draft,
+                    headSha: pr.head && pr.head.sha,
                     author: mapRestUser(pr.user)
                 },
                 threads,
                 comments: issueComments.map(mapRestIssueComment).sort(byCreatedAt),
                 reviews: reviewList.filter(r => (r.body || '').trim()).map(mapRestReview).sort(byCreatedAt)
             };
+        }
+
+        // ---------- Current code for outdated threads ----------
+
+        function decodeBase64Utf8(b64) {
+            const binary = atob((b64 || '').replace(/\s/g, ''));
+            const bytes = Uint8Array.from(binary, ch => ch.charCodeAt(0));
+            return new TextDecoder('utf-8').decode(bytes);
+        }
+
+        // The comment anchors to the last line of its diff hunk; strip the +/-/space marker.
+        function anchorLineFromDiffHunk(diffHunk) {
+            if (!diffHunk) return '';
+            const lines = diffHunk.split('\n').filter(l => l.length);
+            for (let i = lines.length - 1; i >= 0; i--) {
+                if (lines[i].startsWith('@@')) continue;
+                return lines[i].replace(/^[+\- ]/, '');
+            }
+            return '';
+        }
+
+        async function fetchFileText(owner, repo, path, sha) {
+            const encodedPath = path.split('/').map(encodeURIComponent).join('/');
+            const url = `${REST_BASE}/repos/${owner}/${repo}/contents/${encodedPath}?ref=${encodeURIComponent(sha)}`;
+            const response = await fetch(url, { headers: restHeaders() });
+            if (response.status === 404) return null; // file no longer exists at head
+            if (!response.ok) {
+                let message = `GitHub API returned ${response.status}`;
+                try { const d = await response.json(); if (d.message) message = d.message; } catch {}
+                throw new Error(message);
+            }
+            const data = await response.json();
+            if (data.encoding !== 'base64' || typeof data.content !== 'string') {
+                throw new Error('File is too large or not text; cannot show current version.');
+            }
+            return decodeBase64Utf8(data.content);
+        }
+
+        async function fetchCurrentCode(thread) {
+            if (!prMeta.headSha) return { found: false, reason: 'no-head' };
+            const path = thread.path;
+            if (!path) return { found: false, reason: 'no-path' };
+
+            const text = await fetchFileText(prMeta.owner, prMeta.repo, path, prMeta.headSha);
+            if (text === null) return { found: false, reason: 'file-removed' };
+
+            const anchor = anchorLineFromDiffHunk((thread.comments[0] || {}).diffHunk).trim();
+            const fileLines = text.split('\n');
+
+            // Locate the commented line in the current file by exact (trimmed) content match.
+            let matches = [];
+            if (anchor) {
+                fileLines.forEach((line, i) => {
+                    if (line.trim() === anchor) matches.push(i);
+                });
+            }
+            if (matches.length === 0) return { found: false, reason: 'line-changed' };
+
+            // Prefer the match nearest the comment's original line number when ambiguous.
+            let idx = matches[0];
+            if (matches.length > 1 && thread.originalLine) {
+                idx = matches.reduce((best, m) =>
+                    Math.abs(m + 1 - thread.originalLine) < Math.abs(best + 1 - thread.originalLine) ? m : best, matches[0]);
+            }
+
+            const start = Math.max(0, idx - 3);
+            const end = Math.min(fileLines.length, idx + 4);
+            const lines = fileLines.slice(start, end).map((content, k) => ({
+                num: start + k + 1,
+                content,
+                isAnchor: start + k === idx
+            }));
+            return { found: true, lines };
+        }
+
+        function toggleCurrentCode(threadId) {
+            const thread = threads.find(t => t.id === threadId);
+            if (!thread) return;
+            if (!thread._currentCode) {
+                loadCurrentCode(threadId);
+                return;
+            }
+            if (thread._currentCode.loading) return;
+            thread._currentCodeCollapsed = !thread._currentCodeCollapsed;
+            renderAll();
+        }
+
+        async function loadCurrentCode(threadId) {
+            const thread = threads.find(t => t.id === threadId);
+            if (!thread) return;
+            thread._currentCodeCollapsed = false;
+            setError('');
+            thread._currentCode = { loading: true };
+            renderAll();
+            try {
+                thread._currentCode = await fetchCurrentCode(thread);
+            } catch (error) {
+                console.error('Failed to load current code:', error);
+                thread._currentCode = { found: false, reason: 'error', message: error.message };
+            }
+            renderAll();
         }
 
         // ---------- Rendering ----------
@@ -1402,12 +1537,33 @@
 
             const commentsHtml = comments.map((c, i) => renderComment(c, '', i > 0)).join('');
 
+            // For outdated threads, label the diff as "when commented" and offer the current code.
+            let currentCodeBtn = '';
+            if (t.isOutdated) {
+                let label = 'Show current code';
+                let disabled = '';
+                if (t._currentCode) {
+                    if (t._currentCode.loading) { label = 'Loading…'; disabled = 'disabled'; }
+                    else if (!t._currentCodeCollapsed) { label = 'Hide current code'; }
+                }
+                currentCodeBtn = `<button class="btn btn-small show-current-btn" type="button" ${disabled}>${label}</button>`;
+            }
+            const codeBlock = t.isOutdated
+                ? `<div class="code-panel">
+                        <div class="code-panel-head">When commented</div>
+                        ${renderDiffHunk(first.diffHunk)}
+                   </div>
+                   ${renderCurrentCode(t)}`
+                : renderDiffHunk(first.diffHunk);
+
             const actions = readOnly
                 ? `<div class="thread-buttons">
+                        ${currentCodeBtn}
                         <a class="btn btn-small" href="${escapeAttribute(first.url || prMeta.url)}" target="_blank" rel="noopener noreferrer">View on GitHub</a>
                    </div>`
                 : `<textarea class="reply-input" placeholder="Reply to this thread..."></textarea>
                    <div class="thread-buttons">
+                        ${currentCodeBtn}
                         <a class="btn btn-small" href="${escapeAttribute(first.url || prMeta.url)}" target="_blank" rel="noopener noreferrer">GitHub</a>
                         <button class="btn btn-small resolve-btn" type="button">${t.isResolved ? 'Unresolve' : 'Resolve'}</button>
                         <button class="btn btn-small btn-primary reply-btn" type="button">Reply</button>
@@ -1419,10 +1575,46 @@
                         <span class="thread-loc">${loc || 'thread'} · ${countLabel}</span>
                         <span class="thread-badges">${badges.join('')}</span>
                     </div>
-                    ${renderDiffHunk(first.diffHunk)}
+                    ${codeBlock}
                     <div class="thread-comments">${commentsHtml}</div>
                     <div class="thread-actions">${actions}</div>
                 </article>`;
+        }
+
+        function renderCodeLines(lines) {
+            return `<pre class="diff-hunk">${lines.map(l =>
+                `<span class="diff-line ${l.isAnchor ? 'diff-anchor' : 'diff-ctx'}"><span class="code-ln">${l.num}</span>${escape(l.content) || '&nbsp;'}</span>`
+            ).join('')}</pre>`;
+        }
+
+        function renderCurrentCode(thread) {
+            const cc = thread._currentCode;
+            if (!cc) return '';
+            if (thread._currentCodeCollapsed) return '';
+            if (cc.loading) {
+                return `<div class="code-panel">
+                    <div class="code-panel-head">Current version</div>
+                    <div class="code-note"><span class="spinner"></span> Loading current code…</div>
+                </div>`;
+            }
+            if (cc.found) {
+                const shaTag = prMeta.headSha ? ` · ${escape(prMeta.headSha.slice(0, 7))}` : '';
+                return `<div class="code-panel">
+                    <div class="code-panel-head">Current version${shaTag}</div>
+                    ${renderCodeLines(cc.lines)}
+                </div>`;
+            }
+            const notes = {
+                'file-removed': 'The file no longer exists at the current head of this PR.',
+                'line-changed': 'The commented line is no longer present in the current version — it was changed or removed.',
+                'no-head': 'Could not determine the current head commit for this PR.',
+                'no-path': 'This thread has no file path to compare.',
+                'error': cc.message || 'Could not load the current version.'
+            };
+            return `<div class="code-panel">
+                <div class="code-panel-head">Current version</div>
+                <div class="code-note">${escape(notes[cc.reason] || 'Current version unavailable.')}</div>
+            </div>`;
         }
 
         function renderThreadGroups(list) {
@@ -1795,6 +1987,8 @@
                     ? await fetchPRRest(parsed.owner, parsed.repo, parsed.number)
                     : await fetchPR(parsed.owner, parsed.repo, parsed.number);
                 prMeta = result.meta;
+                prMeta.owner = parsed.owner;
+                prMeta.repo = parsed.repo;
                 threads = result.threads;
                 conversation = result.comments;
                 reviews = result.reviews;
@@ -1944,6 +2138,12 @@
                 if (resolveBtn) {
                     const article = resolveBtn.closest('.thread');
                     toggleResolve(article.dataset.threadId, resolveBtn);
+                    return;
+                }
+                const showCurrentBtn = event.target.closest('.show-current-btn');
+                if (showCurrentBtn) {
+                    const article = showCurrentBtn.closest('.thread');
+                    toggleCurrentCode(article.dataset.threadId);
                 }
             });
 

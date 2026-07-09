@@ -61,6 +61,7 @@ A clean, focused view of a single pull request's unresolved conversation.
 - Hide comments and review summaries with a reason (spam, off topic, resolved, etc.)
 - Bulk-select comments/reviews with checkboxes to hide or unhide many at once
 - Filter by file, author, or text; toggle resolved/hidden items and filter outdated threads
+- For outdated threads, compare the code when commented against the current version at the PR head
 - Sticky section and file headers while scrolling; deep-linkable from the GitHub PR Dashboard
 - Works read-only without a token (public PRs via REST); a token adds resolved-state and reply/resolve/hide via GraphQL
 - Shares the GitHub token with the other tools
