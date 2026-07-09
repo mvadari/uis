@@ -718,9 +718,26 @@
 
         let prs = [];
         let milestones = [];
-        let releaseName = localStorage.getItem(RELEASE_KEY) || '';
+        let releaseName = getReleaseFromHash() || localStorage.getItem(RELEASE_KEY) || '';
         let releaseCounts = null;
         let autoRefreshTimer = null;
+
+        function getReleaseFromHash() {
+            const hash = window.location.hash.replace(/^#/, '');
+            if (!hash) return '';
+            try {
+                return decodeURIComponent(hash);
+            } catch {
+                return hash;
+            }
+        }
+
+        function setReleaseHash(release) {
+            const target = release ? `#${encodeURIComponent(release)}` : '#';
+            if (window.location.hash !== target) {
+                window.location.hash = target;
+            }
+        }
 
         function getToken() {
             return localStorage.getItem(TOKEN_KEY) || '';
@@ -1128,6 +1145,7 @@
 
             releaseName = release;
             localStorage.setItem(RELEASE_KEY, releaseName);
+            setReleaseHash(releaseName);
             document.getElementById('error').style.display = 'none';
             if (!isAutoRefresh) document.getElementById('prList').innerHTML = '<div class="loading">Loading release PRs...</div>';
 
@@ -1521,8 +1539,19 @@
         document.getElementById('tokenStatus').textContent = getToken() ? 'Set' : 'Not set';
 
         document.getElementById('releaseSelect').addEventListener('change', () => {
+            setReleaseHash(document.getElementById('releaseSelect').value);
             updateQueryPreview();
             fetchAllPRs();
+        });
+        window.addEventListener('hashchange', () => {
+            const release = getReleaseFromHash();
+            const select = document.getElementById('releaseSelect');
+            if (release === normalizeRelease(select.value)) return;
+            if (release && milestones.some(milestone => milestone.title === release)) {
+                select.value = release;
+                updateQueryPreview();
+                fetchAllPRs();
+            }
         });
         document.getElementById('refreshBtn').addEventListener('click', () => fetchAllPRs());
         document.getElementById('toggleToken').addEventListener('click', () => {
