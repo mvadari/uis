@@ -880,14 +880,49 @@
         .viewed-check input { cursor: pointer; margin: 0; }
 
         .file-diff {
+            background: var(--color-canvas-default);
             border-top: 1px solid var(--color-border-muted);
+            overflow-x: auto;
         }
 
-        .file-diff .diff-hunk {
-            border: 0;
-            margin: 0;
-            padding: 8px 0;
+        .diff-table {
+            border-collapse: collapse;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            tab-size: 4;
+            width: 100%;
         }
+
+        .diff-table td { padding: 0; }
+
+        .diff-gutter {
+            border-right: 1px solid var(--color-border-muted);
+            color: var(--color-fg-muted);
+            min-width: 40px;
+            padding: 0 10px;
+            text-align: right;
+            user-select: none;
+            vertical-align: top;
+            white-space: nowrap;
+            width: 1%;
+        }
+
+        .diff-code {
+            color: var(--color-fg-default);
+            padding: 0 8px 0 12px;
+            white-space: pre;
+        }
+
+        .diff-row.diff-add td { background: var(--color-diff-add-bg); }
+        .diff-row.diff-add .diff-gutter { color: var(--color-diff-add-fg); }
+        .diff-row.diff-del td { background: var(--color-diff-del-bg); }
+        .diff-row.diff-del .diff-gutter { color: var(--color-diff-del-fg); }
+        .diff-row.diff-hunk-head td {
+            background: var(--color-accent-subtle);
+            color: var(--color-accent-fg);
+        }
+        .diff-row.diff-hunk-head .diff-code { color: var(--color-accent-fg); }
 
         .file-diff-note {
             color: var(--color-fg-muted);
@@ -2096,14 +2131,29 @@
 
         function renderPatch(patch) {
             if (!patch) return '';
-            const rows = patch.split('\n').map(line => {
+            let oldLn = 0;
+            let newLn = 0;
+            const rows = patch.replace(/\n$/, '').split('\n').map(line => {
+                const marker = line[0];
+                // Hunk header resets the old/new line counters and spans both gutters.
+                if (line.startsWith('@@')) {
+                    const m = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+                    if (m) { oldLn = parseInt(m[1], 10); newLn = parseInt(m[2], 10); }
+                    return `<tr class="diff-row diff-hunk-head"><td class="diff-gutter" colspan="2"></td><td class="diff-code">${escape(line) || '&nbsp;'}</td></tr>`;
+                }
+                // "\ No newline at end of file" — informational, no line numbers.
+                if (marker === '\\') {
+                    return `<tr class="diff-row diff-ctx"><td class="diff-gutter"></td><td class="diff-gutter"></td><td class="diff-code">${escape(line)}</td></tr>`;
+                }
                 let cls = 'diff-ctx';
-                if (line.startsWith('@@')) cls = 'diff-hunk-head';
-                else if (line.startsWith('+')) cls = 'diff-add';
-                else if (line.startsWith('-')) cls = 'diff-del';
-                return `<span class="diff-line ${cls}">${escape(line) || '&nbsp;'}</span>`;
+                let oldNum = '';
+                let newNum = '';
+                if (marker === '+') { cls = 'diff-add'; newNum = newLn++; }
+                else if (marker === '-') { cls = 'diff-del'; oldNum = oldLn++; }
+                else { oldNum = oldLn++; newNum = newLn++; }
+                return `<tr class="diff-row ${cls}"><td class="diff-gutter">${oldNum}</td><td class="diff-gutter">${newNum}</td><td class="diff-code">${escape(line) || '&nbsp;'}</td></tr>`;
             });
-            return `<pre class="diff-hunk">${rows.join('')}</pre>`;
+            return `<table class="diff-table"><tbody>${rows.join('')}</tbody></table>`;
         }
 
         function renderFileDiff(f) {
