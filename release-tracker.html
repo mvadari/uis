@@ -711,7 +711,7 @@
         const TOKEN_KEY = 'github_token';
         const RELEASE_KEY = 'rippled_release_tracker_release';
         const CACHE_KEY = 'rippled_release_tracker_cache';
-        const CACHE_VERSION = 'open-only-v4';
+        const CACHE_VERSION = 'all-prs-v5';
         const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000;
         const APPROVAL_EXCLUDED_REVIEWERS = new Set(['xrplf-ai-reviewer[bot]', 'Copilot']);
         const COPILOT_REVIEWERS = new Set(['Copilot', 'copilot-pull-request-reviewer[bot]', 'github-copilot[bot]']);
@@ -737,6 +737,40 @@
             if (window.location.hash !== target) {
                 window.location.hash = target;
             }
+        }
+
+        const FILTER_DEFAULTS = { status: 'all', sort: 'number-desc', q: '' };
+
+        function applyFiltersFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            const status = params.get('status');
+            const sort = params.get('sort');
+            const q = params.get('q');
+            const statusSelect = document.getElementById('statusFilter');
+            const sortSelect = document.getElementById('sortMode');
+            if (status && [...statusSelect.options].some(option => option.value === status)) {
+                statusSelect.value = status;
+            }
+            if (sort && [...sortSelect.options].some(option => option.value === sort)) {
+                sortSelect.value = sort;
+            }
+            if (q !== null) document.getElementById('searchInput').value = q;
+        }
+
+        function updateFilterParams() {
+            const params = new URLSearchParams(window.location.search);
+            const values = {
+                status: document.getElementById('statusFilter').value,
+                sort: document.getElementById('sortMode').value,
+                q: document.getElementById('searchInput').value.trim()
+            };
+            Object.entries(values).forEach(([key, value]) => {
+                if (value && value !== FILTER_DEFAULTS[key]) params.set(key, value);
+                else params.delete(key);
+            });
+            const query = params.toString();
+            const newUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`;
+            history.replaceState(null, '', newUrl);
         }
 
         function getToken() {
@@ -866,7 +900,7 @@
                 preview.textContent = 'Release lists are defined by GitHub milestones.';
                 return;
             }
-            preview.innerHTML = `Searching open PRs in <code>milestone:"${escape(value)}"</code>.`;
+            preview.innerHTML = `Searching all PRs in <code>milestone:"${escape(value)}"</code>.`;
         }
 
         function selectedMilestone() {
@@ -966,7 +1000,11 @@
         }
 
         async function searchPRNumbersForRelease(release) {
-            return searchPRNumbers(release, 'open');
+            const [open, closed] = await Promise.all([
+                searchPRNumbers(release, 'open'),
+                searchPRNumbers(release, 'closed')
+            ]);
+            return [...new Set([...open, ...closed])].sort((a, b) => b - a);
         }
 
         async function searchCount(query) {
@@ -1389,6 +1427,7 @@
                 }
             }
 
+            updateFilterParams();
             renderPRs();
         }
 
@@ -1569,9 +1608,9 @@
             loadMilestones();
         });
         document.getElementById('autoRefresh').addEventListener('change', setupAutoRefresh);
-        document.getElementById('statusFilter').addEventListener('change', renderPRs);
-        document.getElementById('sortMode').addEventListener('change', renderPRs);
-        document.getElementById('searchInput').addEventListener('input', renderPRs);
+        document.getElementById('statusFilter').addEventListener('change', () => { updateFilterParams(); renderPRs(); });
+        document.getElementById('sortMode').addEventListener('change', () => { updateFilterParams(); renderPRs(); });
+        document.getElementById('searchInput').addEventListener('input', () => { updateFilterParams(); renderPRs(); });
         document.querySelectorAll('[data-summary-filter]').forEach(tile => {
             tile.addEventListener('click', () => applySummaryFilter(tile.dataset.summaryFilter));
         });
@@ -1581,6 +1620,7 @@
         });
 
         async function initialize() {
+            applyFiltersFromURL();
             await loadMilestones();
             if (!releaseName) {
                 setupAutoRefresh();
