@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PR Comments</title>
+    <title>PR Review</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="stylesheet" href="shared-styles.css">
     <style>
@@ -721,6 +721,154 @@
             background: var(--color-canvas-subtle);
         }
 
+        /* Tabs */
+        .tab-nav {
+            border-bottom: 1px solid var(--color-border-default);
+            display: flex;
+            gap: 4px;
+            margin-bottom: 16px;
+        }
+
+        .tab-btn {
+            background: none;
+            border: 0;
+            border-bottom: 2px solid transparent;
+            color: var(--color-fg-muted);
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: -1px;
+            padding: 8px 14px;
+        }
+
+        .tab-btn:hover { color: var(--color-fg-default); }
+
+        .tab-btn.active {
+            border-bottom-color: #fd8c73;
+            color: var(--color-fg-default);
+        }
+
+        .tab-count {
+            background: var(--color-canvas-subtle);
+            border: 1px solid var(--color-border-default);
+            border-radius: 999px;
+            color: var(--color-fg-muted);
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 6px;
+            padding: 0 7px;
+        }
+
+        .tab-panel[hidden] { display: none; }
+
+        /* Files tab */
+        .file-row {
+            background: var(--color-canvas-default);
+            border: 1px solid var(--color-border-default);
+            border-radius: 6px;
+            margin-bottom: 8px;
+            overflow: hidden;
+        }
+
+        .file-row.viewed .file-path { color: var(--color-fg-muted); text-decoration: line-through; }
+
+        .file-row-head {
+            align-items: center;
+            cursor: pointer;
+            display: flex;
+            gap: 10px;
+            padding: 10px 12px;
+        }
+
+        .file-row-head:hover { background: var(--color-canvas-subtle); }
+
+        .file-caret {
+            color: var(--color-fg-muted);
+            flex: 0 0 auto;
+            font-size: 11px;
+            transition: transform 0.1s ease;
+            width: 10px;
+        }
+
+        .file-row.open .file-caret { transform: rotate(90deg); }
+
+        .file-status-icon {
+            border-radius: 4px;
+            flex: 0 0 auto;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 1px 6px;
+        }
+
+        .file-status-added { background: var(--color-diff-add-bg); color: var(--color-diff-add-fg); }
+        .file-status-removed { background: var(--color-diff-del-bg); color: var(--color-diff-del-fg); }
+        .file-status-modified { background: var(--color-attention-subtle); color: var(--color-attention-fg); }
+        .file-status-renamed { background: var(--color-accent-subtle); color: var(--color-accent-fg); }
+
+        .file-path {
+            flex: 1 1 auto;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 13px;
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .file-stat {
+            flex: 0 0 auto;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        .file-stat .add { color: var(--color-diff-add-fg); }
+        .file-stat .del { color: var(--color-diff-del-fg); }
+
+        .file-actions {
+            align-items: center;
+            display: flex;
+            flex: 0 0 auto;
+            gap: 12px;
+        }
+
+        .file-actions a {
+            color: var(--color-accent-fg);
+            font-size: 12px;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .file-actions a:hover { text-decoration: underline; }
+
+        .viewed-check {
+            align-items: center;
+            color: var(--color-fg-muted);
+            cursor: pointer;
+            display: inline-flex;
+            font-size: 12px;
+            gap: 5px;
+            user-select: none;
+            white-space: nowrap;
+        }
+
+        .viewed-check input { cursor: pointer; margin: 0; }
+
+        .file-diff {
+            border-top: 1px solid var(--color-border-muted);
+        }
+
+        .file-diff .diff-hunk {
+            border: 0;
+            margin: 0;
+            padding: 8px 0;
+        }
+
+        .file-diff-note {
+            color: var(--color-fg-muted);
+            font-size: 13px;
+            padding: 12px;
+        }
+
         @media (max-width: 860px) {
             .container { padding: 12px; }
             .header-main,
@@ -768,8 +916,8 @@
                         <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
                     </svg>
                     <div class="title-block">
-                        <h1 class="header-title">PR Comments</h1>
-                        <div class="header-subtitle">A clean view of a pull request's unresolved conversation</div>
+                        <h1 class="header-title">PR Review</h1>
+                        <div class="header-subtitle">Review a pull request — conversation and changed files</div>
                     </div>
                 </div>
                 <div class="header-controls">
@@ -791,6 +939,14 @@
 
         <div id="prHeader"></div>
 
+        <nav class="tab-nav" id="tabNav" style="display:none;">
+            <button class="tab-btn active" id="tabComments" data-tab="comments" type="button">Comments<span class="tab-count" id="commentsTabCount">0</span></button>
+            <button class="tab-btn" id="tabFiles" data-tab="files" type="button">Files<span class="tab-count" id="filesTabCount">0</span></button>
+        </nav>
+
+        <div class="error-banner" id="errorBanner"></div>
+
+        <div class="tab-panel" id="panel-comments">
         <section class="summary-grid" aria-label="Comment summary" id="summaryGrid" style="display:none;">
             <div class="summary-tile">
                 <div class="summary-label" id="threadCountLabel">Unresolved Threads</div>
@@ -828,10 +984,23 @@
             </div>
         </div>
 
-        <div class="error-banner" id="errorBanner"></div>
         <main id="content">
             <div class="empty-state">No pull request loaded yet.</div>
         </main>
+        </div>
+
+        <div class="tab-panel" id="panel-files" hidden>
+            <div class="status-line" id="filesStatusLine" style="display:none;">
+                <div id="filesSummary"></div>
+                <div class="status-controls">
+                    <button class="btn" id="filesViewedFilterButton" type="button">Viewed: all</button>
+                    <input class="filter-box" type="search" id="filesFilterInput" placeholder="Filter by file path">
+                </div>
+            </div>
+            <main id="filesContent">
+                <div class="empty-state">No pull request loaded yet.</div>
+            </main>
+        </div>
     </div>
 
     <div class="modal" id="tokenModal">
@@ -868,12 +1037,18 @@
         const OUTDATED_FILTER_KEY = 'pr_comments_outdated_filter';
         const GRAPHQL_URL = 'https://api.github.com/graphql';
 
+        const FILES_VIEWED_FILTER_KEY = 'pr_review_files_viewed_filter';
+        const ACTIVE_TAB_KEY = 'pr_review_active_tab';
+
         let prMeta = null;
         let threads = [];
         let conversation = [];
         let reviews = [];
+        let files = [];
         let loading = false;
         let readOnly = false;
+        let activeTab = localStorage.getItem(ACTIVE_TAB_KEY) || 'comments';
+        let filesViewedFilter = localStorage.getItem(FILES_VIEWED_FILTER_KEY) || 'all'; // 'all' | 'viewed' | 'unviewed'
         let showResolved = localStorage.getItem(SHOW_RESOLVED_KEY) === 'true';
         let outdatedFilter = localStorage.getItem(OUTDATED_FILTER_KEY) || 'all'; // 'all' | 'hide' | 'only'
         let selectedIds = new Set();
@@ -907,6 +1082,16 @@
             filterInput: document.getElementById('filterInput'),
             errorBanner: document.getElementById('errorBanner'),
             content: document.getElementById('content'),
+            tabNav: document.getElementById('tabNav'),
+            commentsTabCount: document.getElementById('commentsTabCount'),
+            filesTabCount: document.getElementById('filesTabCount'),
+            panelComments: document.getElementById('panel-comments'),
+            panelFiles: document.getElementById('panel-files'),
+            filesStatusLine: document.getElementById('filesStatusLine'),
+            filesSummary: document.getElementById('filesSummary'),
+            filesViewedFilterButton: document.getElementById('filesViewedFilterButton'),
+            filesFilterInput: document.getElementById('filesFilterInput'),
+            filesContent: document.getElementById('filesContent'),
             tokenModal: document.getElementById('tokenModal'),
             closeTokenModal: document.getElementById('closeTokenModal'),
             tokenInput: document.getElementById('tokenInput'),
@@ -1034,6 +1219,10 @@
                     pageInfo { hasNextPage endCursor }
                     nodes { id ${AUTHOR_FRAGMENT} bodyHTML body state createdAt url isMinimized minimizedReason }
                   }
+                  files(first:100) {
+                    pageInfo { hasNextPage endCursor }
+                    nodes { path viewerViewedState }
+                  }
                 }
               }
             }`;
@@ -1076,6 +1265,32 @@
                     nodes { id ${AUTHOR_FRAGMENT} bodyHTML body state createdAt url isMinimized minimizedReason }
                   }
                 }
+              }
+            }`;
+
+        const FILES_PAGE_QUERY = `
+            query($owner:String!, $repo:String!, $number:Int!, $cursor:String!) {
+              repository(owner:$owner, name:$repo) {
+                pullRequest(number:$number) {
+                  files(first:100, after:$cursor) {
+                    pageInfo { hasNextPage endCursor }
+                    nodes { path viewerViewedState }
+                  }
+                }
+              }
+            }`;
+
+        const MARK_VIEWED_MUTATION = `
+            mutation($prId:ID!, $path:String!) {
+              markFileAsViewed(input:{pullRequestId:$prId, path:$path}) {
+                pullRequest { id }
+              }
+            }`;
+
+        const UNMARK_VIEWED_MUTATION = `
+            mutation($prId:ID!, $path:String!) {
+              unmarkFileAsViewed(input:{pullRequestId:$prId, path:$path}) {
+                pullRequest { id }
               }
             }`;
 
@@ -1152,6 +1367,15 @@
                 ri = rv.pageInfo;
             }
 
+            const fileNodes = [...(p.files ? p.files.nodes : [])];
+            let fi = p.files && p.files.pageInfo;
+            while (fi && fi.hasNextPage) {
+                const d = await graphql(FILES_PAGE_QUERY, { owner, repo, number, cursor: fi.endCursor });
+                const fl = d.repository.pullRequest.files;
+                fileNodes.push(...fl.nodes);
+                fi = fl.pageInfo;
+            }
+
             return {
                 meta: {
                     id: p.id,
@@ -1173,7 +1397,8 @@
                     comments: (t.comments.nodes || []).slice().sort(byCreatedAt)
                 })),
                 comments: commentNodes.slice().sort(byCreatedAt),
-                reviews: reviewNodes.filter(r => (r.body || '').trim()).slice().sort(byCreatedAt)
+                reviews: reviewNodes.filter(r => (r.body || '').trim()).slice().sort(byCreatedAt),
+                viewedByPath: new Map(fileNodes.map(f => [f.path, f.viewerViewedState]))
             };
         }
 
@@ -1320,6 +1545,55 @@
                 comments: issueComments.map(mapRestIssueComment).sort(byCreatedAt),
                 reviews: reviewList.filter(r => (r.body || '').trim()).map(mapRestReview).sort(byCreatedAt)
             };
+        }
+
+        // ---------- Files ----------
+
+        // Map REST PR-file `status` to a compact label/class for the row badge.
+        const FILE_STATUS_INFO = {
+            added: { label: 'added', cls: 'file-status-added' },
+            removed: { label: 'removed', cls: 'file-status-removed' },
+            modified: { label: 'modified', cls: 'file-status-modified' },
+            renamed: { label: 'renamed', cls: 'file-status-renamed' },
+            copied: { label: 'copied', cls: 'file-status-renamed' },
+            changed: { label: 'changed', cls: 'file-status-modified' }
+        };
+
+        // The REST files endpoint carries the patch text and status; GraphQL supplies viewer
+        // viewed-state (which REST cannot report), so we fetch REST always and overlay viewed.
+        async function fetchFilesRest(owner, repo, number) {
+            const list = await restGetAll(`${REST_BASE}/repos/${owner}/${repo}/pulls/${number}/files`);
+            if (!Array.isArray(list)) return [];
+            return list.map(f => ({
+                path: f.filename,
+                previousPath: f.previous_filename || null,
+                status: f.status,
+                additions: f.additions,
+                deletions: f.deletions,
+                patch: f.patch || null,
+                blobUrl: f.blob_url,
+                viewed: null,
+                anchor: null,
+                expanded: false
+            }));
+        }
+
+        async function sha256Hex(text) {
+            const buffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+            return [...new Uint8Array(buffer)].map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        // GitHub anchors each file on its Files-changed page as diff-<sha256(path)>.
+        async function assignFileAnchors(list) {
+            if (!(window.crypto && window.crypto.subtle)) return;
+            await Promise.all(list.map(async f => {
+                try { f.anchor = await sha256Hex(f.path); } catch { f.anchor = null; }
+            }));
+        }
+
+        function fileDiffUrl(f) {
+            const base = `${prMeta.url}/files`;
+            return f.anchor ? `${base}#diff-${f.anchor}` : base;
         }
 
         // ---------- Current code for outdated threads ----------
@@ -1773,10 +2047,131 @@
             updateBulkBar();
         }
 
+        // ---------- Files rendering ----------
+
+        function renderPatch(patch) {
+            if (!patch) return '';
+            const rows = patch.split('\n').map(line => {
+                let cls = 'diff-ctx';
+                if (line.startsWith('@@')) cls = 'diff-hunk-head';
+                else if (line.startsWith('+')) cls = 'diff-add';
+                else if (line.startsWith('-')) cls = 'diff-del';
+                return `<span class="diff-line ${cls}">${escape(line) || '&nbsp;'}</span>`;
+            });
+            return `<pre class="diff-hunk">${rows.join('')}</pre>`;
+        }
+
+        function renderFileDiff(f) {
+            if (!f.expanded) return '';
+            if (f.patch) {
+                return `<div class="file-diff">${renderPatch(f.patch)}</div>`;
+            }
+            const reason = f.status === 'renamed'
+                ? 'File was renamed with no content changes.'
+                : 'No inline diff available (the file is binary or too large).';
+            return `<div class="file-diff"><div class="file-diff-note">${escape(reason)} <a href="${escapeAttribute(fileDiffUrl(f))}" target="_blank" rel="noopener noreferrer">View on GitHub ↗</a></div></div>`;
+        }
+
+        function renderFileRow(f) {
+            const info = FILE_STATUS_INFO[f.status] || { label: f.status || 'changed', cls: 'file-status-modified' };
+            const isViewed = f.viewed === 'VIEWED';
+            const stat = [];
+            if (f.additions) stat.push(`<span class="add">+${f.additions}</span>`);
+            if (f.deletions) stat.push(`<span class="del">−${f.deletions}</span>`);
+            const viewedControl = readOnly
+                ? ''
+                : `<label class="viewed-check" title="Mark as viewed (syncs to GitHub)">
+                        <input type="checkbox" class="viewed-check-input" ${isViewed ? 'checked' : ''}>
+                        Viewed
+                   </label>`;
+            const renamedFrom = f.previousPath
+                ? `<span class="file-stat" style="color:var(--color-fg-muted);">${escape(f.previousPath)} →</span>`
+                : '';
+            return `
+                <div class="file-row ${f.expanded ? 'open' : ''} ${isViewed ? 'viewed' : ''}" data-file-path="${escapeAttribute(f.path)}">
+                    <div class="file-row-head">
+                        <span class="file-caret">▶</span>
+                        <span class="file-status-icon ${info.cls}">${escape(info.label)}</span>
+                        ${renamedFrom}
+                        <span class="file-path">${escape(f.path)}</span>
+                        <span class="file-stat">${stat.join(' ')}</span>
+                        <span class="file-actions">
+                            ${viewedControl}
+                            <a href="${escapeAttribute(fileDiffUrl(f))}" target="_blank" rel="noopener noreferrer" title="Open this file's diff on GitHub">GitHub ↗</a>
+                        </span>
+                    </div>
+                    ${renderFileDiff(f)}
+                </div>`;
+        }
+
+        function filteredFiles() {
+            const filter = els.filesFilterInput.value.trim().toLowerCase();
+            let list = files;
+            if (filesViewedFilter === 'viewed') list = list.filter(f => f.viewed === 'VIEWED');
+            else if (filesViewedFilter === 'unviewed') list = list.filter(f => f.viewed !== 'VIEWED');
+            if (filter) list = list.filter(f => f.path.toLowerCase().includes(filter));
+            return list;
+        }
+
+        function updateFilesSummary() {
+            const total = files.length;
+            const viewed = files.filter(f => f.viewed === 'VIEWED').length;
+            const adds = files.reduce((n, f) => n + (f.additions || 0), 0);
+            const dels = files.reduce((n, f) => n + (f.deletions || 0), 0);
+            const viewedText = readOnly ? '' : ` · ${viewed}/${total} viewed`;
+            els.filesSummary.innerHTML =
+                `${total} file${total === 1 ? '' : 's'} · <span style="color:var(--color-diff-add-fg)">+${adds}</span> <span style="color:var(--color-diff-del-fg)">−${dels}</span>${viewedText}`;
+        }
+
+        function renderFilesContent() {
+            if (!prMeta) {
+                els.filesContent.innerHTML = '<div class="empty-state">No pull request loaded yet.</div>';
+                return;
+            }
+            const list = filteredFiles();
+            if (list.length === 0) {
+                const msg = files.length === 0 ? 'No changed files on this pull request.' : 'No files match the filter.';
+                els.filesContent.innerHTML = `<div class="empty-state">${msg}</div>`;
+                return;
+            }
+            els.filesContent.innerHTML = list.map(renderFileRow).join('');
+        }
+
+        function updateFilesViewedButton() {
+            const labels = { all: 'Viewed: all', viewed: 'Viewed: only', unviewed: 'Viewed: unviewed' };
+            els.filesViewedFilterButton.textContent = labels[filesViewedFilter] || labels.all;
+            els.filesViewedFilterButton.classList.toggle('filter-active', filesViewedFilter !== 'all');
+            // The viewed filter is meaningless without a token (REST can't report viewed state).
+            els.filesViewedFilterButton.style.display = readOnly ? 'none' : '';
+        }
+
+        function updateTabCounts() {
+            els.commentsTabCount.textContent = threads.filter(t => !t.isResolved).length;
+            els.filesTabCount.textContent = files.length;
+        }
+
+        function setActiveTab(tab) {
+            activeTab = tab === 'files' ? 'files' : 'comments';
+            localStorage.setItem(ACTIVE_TAB_KEY, activeTab);
+            els.tabComments.classList.toggle('active', activeTab === 'comments');
+            els.tabFiles.classList.toggle('active', activeTab === 'files');
+            els.panelComments.hidden = activeTab !== 'comments';
+            els.panelFiles.hidden = activeTab !== 'files';
+        }
+
+        function renderFilesPanel() {
+            els.filesStatusLine.style.display = prMeta ? '' : 'none';
+            updateFilesViewedButton();
+            updateFilesSummary();
+            renderFilesContent();
+        }
+
         function renderAll() {
             renderPRHeader();
             updateSummary();
+            updateTabCounts();
             renderContent();
+            renderFilesPanel();
         }
 
         // ---------- Actions ----------
@@ -1823,6 +2218,31 @@
                 setError(error.message);
                 button.disabled = false;
                 button.textContent = resolving ? 'Resolve' : 'Unresolve';
+            }
+        }
+
+        function toggleFileExpanded(path) {
+            const f = files.find(x => x.path === path);
+            if (!f) return;
+            f.expanded = !f.expanded;
+            renderFilesContent();
+        }
+
+        async function toggleViewed(path, checkbox) {
+            const f = files.find(x => x.path === path);
+            if (!f) return;
+            const marking = f.viewed !== 'VIEWED';
+            setError('');
+            if (checkbox) checkbox.disabled = true;
+            try {
+                await graphql(marking ? MARK_VIEWED_MUTATION : UNMARK_VIEWED_MUTATION, { prId: prMeta.id, path });
+                f.viewed = marking ? 'VIEWED' : 'UNVIEWED';
+                updateFilesSummary();
+                renderFilesContent();
+            } catch (error) {
+                console.error('Failed to update viewed state:', error);
+                setError(error.message);
+                if (checkbox) checkbox.disabled = false;
             }
         }
 
@@ -1992,9 +2412,21 @@
                 threads = result.threads;
                 conversation = result.comments;
                 reviews = result.reviews;
+
+                // Files: REST supplies patch/status, GraphQL supplies per-viewer viewed state.
+                const restFiles = await fetchFilesRest(parsed.owner, parsed.repo, parsed.number);
+                const viewedByPath = result.viewedByPath || new Map();
+                files = restFiles.map(f => ({
+                    ...f,
+                    viewed: viewedByPath.has(f.path) ? viewedByPath.get(f.path) : null
+                }));
+                await assignFileAnchors(files);
+
                 els.summaryGrid.style.display = '';
                 els.statusLine.style.display = '';
+                els.tabNav.style.display = 'flex';
                 els.lastUpdated.textContent = `Last updated: ${new Date().toLocaleTimeString()}${readOnly ? ' (read-only)' : ''}`;
+                setActiveTab(activeTab);
                 renderAll();
             } catch (error) {
                 console.error('Failed to load PR:', error);
@@ -2003,10 +2435,14 @@
                 threads = [];
                 conversation = [];
                 reviews = [];
+                files = [];
                 els.prHeader.innerHTML = '';
                 els.summaryGrid.style.display = 'none';
                 els.statusLine.style.display = 'none';
+                els.filesStatusLine.style.display = 'none';
+                els.tabNav.style.display = 'none';
                 els.content.innerHTML = '<div class="empty-state">Could not load this pull request.</div>';
+                els.filesContent.innerHTML = '<div class="empty-state">No pull request loaded yet.</div>';
             } finally {
                 setLoading(false);
             }
@@ -2095,6 +2531,30 @@
                 localStorage.setItem(OUTDATED_FILTER_KEY, outdatedFilter);
                 updateOutdatedButton();
                 renderContent();
+            });
+
+            els.tabNav.addEventListener('click', event => {
+                const btn = event.target.closest('.tab-btn');
+                if (btn) setActiveTab(btn.dataset.tab);
+            });
+            els.filesFilterInput.addEventListener('input', renderFilesContent);
+            els.filesViewedFilterButton.addEventListener('click', () => {
+                const order = ['all', 'viewed', 'unviewed'];
+                filesViewedFilter = order[(order.indexOf(filesViewedFilter) + 1) % order.length];
+                localStorage.setItem(FILES_VIEWED_FILTER_KEY, filesViewedFilter);
+                updateFilesViewedButton();
+                renderFilesContent();
+            });
+            els.filesContent.addEventListener('click', event => {
+                // Clicks on the GitHub link or the viewed checkbox act on their own; don't expand.
+                if (event.target.closest('.file-actions')) return;
+                const row = event.target.closest('.file-row');
+                if (row) toggleFileExpanded(row.dataset.filePath);
+            });
+            els.filesContent.addEventListener('change', event => {
+                const check = event.target.closest('.viewed-check-input');
+                if (!check) return;
+                toggleViewed(check.closest('.file-row').dataset.filePath, check);
             });
 
             els.content.addEventListener('click', event => {
