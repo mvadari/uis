@@ -536,14 +536,34 @@
             font-size: 12px;
         }
 
-        .comment-link {
-            color: var(--color-fg-muted);
+        .comment-links {
+            align-items: center;
+            display: inline-flex;
+            gap: 2px;
             margin-left: auto;
-            text-decoration: none;
-            font-size: 12px;
         }
 
-        .comment-link:hover { color: var(--color-accent-fg); }
+        .comment-link-btn {
+            align-items: center;
+            background: none;
+            border: 0;
+            border-radius: 4px;
+            color: var(--color-fg-muted);
+            cursor: pointer;
+            display: inline-flex;
+            justify-content: center;
+            padding: 4px;
+            text-decoration: none;
+        }
+
+        .comment-link-btn:hover {
+            background: var(--color-canvas-subtle);
+            color: var(--color-accent-fg);
+        }
+
+        .comment-link-btn.copied { color: var(--color-success-fg); }
+
+        .comment-link-btn .link-icon { display: block; }
 
         .review-state-tag {
             border-radius: 999px;
@@ -1758,6 +1778,19 @@
             return `<pre class="diff-hunk">${rows.join('')}</pre>`;
         }
 
+        const ICON_LINK = '<svg class="link-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 2 2 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a2 2 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 2 2 0 0 0-2.83 0l-2.5 2.5a2 2 0 0 0 0 2.83Z"></path></svg>';
+        const ICON_EXTERNAL = '<svg class="link-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M3.75 2h3.5a.75.75 0 0 1 0 1.5h-3.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25v-3.5a.75.75 0 0 1 1.5 0v3.5A1.75 1.75 0 0 1 12.25 14h-8.5A1.75 1.75 0 0 1 2 12.25v-8.5C2 2.784 2.784 2 3.75 2Zm6.854-1h4.146a.25.25 0 0 1 .25.25v4.146a.25.25 0 0 1-.427.177L13.03 4.03 9.28 7.78a.751.751 0 0 1-1.06-1.06l3.75-3.75-1.543-1.543A.25.25 0 0 1 10.604 1Z"></path></svg>';
+
+        // A copy-link button plus an external-link icon, shown top-right of each comment/review.
+        function commentLinkActions(url) {
+            const safe = escapeAttribute(url || (prMeta && prMeta.url) || '');
+            return `
+                <span class="comment-links">
+                    <button class="comment-link-btn copy-link-btn" type="button" data-url="${safe}" title="Copy link" aria-label="Copy link">${ICON_LINK}</button>
+                    <a class="comment-link-btn" href="${safe}" target="_blank" rel="noopener noreferrer" title="Open on GitHub" aria-label="Open on GitHub">${ICON_EXTERNAL}</a>
+                </span>`;
+        }
+
         function renderComment(c, badgeHtml = '', isReply = false) {
             const login = c.author && c.author.login ? c.author.login : 'ghost';
             const authorUrl = c.author && c.author.url ? c.author.url : `https://github.com/${login}`;
@@ -1774,7 +1807,7 @@
                         ${replyTag}
                         <span class="comment-time">${escape(formatRelative(c.createdAt))}</span>
                         ${badgeHtml}
-                        <a class="comment-link" href="${escapeAttribute(c.url || prMeta.url)}" target="_blank" rel="noopener noreferrer" title="View on GitHub">↗</a>
+                        ${commentLinkActions(c.url)}
                     </div>
                     <div class="comment-body">${body}</div>
                 </div>`;
@@ -1847,14 +1880,10 @@
                 : renderDiffHunk(first.diffHunk);
 
             const actions = readOnly
-                ? `<div class="thread-buttons">
-                        ${currentCodeBtn}
-                        <a class="btn btn-small" href="${escapeAttribute(first.url || prMeta.url)}" target="_blank" rel="noopener noreferrer">View on GitHub</a>
-                   </div>`
+                ? (currentCodeBtn ? `<div class="thread-buttons">${currentCodeBtn}</div>` : '')
                 : `<textarea class="reply-input" placeholder="Reply to this thread..."></textarea>
                    <div class="thread-buttons">
                         ${currentCodeBtn}
-                        <a class="btn btn-small" href="${escapeAttribute(first.url || prMeta.url)}" target="_blank" rel="noopener noreferrer">GitHub</a>
                         <button class="btn btn-small resolve-btn" type="button">${t.isResolved ? 'Unresolve' : 'Resolve'}</button>
                         <button class="btn btn-small btn-primary reply-btn" type="button">Reply</button>
                    </div>`;
@@ -1954,7 +1983,7 @@
                             <span class="review-state-tag ${st.cls}">${escape(st.label)}</span>
                             <span class="comment-time">${escape(formatRelative(r.createdAt))}</span>
                             ${hiddenBadgeHtml(r)}
-                            <a class="comment-link" href="${escapeAttribute(r.url || prMeta.url)}" target="_blank" rel="noopener noreferrer" title="View on GitHub">↗</a>
+                            ${commentLinkActions(r.url)}
                         </div>
                         <div class="comment-body">${body}</div>
                     </div>
@@ -2189,6 +2218,30 @@
         }
 
         // ---------- Actions ----------
+
+        async function copyLink(url, button) {
+            if (!url) return;
+            try {
+                await navigator.clipboard.writeText(url);
+            } catch {
+                // Clipboard API needs a secure context; fall back to a hidden textarea.
+                const ta = document.createElement('textarea');
+                ta.value = url;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                let ok = false;
+                try { ok = document.execCommand('copy'); } catch {}
+                document.body.removeChild(ta);
+                if (!ok) { showToast('Could not copy link', 'error'); return; }
+            }
+            showToast('Link copied', 'success');
+            if (button) {
+                button.classList.add('copied');
+                setTimeout(() => button.classList.remove('copied'), 1000);
+            }
+        }
 
         async function submitReply(threadId, textarea, button) {
             const body = textarea.value.trim();
@@ -2566,6 +2619,12 @@
             });
 
             els.content.addEventListener('click', event => {
+                const copyBtn = event.target.closest('.copy-link-btn');
+                if (copyBtn) {
+                    copyLink(copyBtn.dataset.url, copyBtn);
+                    return;
+                }
+
                 const noticeTokenBtn = event.target.closest('.notice-token-btn');
                 if (noticeTokenBtn) {
                     openTokenModal();
