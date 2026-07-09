@@ -761,6 +761,12 @@
 
         .tab-panel[hidden] { display: none; }
 
+        .filter-select {
+            width: auto;
+            padding: 4px 8px;
+            font-size: 13px;
+        }
+
         /* Files tab */
         .file-row {
             background: var(--color-canvas-default);
@@ -965,7 +971,11 @@
         <div class="status-line" id="statusLine" style="display:none;">
             <div id="lastUpdated">Last updated: Never</div>
             <div class="status-controls">
-                <button class="btn" id="outdatedFilterButton" type="button">Outdated: all</button>
+                <select class="filter-select" id="outdatedFilterSelect" aria-label="Outdated filter">
+                    <option value="all">Outdated: all</option>
+                    <option value="hide">Outdated: hidden</option>
+                    <option value="only">Outdated: only</option>
+                </select>
                 <button class="btn" id="toggleResolvedButton" type="button">Show resolved</button>
                 <input class="filter-box" type="search" id="filterInput" placeholder="Filter by file, author, or text">
             </div>
@@ -993,7 +1003,11 @@
             <div class="status-line" id="filesStatusLine" style="display:none;">
                 <div id="filesSummary"></div>
                 <div class="status-controls">
-                    <button class="btn" id="filesViewedFilterButton" type="button">Viewed: all</button>
+                    <select class="filter-select" id="filesViewedFilterSelect" aria-label="Viewed filter">
+                        <option value="all">Viewed: all</option>
+                        <option value="viewed">Viewed: only</option>
+                        <option value="unviewed">Viewed: unviewed</option>
+                    </select>
                     <input class="filter-box" type="search" id="filesFilterInput" placeholder="Filter by file path">
                 </div>
             </div>
@@ -1071,7 +1085,7 @@
             reviewCount: document.getElementById('reviewCount'),
             lastUpdated: document.getElementById('lastUpdated'),
             toggleResolvedButton: document.getElementById('toggleResolvedButton'),
-            outdatedFilterButton: document.getElementById('outdatedFilterButton'),
+            outdatedFilterSelect: document.getElementById('outdatedFilterSelect'),
             bulkBar: document.getElementById('bulkBar'),
             bulkCount: document.getElementById('bulkCount'),
             bulkSelectAll: document.getElementById('bulkSelectAll'),
@@ -1091,7 +1105,7 @@
             panelFiles: document.getElementById('panel-files'),
             filesStatusLine: document.getElementById('filesStatusLine'),
             filesSummary: document.getElementById('filesSummary'),
-            filesViewedFilterButton: document.getElementById('filesViewedFilterButton'),
+            filesViewedFilterSelect: document.getElementById('filesViewedFilterSelect'),
             filesFilterInput: document.getElementById('filesFilterInput'),
             filesContent: document.getElementById('filesContent'),
             tokenModal: document.getElementById('tokenModal'),
@@ -2140,11 +2154,9 @@
         }
 
         function updateFilesViewedButton() {
-            const labels = { all: 'Viewed: all', viewed: 'Viewed: only', unviewed: 'Viewed: unviewed' };
-            els.filesViewedFilterButton.textContent = labels[filesViewedFilter] || labels.all;
-            els.filesViewedFilterButton.classList.toggle('filter-active', filesViewedFilter !== 'all');
+            els.filesViewedFilterSelect.value = filesViewedFilter;
             // The viewed filter is meaningless without a token (REST can't report viewed state).
-            els.filesViewedFilterButton.style.display = readOnly ? 'none' : '';
+            els.filesViewedFilterSelect.style.display = readOnly ? 'none' : '';
         }
 
         function updateTabCounts() {
@@ -2483,9 +2495,7 @@
         }
 
         function updateOutdatedButton() {
-            const labels = { all: 'Outdated: all', hide: 'Outdated: hidden', only: 'Outdated: only' };
-            els.outdatedFilterButton.textContent = labels[outdatedFilter] || labels.all;
-            els.outdatedFilterButton.classList.toggle('filter-active', outdatedFilter !== 'all');
+            els.outdatedFilterSelect.value = outdatedFilter;
         }
 
         function updateReadOnlyUI() {
@@ -2527,11 +2537,9 @@
                 updateResolvedButton();
                 renderContent();
             });
-            els.outdatedFilterButton.addEventListener('click', () => {
-                const order = ['all', 'hide', 'only'];
-                outdatedFilter = order[(order.indexOf(outdatedFilter) + 1) % order.length];
+            els.outdatedFilterSelect.addEventListener('change', () => {
+                outdatedFilter = els.outdatedFilterSelect.value;
                 localStorage.setItem(OUTDATED_FILTER_KEY, outdatedFilter);
-                updateOutdatedButton();
                 renderContent();
             });
 
@@ -2540,11 +2548,9 @@
                 if (btn) setActiveTab(btn.dataset.tab);
             });
             els.filesFilterInput.addEventListener('input', renderFilesContent);
-            els.filesViewedFilterButton.addEventListener('click', () => {
-                const order = ['all', 'viewed', 'unviewed'];
-                filesViewedFilter = order[(order.indexOf(filesViewedFilter) + 1) % order.length];
+            els.filesViewedFilterSelect.addEventListener('change', () => {
+                filesViewedFilter = els.filesViewedFilterSelect.value;
                 localStorage.setItem(FILES_VIEWED_FILTER_KEY, filesViewedFilter);
-                updateFilesViewedButton();
                 renderFilesContent();
             });
             els.filesContent.addEventListener('click', event => {
