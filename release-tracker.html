@@ -677,7 +677,7 @@
             <div class="filter-controls">
                 <select id="statusFilter" aria-label="Filter by status">
                     <option value="all">All statuses</option>
-                    <option value="open">Open</option>
+                    <option value="open" selected>Open</option>
                     <option value="draft">Draft</option>
                     <option value="merged">Merged</option>
                     <option value="closed">Closed</option>
@@ -739,7 +739,7 @@
             }
         }
 
-        const FILTER_DEFAULTS = { status: 'all', sort: 'number-desc', q: '' };
+        const FILTER_DEFAULTS = { status: 'open', sort: 'number-desc', q: '' };
 
         function applyFiltersFromURL() {
             const params = new URLSearchParams(window.location.search);
@@ -1166,6 +1166,12 @@
         }
 
         async function enrichPR(pr) {
+            // Merged/closed PRs are done — CI and Copilot freshness are no longer
+            // actionable, so skip those calls. Reviews are kept for approval history.
+            if (pr.merged_at || pr.state === 'closed') {
+                const reviews = await fetchReviews(pr.number);
+                return { ...pr, ciStatus: null, reviews, copilotReview: null };
+            }
             const [ciStatus, reviews, commits] = await Promise.all([
                 fetchCIStatus(pr.head.sha),
                 fetchReviews(pr.number),
@@ -1229,6 +1235,7 @@
         }
 
         function needsAttention(pr) {
+            if (pr.merged_at || pr.state === 'closed') return false;
             return pr.draft ||
                 pr.reviews?.changesRequested?.length > 0 ||
                 pr.copilotReview?.state === 'missing' ||
@@ -1449,6 +1456,7 @@
 
             container.innerHTML = items.map(pr => {
                 const cardState = pr.merged_at ? 'merged' : pr.state === 'open' ? 'open' : 'closed';
+                const isDone = pr.merged_at || pr.state === 'closed';
                 const labels = (pr.labels || []).map(label => `<span class="badge label-badge" style="${labelStyle(label)}">${escape(label.name)}</span>`).join('');
                 const removeButton = `<button class="btn icon-button" title="Remove this PR from the selected GitHub milestone" onclick="removeFromMilestone(${pr.number})">x</button>`;
 
@@ -1482,9 +1490,9 @@
                                 </div>
                                 <div class="pr-badges">
                                     ${renderStateBadge(pr)}
-                                    ${renderCIStatus(pr)}
+                                    ${isDone ? '' : renderCIStatus(pr)}
                                     ${renderApprovals(pr)}
-                                    ${renderCopilotReview(pr)}
+                                    ${isDone ? '' : renderCopilotReview(pr)}
                                     ${labels}
                                 </div>
                             </div>
