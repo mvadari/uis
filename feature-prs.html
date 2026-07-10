@@ -199,6 +199,15 @@
             color: #ffffff;
         }
 
+        .auto-refresh-toggle {
+            align-items: center;
+            color: var(--color-fg-muted);
+            display: inline-flex;
+            font-size: 13px;
+            gap: 5px;
+            white-space: nowrap;
+        }
+
         .error-banner {
             background: var(--color-danger-subtle);
             border: 1px solid rgba(209, 36, 47, 0.35);
@@ -637,6 +646,7 @@
             <div id="lastUpdated">Last updated: Never</div>
             <div class="status-controls">
                 <button class="btn" id="myPrsButton" type="button">My PRs</button>
+                <label class="auto-refresh-toggle" title="Automatically reload every 5 minutes"><input type="checkbox" id="autoRefresh"> Auto-refresh</label>
                 <input class="filter-box" type="search" id="filterInput" placeholder="Filter by PR, author, or reviewer">
             </div>
         </div>
@@ -693,12 +703,16 @@
         const STATE_KEY = 'base_branch_prs_state';
         const CACHE_KEY = 'feature_prs_cache';
         const MY_FILTER_KEY = 'feature_prs_my_filter';
+        const AUTO_REFRESH_KEY = 'feature_prs_auto_refresh';
+        const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000;
         const API_BASE = 'https://api.github.com';
 
         let pullRequests = [];
         let loading = false;
         let viewerLogin = '';
         let showOnlyMine = localStorage.getItem(MY_FILTER_KEY) === 'true';
+        let autoRefresh = localStorage.getItem(AUTO_REFRESH_KEY) !== 'false';
+        let autoRefreshTimer = null;
         let lastSeenToken = '';
 
         const els = {
@@ -728,6 +742,7 @@
             changesCount: document.getElementById('changesCount'),
             lastUpdated: document.getElementById('lastUpdated'),
             myPrsButton: document.getElementById('myPrsButton'),
+            autoRefresh: document.getElementById('autoRefresh'),
             filterInput: document.getElementById('filterInput'),
             errorBanner: document.getElementById('errorBanner'),
             prList: document.getElementById('prList')
@@ -1529,6 +1544,15 @@
             return Boolean(parseRepo(els.repoInput.value) && els.branchInput.value.trim());
         }
 
+        function setupAutoRefresh() {
+            if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+            if (autoRefresh) {
+                autoRefreshTimer = setInterval(() => {
+                    if (hasLoadableInputs()) loadPRs();
+                }, AUTO_REFRESH_INTERVAL);
+            }
+        }
+
         function init() {
             els.repoInput.value = localStorage.getItem(REPO_KEY) || 'XRPLF/rippled';
             els.branchInput.value = localStorage.getItem(BRANCH_KEY) || '';
@@ -1542,6 +1566,12 @@
                 loadPRs();
             });
             els.refreshButton.addEventListener('click', loadPRs);
+            els.autoRefresh.checked = autoRefresh;
+            els.autoRefresh.addEventListener('change', () => {
+                autoRefresh = els.autoRefresh.checked;
+                localStorage.setItem(AUTO_REFRESH_KEY, String(autoRefresh));
+                setupAutoRefresh();
+            });
             els.myPrsButton.addEventListener('click', toggleMyPRsFilter);
             els.filterInput.addEventListener('input', renderPRs);
             els.prList.addEventListener('click', event => {
@@ -1571,6 +1601,7 @@
             });
 
             if (hasLoadableInputs()) loadPRs();
+            setupAutoRefresh();
         }
 
         init();

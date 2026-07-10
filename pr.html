@@ -261,6 +261,15 @@
             justify-content: flex-end;
         }
 
+        .auto-refresh-toggle {
+            align-items: center;
+            color: var(--color-fg-muted);
+            display: inline-flex;
+            font-size: 13px;
+            gap: 5px;
+            white-space: nowrap;
+        }
+
         .btn.filter-active {
             background: var(--color-accent-fg);
             border-color: var(--color-accent-fg);
@@ -1032,6 +1041,7 @@
                     <option value="only">Outdated: only</option>
                 </select>
                 <button class="btn" id="toggleResolvedButton" type="button">Show resolved</button>
+                <label class="auto-refresh-toggle" title="Automatically reload this PR every 5 minutes"><input type="checkbox" id="autoRefresh"> Auto-refresh</label>
                 <input class="filter-box" type="search" id="filterInput" placeholder="Filter by file, author, or text">
             </div>
         </div>
@@ -1108,6 +1118,8 @@
 
         const FILES_VIEWED_FILTER_KEY = 'pr_review_files_viewed_filter';
         const ACTIVE_TAB_KEY = 'pr_review_active_tab';
+        const AUTO_REFRESH_KEY = 'pr_review_auto_refresh';
+        const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000;
 
         let prMeta = null;
         let threads = [];
@@ -1120,6 +1132,8 @@
         let filesViewedFilter = localStorage.getItem(FILES_VIEWED_FILTER_KEY) || 'all'; // 'all' | 'viewed' | 'unviewed'
         let showResolved = localStorage.getItem(SHOW_RESOLVED_KEY) === 'true';
         let outdatedFilter = localStorage.getItem(OUTDATED_FILTER_KEY) || 'all'; // 'all' | 'hide' | 'only'
+        let autoRefresh = localStorage.getItem(AUTO_REFRESH_KEY) !== 'false';
+        let autoRefreshTimer = null;
         let selectedIds = new Set();
         const REST_BASE = 'https://api.github.com';
 
@@ -1140,6 +1154,7 @@
             reviewCount: document.getElementById('reviewCount'),
             lastUpdated: document.getElementById('lastUpdated'),
             toggleResolvedButton: document.getElementById('toggleResolvedButton'),
+            autoRefresh: document.getElementById('autoRefresh'),
             outdatedFilterSelect: document.getElementById('outdatedFilterSelect'),
             bulkBar: document.getElementById('bulkBar'),
             bulkCount: document.getElementById('bulkCount'),
@@ -2632,6 +2647,12 @@
                 loadPR();
             });
             els.refreshButton.addEventListener('click', loadPR);
+            els.autoRefresh.checked = autoRefresh;
+            els.autoRefresh.addEventListener('change', () => {
+                autoRefresh = els.autoRefresh.checked;
+                localStorage.setItem(AUTO_REFRESH_KEY, String(autoRefresh));
+                setupAutoRefresh();
+            });
             els.prInput.addEventListener('input', updateQueryPreview);
             els.filterInput.addEventListener('input', renderContent);
             els.toggleResolvedButton.addEventListener('click', () => {
@@ -2760,6 +2781,16 @@
             });
 
             if (initial && parsePRInput(initial)) loadPR();
+            setupAutoRefresh();
+        }
+
+        function setupAutoRefresh() {
+            if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+            if (autoRefresh) {
+                autoRefreshTimer = setInterval(() => {
+                    if (prMeta && parsePRInput(els.prInput.value)) loadPR();
+                }, AUTO_REFRESH_INTERVAL);
+            }
         }
 
         init();

@@ -792,6 +792,7 @@
                 <span style="color: var(--color-fg-muted); font-size: 13px; margin-right: 4px;">Filter by label:</span>
                 <button class="label-filter" data-label="Amendment">🔧 Amendment</button>
                 <button class="label-filter" data-label="API Change">⚡ API Change</button>
+                <label style="display:inline-flex;align-items:center;gap:5px;font-size:13px;color:var(--color-fg-muted);margin-left:auto;white-space:nowrap;" title="Automatically reload every 5 minutes"><input type="checkbox" id="autoRefresh"> Auto-refresh every 5 min</label>
             </div>
         </div>
 
@@ -841,6 +842,10 @@
         let currentLabel = '';
         let isLoading = false;
         let hasMore = true;
+        const AUTO_REFRESH_KEY = 'xrpld_auto_refresh';
+        const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000;
+        let autoRefresh = localStorage.getItem(AUTO_REFRESH_KEY) !== 'false';
+        let autoRefreshTimer = null;
 
         // Friendly status info
         const statusInfo = {
@@ -1463,9 +1468,38 @@
             if (e.key === 'Escape') closeModal();
         });
 
+        // Re-run whichever view is currently active (search, label filter, or list)
+        function refreshCurrentView() {
+            if (searchQuery) {
+                performSearch(searchQuery);
+            } else if (currentLabel) {
+                performLabelFilter(currentLabel);
+            } else {
+                currentPage = 1;
+                fetchPRs(currentState, 1, false);
+            }
+            updateStats();
+        }
+
+        function setupAutoRefresh() {
+            if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+            if (autoRefresh) {
+                autoRefreshTimer = setInterval(refreshCurrentView, AUTO_REFRESH_INTERVAL);
+            }
+        }
+
+        const autoRefreshCheckbox = document.getElementById('autoRefresh');
+        autoRefreshCheckbox.checked = autoRefresh;
+        autoRefreshCheckbox.addEventListener('change', () => {
+            autoRefresh = autoRefreshCheckbox.checked;
+            localStorage.setItem(AUTO_REFRESH_KEY, String(autoRefresh));
+            setupAutoRefresh();
+        });
+
         // Initial load
         fetchPRs('open', 1);
         updateStats();
+        setupAutoRefresh();
     </script>
 </body>
 </html>
