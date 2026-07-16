@@ -2328,7 +2328,6 @@
                             <option value="">All milestones</option>
                         </select>
                     </div>
-                    <button id="updateAllBtn" style="display: none;">Update All Branches</button>
                 </div>
 
                 <div id="error"></div>
@@ -2840,164 +2839,6 @@
                     button.textContent = '🔄 Update';
                 }
             }
-        }
-
-        // Update button visibility based on whether there are branches to update
-        async function updateButtonVisibility() {
-            const button = document.getElementById('updateAllBtn');
-            if (!button) return;
-
-            const token = getStoredToken();
-            if (!token || allPRs.length === 0) {
-                button.style.display = 'none';
-                return;
-            }
-
-            // Get current user if not cached
-            if (!currentUser) {
-                try {
-                    const userResponse = await fetch('https://api.github.com/user', {
-                        headers: {
-                            'Authorization': `token ${token}`,
-                            'Accept': 'application/vnd.github.v3+json'
-                        }
-                    });
-                    const userData = await userResponse.json();
-                    currentUser = userData.login;
-                } catch (error) {
-                    button.style.display = 'none';
-                    return;
-                }
-            }
-
-            // Check if there are any PRs that need updating
-            const prsToUpdate = allPRs.filter(pr => {
-                const isAuthor = pr.user.login === currentUser;
-                const isAssignee = pr.assignees && pr.assignees.some(a => a.login === currentUser);
-                const isOwnedOrAssigned = isAuthor || isAssignee;
-
-                return pr.mergeable_state === 'behind' &&
-                       pr.mergeable !== false &&
-                       isOwnedOrAssigned;
-            });
-
-            button.style.display = prsToUpdate.length > 0 ? 'inline-block' : 'none';
-        }
-
-        // Update all branches that need updating
-        window.updateAllBranches = async function() {
-            const token = getStoredToken();
-            if (!token) {
-                showNotification('GitHub token is required to update branches', 'error');
-                return;
-            }
-
-            // Get current user if not cached
-            if (!currentUser) {
-                try {
-                    const userResponse = await fetch('https://api.github.com/user', {
-                        headers: {
-                            'Authorization': `token ${token}`,
-                            'Accept': 'application/vnd.github.v3+json'
-                        }
-                    });
-                    const userData = await userResponse.json();
-                    currentUser = userData.login;
-                } catch (error) {
-                    showNotification('Failed to get current user', 'error');
-                    return;
-                }
-            }
-
-            // Filter PRs that need updating:
-            // 1. Behind (mergeable_state === 'behind')
-            // 2. No conflicts (mergeable !== false)
-            // 3. Owned by or assigned to current user (not just reviewing)
-            const prsToUpdate = allPRs.filter(pr => {
-                const isAuthor = pr.user.login === currentUser;
-                const isAssignee = pr.assignees && pr.assignees.some(a => a.login === currentUser);
-                const isOwnedOrAssigned = isAuthor || isAssignee;
-
-                return pr.mergeable_state === 'behind' &&
-                       pr.mergeable !== false &&
-                       isOwnedOrAssigned;
-            });
-
-            if (prsToUpdate.length === 0) {
-                showNotification('No branches need updating', 'info');
-                return;
-            }
-
-            const button = document.getElementById('updateAllBtn');
-            const originalText = button.textContent;
-            button.disabled = true;
-            button.textContent = `Updating ${prsToUpdate.length} PR(s)...`;
-
-            let successfulPRs = [];
-            let failedPRs = [];
-
-            for (const pr of prsToUpdate) {
-                const urlParts = pr.repository_url.split('/');
-                const owner = urlParts[urlParts.length - 2];
-                const repo = urlParts[urlParts.length - 1];
-                const repoName = `${owner}/${repo}`;
-
-                try {
-                    const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/pulls/${pr.number}/update-branch`, {
-                        method: 'PUT',
-                        headers: {
-                            'Authorization': `token ${token}`,
-                            'Accept': 'application/vnd.github.v3+json'
-                        }
-                    });
-
-                    if (response.status === 202) {
-                        successfulPRs.push({ title: pr.title, number: pr.number, repo: repoName });
-                        // Optimistically update the PR's mergeable_state
-                        pr.mergeable_state = 'clean';
-                    } else {
-                        failedPRs.push({ title: pr.title, number: pr.number, repo: repoName });
-                        console.error(`Failed to update PR #${pr.number}:`, await response.text());
-                    }
-
-                    // Small delay between requests to avoid rate limiting
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                } catch (error) {
-                    failedPRs.push({ title: pr.title, number: pr.number, repo: repoName });
-                    console.error(`Error updating PR #${pr.number}:`, error);
-                }
-            }
-
-            // Update cache and re-render
-            localStorage.setItem(CACHE_KEY, JSON.stringify(allPRs));
-            renderPRs();
-
-            // Reset button
-            button.disabled = false;
-            button.textContent = originalText;
-
-            // Build detailed notification message
-            let message = '';
-            let type = 'info';
-
-            if (successfulPRs.length > 0 && failedPRs.length === 0) {
-                type = 'success';
-                message = `<strong>Successfully updated ${successfulPRs.length} branch(es):</strong><br>`;
-                message += successfulPRs.map(pr => `• ${pr.repo}#${pr.number}: ${pr.title}`).join('<br>');
-            } else if (successfulPRs.length > 0 && failedPRs.length > 0) {
-                type = 'info';
-                message = `<strong>Updated ${successfulPRs.length} branch(es), ${failedPRs.length} failed:</strong><br>`;
-                message += '<strong>✓ Successful:</strong><br>';
-                message += successfulPRs.map(pr => `• ${pr.repo}#${pr.number}: ${pr.title}`).join('<br>');
-                message += '<br><strong>✗ Failed:</strong><br>';
-                message += failedPRs.map(pr => `• ${pr.repo}#${pr.number}: ${pr.title}`).join('<br>');
-            } else {
-                type = 'error';
-                message = `<strong>Failed to update all branches:</strong><br>`;
-                message += failedPRs.map(pr => `• ${pr.repo}#${pr.number}: ${pr.title}`).join('<br>');
-            }
-
-            showNotification(message, type, true);
         }
 
         let currentNotePRId = null;
@@ -3806,12 +3647,17 @@
 
             const labelEl = btn.querySelector('.multiselect-btn-label') || btn;
 
-            if (currentQueryFilters.size === 0) {
+            const querySettings = getQuerySettings();
+            const enabledQueries = querySettings.filter(q => q.enabled && q.query.trim());
+
+            // Empty selection means "no filter" (show all); a full selection is
+            // equivalent, so label both as "All queries".
+            if (currentQueryFilters.size === 0 ||
+                (enabledQueries.length > 0 && currentQueryFilters.size === enabledQueries.length)) {
                 labelEl.textContent = 'All queries';
                 return;
             }
 
-            const querySettings = getQuerySettings();
             const selectedNames = Array.from(currentQueryFilters)
                 .map(id => querySettings.find(q => q.id === id))
                 .filter(Boolean)
@@ -4118,9 +3964,6 @@
 
             // Setup scroll indicator
             setupScrollIndicator();
-
-            // Update button visibility
-            updateButtonVisibility();
         }
 
         // Setup scroll indicator
@@ -5143,7 +4986,6 @@
 
         // Event listeners
         document.getElementById('loadBtn').addEventListener('click', () => fetchPRs(false));
-        document.getElementById('updateAllBtn').addEventListener('click', updateAllBranches);
 
         // Welcome modal event listeners
         document.getElementById('welcomeSetupBtn').addEventListener('click', () => {
