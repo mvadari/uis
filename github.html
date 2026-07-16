@@ -720,6 +720,10 @@
         }
 
         .multiselect-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
             background-color: #f6f8fa;
             color: #24292f;
             border: 1px solid #d0d7de;
@@ -728,14 +732,52 @@
             font-size: 12px;
             cursor: pointer;
             max-width: 220px;
+            white-space: nowrap;
+        }
+
+        .multiselect-btn .multiselect-btn-label {
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
         }
 
+        .multiselect-btn::after {
+            content: '▾';
+            font-size: 10px;
+            line-height: 1;
+            color: #57606a;
+            flex-shrink: 0;
+        }
+
         .multiselect-btn:focus,
         .multiselect-btn.open {
             outline: none;
+            border-color: #0969da;
+        }
+
+        .multiselect-btn.open::after {
+            transform: rotate(180deg);
+        }
+
+        .multiselect-actions {
+            display: flex;
+            gap: 4px;
+            padding: 2px;
+        }
+
+        .multiselect-action {
+            flex: 1;
+            background-color: #f6f8fa;
+            color: #24292f;
+            border: 1px solid #d0d7de;
+            padding: 4px 6px;
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+
+        .multiselect-action:hover {
+            background-color: #eaeef2;
             border-color: #0969da;
         }
 
@@ -2276,7 +2318,7 @@
                     <div class="repo-filter">
                         <label id="queryFilterLabel">Filter by query:</label>
                         <div class="multiselect" id="queryFilterMultiselect">
-                            <button type="button" class="multiselect-btn" id="queryFilterBtn" aria-haspopup="true" aria-expanded="false">All queries</button>
+                            <button type="button" class="multiselect-btn" id="queryFilterBtn" aria-haspopup="true" aria-expanded="false"><span class="multiselect-btn-label">All queries</span></button>
                             <div class="multiselect-panel" id="queryFilterPanel"></div>
                         </div>
                     </div>
@@ -3738,12 +3780,20 @@
             if (enabledQueries.length === 0) {
                 panel.innerHTML = '<div class="multiselect-empty">No queries configured</div>';
             } else {
-                panel.innerHTML = enabledQueries.map(query => `
+                const optionsHtml = enabledQueries.map(query => `
                     <label class="multiselect-option">
                         <input type="checkbox" data-query-id="${query.id}" ${currentQueryFilters.has(query.id) ? 'checked' : ''}>
                         <span>${escapeHtml(query.name)}</span>
                     </label>
                 `).join('');
+                panel.innerHTML = `
+                    <div class="multiselect-actions">
+                        <button type="button" class="multiselect-action" data-action="select-all">Select all</button>
+                        <button type="button" class="multiselect-action" data-action="deselect-all">Deselect all</button>
+                    </div>
+                    <div class="multiselect-divider"></div>
+                    ${optionsHtml}
+                `;
             }
 
             updateQueryFilterButtonLabel();
@@ -3754,8 +3804,10 @@
             const btn = document.getElementById('queryFilterBtn');
             if (!btn) return;
 
+            const labelEl = btn.querySelector('.multiselect-btn-label') || btn;
+
             if (currentQueryFilters.size === 0) {
-                btn.textContent = 'All queries';
+                labelEl.textContent = 'All queries';
                 return;
             }
 
@@ -3765,7 +3817,7 @@
                 .filter(Boolean)
                 .map(q => q.name);
 
-            btn.textContent = selectedNames.length === 1
+            labelEl.textContent = selectedNames.length === 1
                 ? selectedNames[0]
                 : `${selectedNames.length} queries selected`;
         }
@@ -3786,6 +3838,21 @@
             panel.addEventListener('click', (e) => {
                 // Keep the panel open while checking/unchecking options
                 e.stopPropagation();
+
+                const actionBtn = e.target.closest('.multiselect-action');
+                if (!actionBtn) return;
+
+                const querySettings = getQuerySettings();
+                const enabledQueries = querySettings.filter(q => q.enabled && q.query.trim());
+
+                if (actionBtn.dataset.action === 'select-all') {
+                    enabledQueries.forEach(q => currentQueryFilters.add(q.id));
+                } else if (actionBtn.dataset.action === 'deselect-all') {
+                    currentQueryFilters.clear();
+                }
+
+                populateQueryFilter(); // re-render checkboxes to reflect the change
+                renderPRs();
             });
 
             panel.addEventListener('change', (e) => {
@@ -3935,6 +4002,12 @@
             if (showOnlyFlagged) {
                 filteredPRs = filteredPRs.filter(pr => isPRFlagged(pr.id));
             }
+
+            // Update total PR count: show "shown/total" when any filter is trimming the list
+            document.getElementById('totalPRCount').textContent =
+                filteredPRs.length === allPRs.length
+                    ? allPRs.length
+                    : `${filteredPRs.length}/${allPRs.length}`;
 
             // Kanban view - always show all columns
             const columns = {};
