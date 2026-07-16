@@ -29,8 +29,8 @@ const GitHubAPI = {
             token = localStorage.getItem('github_token');
         }
         return {
-            'Authorization': `token ${token}`,
-            'Accept': 'application/vnd.github.v3+json'
+            Authorization: `token ${token}`,
+            Accept: 'application/vnd.github.v3+json',
         };
     },
 
@@ -38,7 +38,7 @@ const GitHubAPI = {
     async validateToken(token) {
         try {
             const response = await fetch('https://api.github.com/user', {
-                headers: this.getAuthHeaders(token)
+                headers: this.getAuthHeaders(token),
             });
             return response.ok;
         } catch (error) {
@@ -51,7 +51,7 @@ const GitHubAPI = {
     async getRateLimit(token) {
         try {
             const response = await fetch('https://api.github.com/rate_limit', {
-                headers: this.getAuthHeaders(token)
+                headers: this.getAuthHeaders(token),
             });
             if (response.ok) {
                 return await response.json();
@@ -67,13 +67,13 @@ const GitHubAPI = {
         const token = localStorage.getItem('github_token');
         const headers = {
             ...this.getAuthHeaders(token),
-            ...options.headers
+            ...options.headers,
         };
 
         try {
             const response = await fetch(url, {
                 ...options,
-                headers
+                headers,
             });
 
             if (!response.ok) {
@@ -86,7 +86,7 @@ const GitHubAPI = {
             console.error('GitHub API request error:', error);
             throw error;
         }
-    }
+    },
 };
 
 // ============================================
@@ -95,14 +95,14 @@ const GitHubAPI = {
 
 function timeAgo(date) {
     const seconds = Math.floor((new Date() - new Date(date)) / 1000);
-    
+
     const intervals = {
         year: 31536000,
         month: 2592000,
         week: 604800,
         day: 86400,
         hour: 3600,
-        minute: 60
+        minute: 60,
     };
 
     for (const [unit, secondsInUnit] of Object.entries(intervals)) {
@@ -120,14 +120,14 @@ function formatDate(date, includeTime = false) {
     const options = {
         year: 'numeric',
         month: 'short',
-        day: 'numeric'
+        day: 'numeric',
     };
-    
+
     if (includeTime) {
         options.hour = '2-digit';
         options.minute = '2-digit';
     }
-    
+
     return d.toLocaleDateString('en-US', options);
 }
 
@@ -190,7 +190,7 @@ const Storage = {
             console.error('Error clearing storage:', error);
             return false;
         }
-    }
+    },
 };
 
 // ============================================
@@ -221,11 +221,11 @@ const Modal = {
     },
 
     closeAll() {
-        document.querySelectorAll('.modal.active').forEach(modal => {
+        document.querySelectorAll('.modal.active').forEach((modal) => {
             modal.classList.remove('active');
         });
         document.body.style.overflow = '';
-    }
+    },
 };
 
 // Close modal when clicking outside
@@ -307,4 +307,3 @@ function formatBytes(bytes, decimals = 2) {
 
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
-

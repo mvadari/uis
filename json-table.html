@@ -1,1029 +1,1066 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JSON Table Viewer</title>
-    <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="stylesheet" href="shared-styles.css">
-    <style>
-        body {
-            background-color: #f6f8fa;
-            color: #1f2328;
-            min-height: 100vh;
-        }
-
-        .container {
-            max-width: 1440px;
-            margin: 0 auto;
-            padding: 16px;
-        }
-
-        .header {
-            background-color: #ffffff;
-            border: 1px solid #d0d7de;
-            border-radius: 6px;
-            padding: 14px 16px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 16px;
-        }
-
-        .title-block {
-            min-width: 0;
-        }
-
-        .header-title {
-            font-size: 20px;
-            font-weight: 600;
-            color: #1f2328;
-            line-height: 1.2;
-        }
-
-        .header-subtitle {
-            font-size: 13px;
-            color: #656d76;
-            margin-top: 2px;
-        }
-
-        .header-controls {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-            justify-content: flex-end;
-        }
-
-        .panel {
-            background-color: #ffffff;
-            border: 1px solid #d0d7de;
-            border-radius: 6px;
-            margin-top: 12px;
-            padding: 14px 16px;
-        }
-
-        .workspace {
-            display: grid;
-            grid-template-columns: minmax(320px, 460px) minmax(0, 1fr);
-            gap: 12px;
-            align-items: start;
-        }
-
-        .workspace > section {
-            min-width: 0;
-        }
-
-        .input-panel {
-            position: sticky;
-            top: 16px;
-        }
-
-        .field-label-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            margin-bottom: 6px;
-        }
-
-        .field-label-row .form-label {
-            margin-bottom: 0;
-        }
-
-        .hint {
-            font-size: 12px;
-            color: #656d76;
-        }
-
-        textarea {
-            min-height: 420px;
-            resize: vertical;
-            font-family: ui-monospace, SFMono-Regular, SFMono, Consolas, "Liberation Mono", Menlo, monospace;
-            line-height: 1.45;
-            white-space: pre;
-            overflow-wrap: normal;
-            overflow-x: auto;
-        }
-
-        .actions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 10px;
-        }
-
-        .file-input {
-            margin-top: 10px;
-        }
-
-        .file-input input {
-            font-size: 13px;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(120px, 1fr));
-            gap: 10px;
-        }
-
-        .stat {
-            border: 1px solid #d0d7de;
-            border-radius: 6px;
-            padding: 10px 12px;
-            background-color: #ffffff;
-            min-width: 0;
-        }
-
-        .stat-label {
-            font-size: 12px;
-            color: #656d76;
-        }
-
-        .stat-value {
-            margin-top: 3px;
-            color: #1f2328;
-            font-size: 22px;
-            font-weight: 600;
-            line-height: 1.15;
-            overflow-wrap: anywhere;
-        }
-
-        .status-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            align-items: center;
-            margin-top: 12px;
-        }
-
-        .schema-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 10px;
-            border-radius: 999px;
-            font-size: 12px;
-            font-weight: 600;
-        }
-
-        .schema-badge.valid {
-            background-color: #dafbe1;
-            color: #1a7f37;
-        }
-
-        .schema-badge.warning {
-            background-color: #fff8c5;
-            color: #7d4e00;
-        }
-
-        .schema-badge.error {
-            background-color: #ffebe9;
-            color: #d1242f;
-        }
-
-        .message-list {
-            margin-top: 12px;
-            display: grid;
-            gap: 8px;
-        }
-
-        .message {
-            border: 1px solid #d0d7de;
-            border-left-width: 4px;
-            border-radius: 6px;
-            padding: 10px 12px;
-            background-color: #ffffff;
-            font-size: 13px;
-        }
-
-        .message strong {
-            display: block;
-            margin-bottom: 2px;
-            color: #1f2328;
-        }
-
-        .message.error {
-            border-left-color: #d1242f;
-        }
-
-        .message.warning {
-            border-left-color: #bf8700;
-        }
-
-        .message.info {
-            border-left-color: #0969da;
-        }
-
-        .key-chip {
-            background-color: #f6f8fa;
-            border: 1px solid #d0d7de;
-            border-radius: 4px;
-            padding: 1px 5px;
-            color: #1f2328;
-            font-family: ui-monospace, SFMono-Regular, SFMono, Consolas, "Liberation Mono", Menlo, monospace;
-            font-size: 12px;
-        }
-
-        .table-toolbar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-
-        .table-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: #1f2328;
-        }
-
-        .table-actions {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        .table-wrap {
-            border: 1px solid #d0d7de;
-            border-radius: 6px;
-            overflow: auto;
-            margin-top: 12px;
-            max-height: 68vh;
-            background-color: #ffffff;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 13px;
-        }
-
-        th,
-        td {
-            border-bottom: 1px solid #d0d7de;
-            border-right: 1px solid #d0d7de;
-            padding: 8px 10px;
-            text-align: left;
-            vertical-align: top;
-            min-width: 140px;
-            max-width: 360px;
-        }
-
-        th:last-child,
-        td:last-child {
-            border-right: 0;
-        }
-
-        tr:last-child td {
-            border-bottom: 0;
-        }
-
-        th {
-            position: sticky;
-            top: 0;
-            z-index: 2;
-            background-color: #f6f8fa;
-            color: #1f2328;
-            font-weight: 600;
-        }
-
-        .row-number {
-            min-width: 72px;
-            width: 72px;
-            color: #656d76;
-            text-align: right;
-            font-variant-numeric: tabular-nums;
-        }
-
-        .cell-value {
-            overflow-wrap: anywhere;
-            white-space: pre-wrap;
-        }
-
-        .cell-empty {
-            color: #8c959f;
-            font-style: italic;
-        }
-
-        .cell-object {
-            font-family: ui-monospace, SFMono-Regular, SFMono, Consolas, "Liberation Mono", Menlo, monospace;
-            font-size: 12px;
-        }
-
-        .empty-state {
-            border: 1px dashed #d0d7de;
-            border-radius: 6px;
-            padding: 36px 18px;
-            text-align: center;
-            color: #656d76;
-            background-color: #ffffff;
-        }
-
-        .issues-table {
-            width: 100%;
-            margin-top: 10px;
-        }
-
-        .issues-table th,
-        .issues-table td {
-            min-width: 100px;
-            max-width: 520px;
-        }
-
-        .key-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 4px;
-        }
-
-        @media (max-width: 960px) {
-            .workspace {
-                grid-template-columns: 1fr;
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>JSON Table Viewer</title>
+        <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+        <link rel="stylesheet" href="shared-styles.css" />
+        <style>
+            body {
+                background-color: #f6f8fa;
+                color: #1f2328;
+                min-height: 100vh;
             }
 
-            .input-panel {
-                position: static;
-            }
-
-            textarea {
-                min-height: 300px;
-            }
-
-            .stats-grid {
-                grid-template-columns: repeat(2, minmax(120px, 1fr));
-            }
-        }
-
-        @media (max-width: 640px) {
             .container {
-                padding: 10px;
+                max-width: 1440px;
+                margin: 0 auto;
+                padding: 16px;
             }
 
             .header {
-                align-items: flex-start;
-                flex-direction: column;
+                background-color: #ffffff;
+                border: 1px solid #d0d7de;
+                border-radius: 6px;
+                padding: 14px 16px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 16px;
+            }
+
+            .title-block {
+                min-width: 0;
+            }
+
+            .header-title {
+                font-size: 20px;
+                font-weight: 600;
+                color: #1f2328;
+                line-height: 1.2;
+            }
+
+            .header-subtitle {
+                font-size: 13px;
+                color: #656d76;
+                margin-top: 2px;
             }
 
             .header-controls {
-                justify-content: flex-start;
-                width: 100%;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                flex-wrap: wrap;
+                justify-content: flex-end;
+            }
+
+            .panel {
+                background-color: #ffffff;
+                border: 1px solid #d0d7de;
+                border-radius: 6px;
+                margin-top: 12px;
+                padding: 14px 16px;
+            }
+
+            .workspace {
+                display: grid;
+                grid-template-columns: minmax(320px, 460px) minmax(0, 1fr);
+                gap: 12px;
+                align-items: start;
+            }
+
+            .workspace > section {
+                min-width: 0;
+            }
+
+            .input-panel {
+                position: sticky;
+                top: 16px;
+            }
+
+            .field-label-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                margin-bottom: 6px;
+            }
+
+            .field-label-row .form-label {
+                margin-bottom: 0;
+            }
+
+            .hint {
+                font-size: 12px;
+                color: #656d76;
+            }
+
+            textarea {
+                min-height: 420px;
+                resize: vertical;
+                font-family:
+                    ui-monospace, SFMono-Regular, SFMono, Consolas, 'Liberation Mono', Menlo,
+                    monospace;
+                line-height: 1.45;
+                white-space: pre;
+                overflow-wrap: normal;
+                overflow-x: auto;
+            }
+
+            .actions {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                margin-top: 10px;
+            }
+
+            .file-input {
+                margin-top: 10px;
+            }
+
+            .file-input input {
+                font-size: 13px;
             }
 
             .stats-grid {
-                grid-template-columns: 1fr;
+                display: grid;
+                grid-template-columns: repeat(4, minmax(120px, 1fr));
+                gap: 10px;
             }
 
-            .btn {
-                justify-content: center;
-            }
-        }
-
-        @media (prefers-color-scheme: dark) {
-            body {
-                background-color: #0d1117;
-                color: #e6edf3;
+            .stat {
+                border: 1px solid #d0d7de;
+                border-radius: 6px;
+                padding: 10px 12px;
+                background-color: #ffffff;
+                min-width: 0;
             }
 
-            .header,
-            .panel,
-            .stat,
-            .message,
-            .table-wrap,
-            .empty-state {
-                background-color: #161b22;
-                border-color: #30363d;
+            .stat-label {
+                font-size: 12px;
+                color: #656d76;
             }
 
-            .header-title,
-            .stat-value,
-            .message strong,
-            .table-title,
-            th,
+            .stat-value {
+                margin-top: 3px;
+                color: #1f2328;
+                font-size: 22px;
+                font-weight: 600;
+                line-height: 1.15;
+                overflow-wrap: anywhere;
+            }
+
+            .status-row {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                align-items: center;
+                margin-top: 12px;
+            }
+
+            .schema-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                padding: 4px 10px;
+                border-radius: 999px;
+                font-size: 12px;
+                font-weight: 600;
+            }
+
+            .schema-badge.valid {
+                background-color: #dafbe1;
+                color: #1a7f37;
+            }
+
+            .schema-badge.warning {
+                background-color: #fff8c5;
+                color: #7d4e00;
+            }
+
+            .schema-badge.error {
+                background-color: #ffebe9;
+                color: #d1242f;
+            }
+
+            .message-list {
+                margin-top: 12px;
+                display: grid;
+                gap: 8px;
+            }
+
+            .message {
+                border: 1px solid #d0d7de;
+                border-left-width: 4px;
+                border-radius: 6px;
+                padding: 10px 12px;
+                background-color: #ffffff;
+                font-size: 13px;
+            }
+
+            .message strong {
+                display: block;
+                margin-bottom: 2px;
+                color: #1f2328;
+            }
+
+            .message.error {
+                border-left-color: #d1242f;
+            }
+
+            .message.warning {
+                border-left-color: #bf8700;
+            }
+
+            .message.info {
+                border-left-color: #0969da;
+            }
+
             .key-chip {
-                color: #e6edf3;
+                background-color: #f6f8fa;
+                border: 1px solid #d0d7de;
+                border-radius: 4px;
+                padding: 1px 5px;
+                color: #1f2328;
+                font-family:
+                    ui-monospace, SFMono-Regular, SFMono, Consolas, 'Liberation Mono', Menlo,
+                    monospace;
+                font-size: 12px;
             }
 
-            .header-subtitle,
-            .hint,
-            .stat-label,
-            .empty-state,
-            .row-number {
-                color: #8b949e;
+            .table-toolbar {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                flex-wrap: wrap;
             }
 
-            .key-chip,
-            th {
-                background-color: #21262d;
-                border-color: #30363d;
+            .table-title {
+                font-size: 16px;
+                font-weight: 600;
+                color: #1f2328;
+            }
+
+            .table-actions {
+                display: flex;
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+
+            .table-wrap {
+                border: 1px solid #d0d7de;
+                border-radius: 6px;
+                overflow: auto;
+                margin-top: 12px;
+                max-height: 68vh;
+                background-color: #ffffff;
+            }
+
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 13px;
             }
 
             th,
             td {
-                border-color: #30363d;
+                border-bottom: 1px solid #d0d7de;
+                border-right: 1px solid #d0d7de;
+                padding: 8px 10px;
+                text-align: left;
+                vertical-align: top;
+                min-width: 140px;
+                max-width: 360px;
             }
 
-            .schema-badge.valid {
-                background-color: #1a4426;
-                color: #3fb950;
+            th:last-child,
+            td:last-child {
+                border-right: 0;
             }
 
-            .schema-badge.warning {
-                background-color: #3d2d00;
-                color: #e3b341;
+            tr:last-child td {
+                border-bottom: 0;
             }
 
-            .schema-badge.error {
-                background-color: #3d1c1c;
-                color: #f85149;
+            th {
+                position: sticky;
+                top: 0;
+                z-index: 2;
+                background-color: #f6f8fa;
+                color: #1f2328;
+                font-weight: 600;
             }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <header class="header">
-            <div class="title-block">
-                <h1 class="header-title">JSON Table Viewer</h1>
-                <p class="header-subtitle">Validate AI-style JSON arrays and inspect them as a table.</p>
-            </div>
-            <div class="header-controls">
-                <a class="btn" href="index.html">Home</a>
-                <button class="btn" id="sampleBtn" type="button">Sample</button>
-                <button class="btn btn-secondary" id="formatBtn" type="button">Format</button>
-            </div>
-        </header>
 
-        <main class="workspace">
-            <section class="panel input-panel" aria-labelledby="inputTitle">
-                <div class="field-label-row">
-                    <label class="form-label" id="inputTitle" for="jsonInput">JSON input</label>
-                    <span class="hint">Ctrl/Cmd + Enter analyzes</span>
+            .row-number {
+                min-width: 72px;
+                width: 72px;
+                color: #656d76;
+                text-align: right;
+                font-variant-numeric: tabular-nums;
+            }
+
+            .cell-value {
+                overflow-wrap: anywhere;
+                white-space: pre-wrap;
+            }
+
+            .cell-empty {
+                color: #8c959f;
+                font-style: italic;
+            }
+
+            .cell-object {
+                font-family:
+                    ui-monospace, SFMono-Regular, SFMono, Consolas, 'Liberation Mono', Menlo,
+                    monospace;
+                font-size: 12px;
+            }
+
+            .empty-state {
+                border: 1px dashed #d0d7de;
+                border-radius: 6px;
+                padding: 36px 18px;
+                text-align: center;
+                color: #656d76;
+                background-color: #ffffff;
+            }
+
+            .issues-table {
+                width: 100%;
+                margin-top: 10px;
+            }
+
+            .issues-table th,
+            .issues-table td {
+                min-width: 100px;
+                max-width: 520px;
+            }
+
+            .key-list {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 4px;
+            }
+
+            @media (max-width: 960px) {
+                .workspace {
+                    grid-template-columns: 1fr;
+                }
+
+                .input-panel {
+                    position: static;
+                }
+
+                textarea {
+                    min-height: 300px;
+                }
+
+                .stats-grid {
+                    grid-template-columns: repeat(2, minmax(120px, 1fr));
+                }
+            }
+
+            @media (max-width: 640px) {
+                .container {
+                    padding: 10px;
+                }
+
+                .header {
+                    align-items: flex-start;
+                    flex-direction: column;
+                }
+
+                .header-controls {
+                    justify-content: flex-start;
+                    width: 100%;
+                }
+
+                .stats-grid {
+                    grid-template-columns: 1fr;
+                }
+
+                .btn {
+                    justify-content: center;
+                }
+            }
+
+            @media (prefers-color-scheme: dark) {
+                body {
+                    background-color: #0d1117;
+                    color: #e6edf3;
+                }
+
+                .header,
+                .panel,
+                .stat,
+                .message,
+                .table-wrap,
+                .empty-state {
+                    background-color: #161b22;
+                    border-color: #30363d;
+                }
+
+                .header-title,
+                .stat-value,
+                .message strong,
+                .table-title,
+                th,
+                .key-chip {
+                    color: #e6edf3;
+                }
+
+                .header-subtitle,
+                .hint,
+                .stat-label,
+                .empty-state,
+                .row-number {
+                    color: #8b949e;
+                }
+
+                .key-chip,
+                th {
+                    background-color: #21262d;
+                    border-color: #30363d;
+                }
+
+                th,
+                td {
+                    border-color: #30363d;
+                }
+
+                .schema-badge.valid {
+                    background-color: #1a4426;
+                    color: #3fb950;
+                }
+
+                .schema-badge.warning {
+                    background-color: #3d2d00;
+                    color: #e3b341;
+                }
+
+                .schema-badge.error {
+                    background-color: #3d1c1c;
+                    color: #f85149;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <header class="header">
+                <div class="title-block">
+                    <h1 class="header-title">JSON Table Viewer</h1>
+                    <p class="header-subtitle">
+                        Validate AI-style JSON arrays and inspect them as a table.
+                    </p>
                 </div>
-                <textarea id="jsonInput" spellcheck="false" placeholder='Paste a JSON array like [{"name":"Ada","role":"Engineer"}]'></textarea>
-                <div class="actions">
-                    <button class="btn btn-primary" id="analyzeBtn" type="button">Analyze</button>
-                    <button class="btn" id="extractBtn" type="button">Extract array</button>
-                    <button class="btn" id="clearBtn" type="button">Clear</button>
+                <div class="header-controls">
+                    <a class="btn" href="index.html">Home</a>
+                    <button class="btn" id="sampleBtn" type="button">Sample</button>
+                    <button class="btn btn-secondary" id="formatBtn" type="button">Format</button>
                 </div>
-                <div class="file-input">
-                    <label class="form-label" for="fileInput">Open JSON file</label>
-                    <input id="fileInput" type="file" accept=".json,application/json">
-                </div>
-            </section>
+            </header>
 
-            <section>
-                <section class="panel" aria-live="polite">
-                    <div class="stats-grid">
-                        <div class="stat">
-                            <div class="stat-label">Rows</div>
-                            <div class="stat-value" id="rowCount">0</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-label">Columns</div>
-                            <div class="stat-value" id="columnCount">0</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-label">Schema</div>
-                            <div class="stat-value" id="schemaStatusText">Waiting</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-label">Row issues</div>
-                            <div class="stat-value" id="issueCount">0</div>
-                        </div>
+            <main class="workspace">
+                <section class="panel input-panel" aria-labelledby="inputTitle">
+                    <div class="field-label-row">
+                        <label class="form-label" id="inputTitle" for="jsonInput">JSON input</label>
+                        <span class="hint">Ctrl/Cmd + Enter analyzes</span>
                     </div>
-                    <div class="status-row" id="statusRow">
-                        <span class="schema-badge warning">Paste JSON to begin</span>
+                    <textarea
+                        id="jsonInput"
+                        spellcheck="false"
+                        placeholder='Paste a JSON array like [{"name":"Ada","role":"Engineer"}]'
+                    ></textarea>
+                    <div class="actions">
+                        <button class="btn btn-primary" id="analyzeBtn" type="button">
+                            Analyze
+                        </button>
+                        <button class="btn" id="extractBtn" type="button">Extract array</button>
+                        <button class="btn" id="clearBtn" type="button">Clear</button>
                     </div>
-                    <div class="message-list" id="messages"></div>
+                    <div class="file-input">
+                        <label class="form-label" for="fileInput">Open JSON file</label>
+                        <input id="fileInput" type="file" accept=".json,application/json" />
+                    </div>
                 </section>
 
-                <section class="panel" id="issuesPanel" hidden>
-                    <div class="table-title">Schema differences</div>
-                    <div class="table-wrap">
-                        <table class="issues-table">
-                            <thead>
-                                <tr>
-                                    <th>Row</th>
-                                    <th>Missing keys</th>
-                                    <th>Extra keys</th>
-                                    <th>Similarity</th>
-                                </tr>
-                            </thead>
-                            <tbody id="issuesBody"></tbody>
-                        </table>
-                    </div>
-                </section>
-
-                <section class="panel">
-                    <div class="table-toolbar">
-                        <div class="table-title">Table output</div>
-                        <div class="table-actions">
-                            <button class="btn" id="copyCsvBtn" type="button" disabled>Copy CSV</button>
-                            <button class="btn" id="downloadCsvBtn" type="button" disabled>Download CSV</button>
+                <section>
+                    <section class="panel" aria-live="polite">
+                        <div class="stats-grid">
+                            <div class="stat">
+                                <div class="stat-label">Rows</div>
+                                <div class="stat-value" id="rowCount">0</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-label">Columns</div>
+                                <div class="stat-value" id="columnCount">0</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-label">Schema</div>
+                                <div class="stat-value" id="schemaStatusText">Waiting</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-label">Row issues</div>
+                                <div class="stat-value" id="issueCount">0</div>
+                            </div>
                         </div>
-                    </div>
-                    <div id="tableHost" class="empty-state">Valid rows will appear here.</div>
+                        <div class="status-row" id="statusRow">
+                            <span class="schema-badge warning">Paste JSON to begin</span>
+                        </div>
+                        <div class="message-list" id="messages"></div>
+                    </section>
+
+                    <section class="panel" id="issuesPanel" hidden>
+                        <div class="table-title">Schema differences</div>
+                        <div class="table-wrap">
+                            <table class="issues-table">
+                                <thead>
+                                    <tr>
+                                        <th>Row</th>
+                                        <th>Missing keys</th>
+                                        <th>Extra keys</th>
+                                        <th>Similarity</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="issuesBody"></tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <section class="panel">
+                        <div class="table-toolbar">
+                            <div class="table-title">Table output</div>
+                            <div class="table-actions">
+                                <button class="btn" id="copyCsvBtn" type="button" disabled>
+                                    Copy CSV
+                                </button>
+                                <button class="btn" id="downloadCsvBtn" type="button" disabled>
+                                    Download CSV
+                                </button>
+                            </div>
+                        </div>
+                        <div id="tableHost" class="empty-state">Valid rows will appear here.</div>
+                    </section>
                 </section>
-            </section>
-        </main>
-    </div>
+            </main>
+        </div>
 
-    <script src="shared-utils.js"></script>
-    <script>
-        const SAMPLE_JSON = [
-            {
-                "title": "Token transfer flow",
-                "owner": "Ada",
-                "status": "ready",
-                "priority": 2
-            },
-            {
-                "title": "Ledger close smoke test",
-                "owner": "Grace",
-                "status": "blocked",
-                "priority": 1,
-                "note": "Needs updated fixture"
-            },
-            {
-                "title": "Wallet import polish",
-                "owner": "Lin",
-                "status": "ready",
-                "priority": 3
+        <script src="shared-utils.js"></script>
+        <script>
+            const SAMPLE_JSON = [
+                {
+                    title: 'Token transfer flow',
+                    owner: 'Ada',
+                    status: 'ready',
+                    priority: 2,
+                },
+                {
+                    title: 'Ledger close smoke test',
+                    owner: 'Grace',
+                    status: 'blocked',
+                    priority: 1,
+                    note: 'Needs updated fixture',
+                },
+                {
+                    title: 'Wallet import polish',
+                    owner: 'Lin',
+                    status: 'ready',
+                    priority: 3,
+                },
+            ];
+
+            const SIMILARITY_THRESHOLD = 0.72;
+            const input = document.getElementById('jsonInput');
+            const messages = document.getElementById('messages');
+            const statusRow = document.getElementById('statusRow');
+            const tableHost = document.getElementById('tableHost');
+            const issuesPanel = document.getElementById('issuesPanel');
+            const issuesBody = document.getElementById('issuesBody');
+            const copyCsvBtn = document.getElementById('copyCsvBtn');
+            const downloadCsvBtn = document.getElementById('downloadCsvBtn');
+            let currentRows = [];
+            let currentColumns = [];
+
+            document.getElementById('analyzeBtn').addEventListener('click', analyzeInput);
+            document.getElementById('formatBtn').addEventListener('click', formatInput);
+            document.getElementById('sampleBtn').addEventListener('click', loadSample);
+            document.getElementById('extractBtn').addEventListener('click', extractArrayInput);
+            document.getElementById('clearBtn').addEventListener('click', clearInput);
+            copyCsvBtn.addEventListener('click', copyCsv);
+            downloadCsvBtn.addEventListener('click', downloadCsv);
+            document.getElementById('fileInput').addEventListener('change', loadFile);
+
+            input.addEventListener('keydown', (event) => {
+                if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+                    event.preventDefault();
+                    analyzeInput();
+                }
+            });
+
+            function cleanJsonText(text) {
+                const trimmed = text.trim();
+                const fenceMatch = trimmed.match(
+                    /^```(?:json|javascript|js)?\s*([\s\S]*?)\s*```$/i,
+                );
+                return fenceMatch ? fenceMatch[1].trim() : trimmed;
             }
-        ];
 
-        const SIMILARITY_THRESHOLD = 0.72;
-        const input = document.getElementById('jsonInput');
-        const messages = document.getElementById('messages');
-        const statusRow = document.getElementById('statusRow');
-        const tableHost = document.getElementById('tableHost');
-        const issuesPanel = document.getElementById('issuesPanel');
-        const issuesBody = document.getElementById('issuesBody');
-        const copyCsvBtn = document.getElementById('copyCsvBtn');
-        const downloadCsvBtn = document.getElementById('downloadCsvBtn');
-        let currentRows = [];
-        let currentColumns = [];
-
-        document.getElementById('analyzeBtn').addEventListener('click', analyzeInput);
-        document.getElementById('formatBtn').addEventListener('click', formatInput);
-        document.getElementById('sampleBtn').addEventListener('click', loadSample);
-        document.getElementById('extractBtn').addEventListener('click', extractArrayInput);
-        document.getElementById('clearBtn').addEventListener('click', clearInput);
-        copyCsvBtn.addEventListener('click', copyCsv);
-        downloadCsvBtn.addEventListener('click', downloadCsv);
-        document.getElementById('fileInput').addEventListener('change', loadFile);
-
-        input.addEventListener('keydown', (event) => {
-            if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-                event.preventDefault();
-                analyzeInput();
+            function extractArrayText(text) {
+                const cleaned = cleanJsonText(text);
+                const start = cleaned.indexOf('[');
+                const end = cleaned.lastIndexOf(']');
+                if (start === -1 || end === -1 || end <= start) {
+                    throw new Error('No complete JSON array was found in the input.');
+                }
+                return cleaned.slice(start, end + 1);
             }
-        });
 
-        function cleanJsonText(text) {
-            const trimmed = text.trim();
-            const fenceMatch = trimmed.match(/^```(?:json|javascript|js)?\s*([\s\S]*?)\s*```$/i);
-            return fenceMatch ? fenceMatch[1].trim() : trimmed;
-        }
-
-        function extractArrayText(text) {
-            const cleaned = cleanJsonText(text);
-            const start = cleaned.indexOf('[');
-            const end = cleaned.lastIndexOf(']');
-            if (start === -1 || end === -1 || end <= start) {
-                throw new Error('No complete JSON array was found in the input.');
-            }
-            return cleaned.slice(start, end + 1);
-        }
-
-        function parseInput(text) {
-            const cleaned = cleanJsonText(text);
-            try {
-                return JSON.parse(cleaned);
-            } catch (strictError) {
-                const extracted = extractArrayText(cleaned);
+            function parseInput(text) {
+                const cleaned = cleanJsonText(text);
                 try {
-                    return JSON.parse(extracted);
-                } catch (extractedError) {
-                    throw strictError;
-                }
-            }
-        }
-
-        function isPlainObject(value) {
-            return value !== null && typeof value === 'object' && !Array.isArray(value);
-        }
-
-        function analyzeRows(rows) {
-            const columns = [];
-            const columnSet = new Set();
-            rows.forEach((row) => {
-                Object.keys(row).forEach((key) => {
-                    if (!columnSet.has(key)) {
-                        columnSet.add(key);
-                        columns.push(key);
+                    return JSON.parse(cleaned);
+                } catch (strictError) {
+                    const extracted = extractArrayText(cleaned);
+                    try {
+                        return JSON.parse(extracted);
+                    } catch (extractedError) {
+                        throw strictError;
                     }
-                });
-            });
-
-            const signatures = new Map();
-            rows.forEach((row) => {
-                const keys = Object.keys(row).sort();
-                const signature = keys.join('\u0000');
-                const existing = signatures.get(signature) || { count: 0, keys };
-                existing.count += 1;
-                signatures.set(signature, existing);
-            });
-
-            const baseline = Array.from(signatures.values()).sort((a, b) => {
-                if (b.count !== a.count) {
-                    return b.count - a.count;
                 }
-                return b.keys.length - a.keys.length;
-            })[0] || { keys: [] };
+            }
 
-            const baselineSet = new Set(baseline.keys);
-            const issues = rows.map((row, index) => {
-                const keys = Object.keys(row);
-                const rowSet = new Set(keys);
-                const missing = baseline.keys.filter((key) => !rowSet.has(key));
-                const extra = keys.filter((key) => !baselineSet.has(key));
-                const intersection = keys.filter((key) => baselineSet.has(key)).length;
-                const union = new Set([...baseline.keys, ...keys]).size || 1;
-                const similarity = intersection / union;
+            function isPlainObject(value) {
+                return value !== null && typeof value === 'object' && !Array.isArray(value);
+            }
+
+            function analyzeRows(rows) {
+                const columns = [];
+                const columnSet = new Set();
+                rows.forEach((row) => {
+                    Object.keys(row).forEach((key) => {
+                        if (!columnSet.has(key)) {
+                            columnSet.add(key);
+                            columns.push(key);
+                        }
+                    });
+                });
+
+                const signatures = new Map();
+                rows.forEach((row) => {
+                    const keys = Object.keys(row).sort();
+                    const signature = keys.join('\u0000');
+                    const existing = signatures.get(signature) || { count: 0, keys };
+                    existing.count += 1;
+                    signatures.set(signature, existing);
+                });
+
+                const baseline = Array.from(signatures.values()).sort((a, b) => {
+                    if (b.count !== a.count) {
+                        return b.count - a.count;
+                    }
+                    return b.keys.length - a.keys.length;
+                })[0] || { keys: [] };
+
+                const baselineSet = new Set(baseline.keys);
+                const issues = rows
+                    .map((row, index) => {
+                        const keys = Object.keys(row);
+                        const rowSet = new Set(keys);
+                        const missing = baseline.keys.filter((key) => !rowSet.has(key));
+                        const extra = keys.filter((key) => !baselineSet.has(key));
+                        const intersection = keys.filter((key) => baselineSet.has(key)).length;
+                        const union = new Set([...baseline.keys, ...keys]).size || 1;
+                        const similarity = intersection / union;
+                        return {
+                            rowNumber: index + 1,
+                            missing,
+                            extra,
+                            similarity,
+                            hasIssue: missing.length > 0 || extra.length > 0,
+                        };
+                    })
+                    .filter((issue) => issue.hasIssue);
+
+                const exact = signatures.size <= 1;
+                const roughlySame =
+                    exact || issues.every((issue) => issue.similarity >= SIMILARITY_THRESHOLD);
                 return {
-                    rowNumber: index + 1,
-                    missing,
-                    extra,
-                    similarity,
-                    hasIssue: missing.length > 0 || extra.length > 0
+                    columns,
+                    baselineKeys: baseline.keys,
+                    signatures: signatures.size,
+                    issues,
+                    exact,
+                    roughlySame,
                 };
-            }).filter((issue) => issue.hasIssue);
-
-            const exact = signatures.size <= 1;
-            const roughlySame = exact || issues.every((issue) => issue.similarity >= SIMILARITY_THRESHOLD);
-            return {
-                columns,
-                baselineKeys: baseline.keys,
-                signatures: signatures.size,
-                issues,
-                exact,
-                roughlySame
-            };
-        }
-
-        function analyzeInput() {
-            const text = input.value.trim();
-            resetOutput();
-
-            if (!text) {
-                renderError('No JSON provided', 'Paste a JSON array of objects to analyze it.');
-                return;
             }
 
-            let parsed;
-            try {
-                parsed = parseInput(text);
-            } catch (error) {
-                renderError('Invalid JSON', error.message);
-                return;
+            function analyzeInput() {
+                const text = input.value.trim();
+                resetOutput();
+
+                if (!text) {
+                    renderError('No JSON provided', 'Paste a JSON array of objects to analyze it.');
+                    return;
+                }
+
+                let parsed;
+                try {
+                    parsed = parseInput(text);
+                } catch (error) {
+                    renderError('Invalid JSON', error.message);
+                    return;
+                }
+
+                if (!Array.isArray(parsed)) {
+                    renderError(
+                        'Top-level value is not a list',
+                        `Found ${describeValue(parsed)} instead of an array.`,
+                    );
+                    return;
+                }
+
+                if (parsed.length === 0) {
+                    renderError(
+                        'The list is empty',
+                        'Add at least one object so the table columns can be inferred.',
+                    );
+                    return;
+                }
+
+                const badRows = parsed
+                    .map((row, index) => ({ row, rowNumber: index + 1 }))
+                    .filter((entry) => !isPlainObject(entry.row));
+
+                if (badRows.length > 0) {
+                    const examples = badRows
+                        .slice(0, 5)
+                        .map((entry) => `row ${entry.rowNumber}: ${describeValue(entry.row)}`)
+                        .join(', ');
+                    renderError('Every list item must be a dictionary/object', examples);
+                    return;
+                }
+
+                const analysis = analyzeRows(parsed);
+                currentRows = parsed;
+                currentColumns = analysis.columns;
+                renderSummary(parsed, analysis);
+                renderIssues(analysis);
+                renderTable(parsed, analysis.columns);
+                copyCsvBtn.disabled = false;
+                downloadCsvBtn.disabled = false;
             }
 
-            if (!Array.isArray(parsed)) {
-                renderError('Top-level value is not a list', `Found ${describeValue(parsed)} instead of an array.`);
-                return;
-            }
+            function renderSummary(rows, analysis) {
+                document.getElementById('rowCount').textContent = rows.length.toLocaleString();
+                document.getElementById('columnCount').textContent =
+                    analysis.columns.length.toLocaleString();
+                document.getElementById('issueCount').textContent =
+                    analysis.issues.length.toLocaleString();
 
-            if (parsed.length === 0) {
-                renderError('The list is empty', 'Add at least one object so the table columns can be inferred.');
-                return;
-            }
+                statusRow.innerHTML = '';
+                messages.innerHTML = '';
 
-            const badRows = parsed
-                .map((row, index) => ({ row, rowNumber: index + 1 }))
-                .filter((entry) => !isPlainObject(entry.row));
+                if (analysis.exact) {
+                    document.getElementById('schemaStatusText').textContent = 'Exact';
+                    statusRow.appendChild(makeBadge('valid', 'All rows share the same keys'));
+                    addMessage('info', 'Baseline keys', keySentence(analysis.baselineKeys));
+                    return;
+                }
 
-            if (badRows.length > 0) {
-                const examples = badRows.slice(0, 5).map((entry) => `row ${entry.rowNumber}: ${describeValue(entry.row)}`).join(', ');
-                renderError('Every list item must be a dictionary/object', examples);
-                return;
-            }
+                if (analysis.roughlySame) {
+                    document.getElementById('schemaStatusText').textContent = 'Close';
+                    statusRow.appendChild(makeBadge('warning', 'Rows are roughly the same'));
+                    addMessage(
+                        'warning',
+                        'Some rows have missing or extra keys',
+                        `${analysis.issues.length} row${analysis.issues.length === 1 ? '' : 's'} differ from the most common key set. The table uses the union of all keys.`,
+                    );
+                    addMessage('info', 'Most common key set', keySentence(analysis.baselineKeys));
+                    return;
+                }
 
-            const analysis = analyzeRows(parsed);
-            currentRows = parsed;
-            currentColumns = analysis.columns;
-            renderSummary(parsed, analysis);
-            renderIssues(analysis);
-            renderTable(parsed, analysis.columns);
-            copyCsvBtn.disabled = false;
-            downloadCsvBtn.disabled = false;
-        }
-
-        function renderSummary(rows, analysis) {
-            document.getElementById('rowCount').textContent = rows.length.toLocaleString();
-            document.getElementById('columnCount').textContent = analysis.columns.length.toLocaleString();
-            document.getElementById('issueCount').textContent = analysis.issues.length.toLocaleString();
-
-            statusRow.innerHTML = '';
-            messages.innerHTML = '';
-
-            if (analysis.exact) {
-                document.getElementById('schemaStatusText').textContent = 'Exact';
-                statusRow.appendChild(makeBadge('valid', 'All rows share the same keys'));
-                addMessage('info', 'Baseline keys', keySentence(analysis.baselineKeys));
-                return;
-            }
-
-            if (analysis.roughlySame) {
-                document.getElementById('schemaStatusText').textContent = 'Close';
-                statusRow.appendChild(makeBadge('warning', 'Rows are roughly the same'));
+                document.getElementById('schemaStatusText').textContent = 'Mixed';
+                statusRow.appendChild(makeBadge('error', 'Rows have meaningfully different keys'));
                 addMessage(
-                    'warning',
-                    'Some rows have missing or extra keys',
-                    `${analysis.issues.length} row${analysis.issues.length === 1 ? '' : 's'} differ from the most common key set. The table uses the union of all keys.`
+                    'error',
+                    'Schema mismatch',
+                    `${analysis.signatures} different key sets were found. The table is still rendered with all keys so you can inspect the data.`,
                 );
                 addMessage('info', 'Most common key set', keySentence(analysis.baselineKeys));
-                return;
             }
 
-            document.getElementById('schemaStatusText').textContent = 'Mixed';
-            statusRow.appendChild(makeBadge('error', 'Rows have meaningfully different keys'));
-            addMessage(
-                'error',
-                'Schema mismatch',
-                `${analysis.signatures} different key sets were found. The table is still rendered with all keys so you can inspect the data.`
-            );
-            addMessage('info', 'Most common key set', keySentence(analysis.baselineKeys));
-        }
+            function renderIssues(analysis) {
+                issuesBody.innerHTML = '';
+                issuesPanel.hidden = analysis.issues.length === 0;
 
-        function renderIssues(analysis) {
-            issuesBody.innerHTML = '';
-            issuesPanel.hidden = analysis.issues.length === 0;
-
-            analysis.issues.forEach((issue) => {
-                const tr = document.createElement('tr');
-                appendCell(tr, String(issue.rowNumber));
-                appendKeyCell(tr, issue.missing);
-                appendKeyCell(tr, issue.extra);
-                appendCell(tr, `${Math.round(issue.similarity * 100)}%`);
-                issuesBody.appendChild(tr);
-            });
-        }
-
-        function renderTable(rows, columns) {
-            if (columns.length === 0) {
-                tableHost.className = 'empty-state';
-                tableHost.textContent = 'Objects contain no keys.';
-                return;
+                analysis.issues.forEach((issue) => {
+                    const tr = document.createElement('tr');
+                    appendCell(tr, String(issue.rowNumber));
+                    appendKeyCell(tr, issue.missing);
+                    appendKeyCell(tr, issue.extra);
+                    appendCell(tr, `${Math.round(issue.similarity * 100)}%`);
+                    issuesBody.appendChild(tr);
+                });
             }
 
-            const wrap = document.createElement('div');
-            wrap.className = 'table-wrap';
-            const table = document.createElement('table');
-            const thead = document.createElement('thead');
-            const tbody = document.createElement('tbody');
-            const headerRow = document.createElement('tr');
-            const rowNumberHeader = document.createElement('th');
-            rowNumberHeader.className = 'row-number';
-            rowNumberHeader.textContent = '#';
-            headerRow.appendChild(rowNumberHeader);
+            function renderTable(rows, columns) {
+                if (columns.length === 0) {
+                    tableHost.className = 'empty-state';
+                    tableHost.textContent = 'Objects contain no keys.';
+                    return;
+                }
 
-            columns.forEach((column) => {
-                const th = document.createElement('th');
-                th.textContent = column;
-                headerRow.appendChild(th);
-            });
-
-            thead.appendChild(headerRow);
-            table.appendChild(thead);
-
-            rows.forEach((row, index) => {
-                const tr = document.createElement('tr');
-                const rowNumber = document.createElement('td');
-                rowNumber.className = 'row-number';
-                rowNumber.textContent = String(index + 1);
-                tr.appendChild(rowNumber);
+                const wrap = document.createElement('div');
+                wrap.className = 'table-wrap';
+                const table = document.createElement('table');
+                const thead = document.createElement('thead');
+                const tbody = document.createElement('tbody');
+                const headerRow = document.createElement('tr');
+                const rowNumberHeader = document.createElement('th');
+                rowNumberHeader.className = 'row-number';
+                rowNumberHeader.textContent = '#';
+                headerRow.appendChild(rowNumberHeader);
 
                 columns.forEach((column) => {
-                    const td = document.createElement('td');
-                    const span = document.createElement('span');
-                    const hasValue = Object.prototype.hasOwnProperty.call(row, column);
-                    const value = row[column];
-                    span.className = 'cell-value';
-
-                    if (!hasValue) {
-                        span.classList.add('cell-empty');
-                        span.textContent = 'missing';
-                    } else if (value === null) {
-                        span.classList.add('cell-empty');
-                        span.textContent = 'null';
-                    } else if (typeof value === 'object') {
-                        span.classList.add('cell-object');
-                        span.textContent = JSON.stringify(value, null, 2);
-                    } else {
-                        span.textContent = String(value);
-                    }
-
-                    td.appendChild(span);
-                    tr.appendChild(td);
+                    const th = document.createElement('th');
+                    th.textContent = column;
+                    headerRow.appendChild(th);
                 });
 
-                tbody.appendChild(tr);
-            });
+                thead.appendChild(headerRow);
+                table.appendChild(thead);
 
-            table.appendChild(tbody);
-            wrap.appendChild(table);
-            tableHost.className = '';
-            tableHost.innerHTML = '';
-            tableHost.appendChild(wrap);
-        }
+                rows.forEach((row, index) => {
+                    const tr = document.createElement('tr');
+                    const rowNumber = document.createElement('td');
+                    rowNumber.className = 'row-number';
+                    rowNumber.textContent = String(index + 1);
+                    tr.appendChild(rowNumber);
 
-        function resetOutput() {
-            currentRows = [];
-            currentColumns = [];
-            copyCsvBtn.disabled = true;
-            downloadCsvBtn.disabled = true;
-            issuesPanel.hidden = true;
-            issuesBody.innerHTML = '';
-            document.getElementById('rowCount').textContent = '0';
-            document.getElementById('columnCount').textContent = '0';
-            document.getElementById('schemaStatusText').textContent = 'Waiting';
-            document.getElementById('issueCount').textContent = '0';
-            statusRow.innerHTML = '<span class="schema-badge warning">Paste JSON to begin</span>';
-            messages.innerHTML = '';
-            tableHost.className = 'empty-state';
-            tableHost.textContent = 'Valid rows will appear here.';
-        }
+                    columns.forEach((column) => {
+                        const td = document.createElement('td');
+                        const span = document.createElement('span');
+                        const hasValue = Object.prototype.hasOwnProperty.call(row, column);
+                        const value = row[column];
+                        span.className = 'cell-value';
 
-        function renderError(title, detail) {
-            document.getElementById('schemaStatusText').textContent = 'Invalid';
-            statusRow.innerHTML = '';
-            statusRow.appendChild(makeBadge('error', title));
-            addMessage('error', title, detail);
-            tableHost.className = 'empty-state';
-            tableHost.textContent = 'Fix the input and analyze again.';
-        }
+                        if (!hasValue) {
+                            span.classList.add('cell-empty');
+                            span.textContent = 'missing';
+                        } else if (value === null) {
+                            span.classList.add('cell-empty');
+                            span.textContent = 'null';
+                        } else if (typeof value === 'object') {
+                            span.classList.add('cell-object');
+                            span.textContent = JSON.stringify(value, null, 2);
+                        } else {
+                            span.textContent = String(value);
+                        }
 
-        function makeBadge(type, text) {
-            const badge = document.createElement('span');
-            badge.className = `schema-badge ${type}`;
-            badge.textContent = text;
-            return badge;
-        }
+                        td.appendChild(span);
+                        tr.appendChild(td);
+                    });
 
-        function addMessage(type, title, detail) {
-            const node = document.createElement('div');
-            node.className = `message ${type}`;
-            const strong = document.createElement('strong');
-            strong.textContent = title;
-            const body = document.createElement('div');
-            body.textContent = detail;
-            node.append(strong, body);
-            messages.appendChild(node);
-        }
-
-        function appendCell(row, text) {
-            const td = document.createElement('td');
-            td.textContent = text;
-            row.appendChild(td);
-        }
-
-        function appendKeyCell(row, keys) {
-            const td = document.createElement('td');
-            const list = document.createElement('div');
-            list.className = 'key-list';
-
-            if (keys.length === 0) {
-                const empty = document.createElement('span');
-                empty.className = 'cell-empty';
-                empty.textContent = 'none';
-                list.appendChild(empty);
-            } else {
-                keys.forEach((key) => {
-                    const chip = document.createElement('span');
-                    chip.className = 'key-chip';
-                    chip.textContent = key;
-                    list.appendChild(chip);
+                    tbody.appendChild(tr);
                 });
+
+                table.appendChild(tbody);
+                wrap.appendChild(table);
+                tableHost.className = '';
+                tableHost.innerHTML = '';
+                tableHost.appendChild(wrap);
             }
 
-            td.appendChild(list);
-            row.appendChild(td);
-        }
-
-        function keySentence(keys) {
-            if (keys.length === 0) {
-                return 'No keys were found.';
-            }
-            return keys.map((key) => `\`${key}\``).join(', ');
-        }
-
-        function describeValue(value) {
-            if (Array.isArray(value)) {
-                return 'array';
-            }
-            if (value === null) {
-                return 'null';
-            }
-            return typeof value;
-        }
-
-        function formatInput() {
-            if (!input.value.trim()) {
-                showToast('Nothing to format yet.', 'warning');
-                return;
+            function resetOutput() {
+                currentRows = [];
+                currentColumns = [];
+                copyCsvBtn.disabled = true;
+                downloadCsvBtn.disabled = true;
+                issuesPanel.hidden = true;
+                issuesBody.innerHTML = '';
+                document.getElementById('rowCount').textContent = '0';
+                document.getElementById('columnCount').textContent = '0';
+                document.getElementById('schemaStatusText').textContent = 'Waiting';
+                document.getElementById('issueCount').textContent = '0';
+                statusRow.innerHTML =
+                    '<span class="schema-badge warning">Paste JSON to begin</span>';
+                messages.innerHTML = '';
+                tableHost.className = 'empty-state';
+                tableHost.textContent = 'Valid rows will appear here.';
             }
 
-            try {
-                const parsed = parseInput(input.value);
-                input.value = JSON.stringify(parsed, null, 2);
-                showToast('JSON formatted.', 'success');
+            function renderError(title, detail) {
+                document.getElementById('schemaStatusText').textContent = 'Invalid';
+                statusRow.innerHTML = '';
+                statusRow.appendChild(makeBadge('error', title));
+                addMessage('error', title, detail);
+                tableHost.className = 'empty-state';
+                tableHost.textContent = 'Fix the input and analyze again.';
+            }
+
+            function makeBadge(type, text) {
+                const badge = document.createElement('span');
+                badge.className = `schema-badge ${type}`;
+                badge.textContent = text;
+                return badge;
+            }
+
+            function addMessage(type, title, detail) {
+                const node = document.createElement('div');
+                node.className = `message ${type}`;
+                const strong = document.createElement('strong');
+                strong.textContent = title;
+                const body = document.createElement('div');
+                body.textContent = detail;
+                node.append(strong, body);
+                messages.appendChild(node);
+            }
+
+            function appendCell(row, text) {
+                const td = document.createElement('td');
+                td.textContent = text;
+                row.appendChild(td);
+            }
+
+            function appendKeyCell(row, keys) {
+                const td = document.createElement('td');
+                const list = document.createElement('div');
+                list.className = 'key-list';
+
+                if (keys.length === 0) {
+                    const empty = document.createElement('span');
+                    empty.className = 'cell-empty';
+                    empty.textContent = 'none';
+                    list.appendChild(empty);
+                } else {
+                    keys.forEach((key) => {
+                        const chip = document.createElement('span');
+                        chip.className = 'key-chip';
+                        chip.textContent = key;
+                        list.appendChild(chip);
+                    });
+                }
+
+                td.appendChild(list);
+                row.appendChild(td);
+            }
+
+            function keySentence(keys) {
+                if (keys.length === 0) {
+                    return 'No keys were found.';
+                }
+                return keys.map((key) => `\`${key}\``).join(', ');
+            }
+
+            function describeValue(value) {
+                if (Array.isArray(value)) {
+                    return 'array';
+                }
+                if (value === null) {
+                    return 'null';
+                }
+                return typeof value;
+            }
+
+            function formatInput() {
+                if (!input.value.trim()) {
+                    showToast('Nothing to format yet.', 'warning');
+                    return;
+                }
+
+                try {
+                    const parsed = parseInput(input.value);
+                    input.value = JSON.stringify(parsed, null, 2);
+                    showToast('JSON formatted.', 'success');
+                    analyzeInput();
+                } catch (error) {
+                    renderError('Invalid JSON', error.message);
+                }
+            }
+
+            function extractArrayInput() {
+                try {
+                    input.value = extractArrayText(input.value);
+                    showToast('Array extracted.', 'success');
+                    analyzeInput();
+                } catch (error) {
+                    renderError('No array found', error.message);
+                }
+            }
+
+            function loadSample() {
+                input.value = JSON.stringify(SAMPLE_JSON, null, 2);
                 analyzeInput();
-            } catch (error) {
-                renderError('Invalid JSON', error.message);
             }
-        }
 
-        function extractArrayInput() {
-            try {
-                input.value = extractArrayText(input.value);
-                showToast('Array extracted.', 'success');
+            function clearInput() {
+                input.value = '';
+                resetOutput();
+                input.focus();
+            }
+
+            async function loadFile(event) {
+                const file = event.target.files[0];
+                if (!file) {
+                    return;
+                }
+
+                input.value = await file.text();
                 analyzeInput();
-            } catch (error) {
-                renderError('No array found', error.message);
-            }
-        }
-
-        function loadSample() {
-            input.value = JSON.stringify(SAMPLE_JSON, null, 2);
-            analyzeInput();
-        }
-
-        function clearInput() {
-            input.value = '';
-            resetOutput();
-            input.focus();
-        }
-
-        async function loadFile(event) {
-            const file = event.target.files[0];
-            if (!file) {
-                return;
             }
 
-            input.value = await file.text();
-            analyzeInput();
-        }
-
-        function valueForCsv(value) {
-            if (value === undefined) {
-                return '';
+            function valueForCsv(value) {
+                if (value === undefined) {
+                    return '';
+                }
+                if (value === null) {
+                    return 'null';
+                }
+                if (typeof value === 'object') {
+                    return JSON.stringify(value);
+                }
+                return String(value);
             }
-            if (value === null) {
-                return 'null';
-            }
-            if (typeof value === 'object') {
-                return JSON.stringify(value);
-            }
-            return String(value);
-        }
 
-        function escapeCsv(value) {
-            const text = valueForCsv(value);
-            if (/[",\n\r]/.test(text)) {
-                return `"${text.replace(/"/g, '""')}"`;
+            function escapeCsv(value) {
+                const text = valueForCsv(value);
+                if (/[",\n\r]/.test(text)) {
+                    return `"${text.replace(/"/g, '""')}"`;
+                }
+                return text;
             }
-            return text;
-        }
 
-        function makeCsv() {
-            const header = currentColumns.map(escapeCsv).join(',');
-            const rows = currentRows.map((row) => currentColumns.map((column) => escapeCsv(row[column])).join(','));
-            return [header, ...rows].join('\n');
-        }
-
-        async function copyCsv() {
-            try {
-                await navigator.clipboard.writeText(makeCsv());
-                showToast('CSV copied.', 'success');
-            } catch (error) {
-                showToast('Could not copy CSV from this browser.', 'error');
+            function makeCsv() {
+                const header = currentColumns.map(escapeCsv).join(',');
+                const rows = currentRows.map((row) =>
+                    currentColumns.map((column) => escapeCsv(row[column])).join(','),
+                );
+                return [header, ...rows].join('\n');
             }
-        }
 
-        function downloadCsv() {
-            const blob = new Blob([makeCsv()], { type: 'text/csv;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = 'json-table.csv';
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            URL.revokeObjectURL(url);
-        }
-    </script>
-</body>
+            async function copyCsv() {
+                try {
+                    await navigator.clipboard.writeText(makeCsv());
+                    showToast('CSV copied.', 'success');
+                } catch (error) {
+                    showToast('Could not copy CSV from this browser.', 'error');
+                }
+            }
+
+            function downloadCsv() {
+                const blob = new Blob([makeCsv()], { type: 'text/csv;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'json-table.csv';
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(url);
+            }
+        </script>
+    </body>
 </html>

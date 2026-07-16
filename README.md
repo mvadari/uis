@@ -7,9 +7,11 @@ A collection of standalone web-based tools that run entirely in your browser.
 ## Tools
 
 ### 🔗 XRPL Network UI
+
 Comprehensive interface for interacting with the XRP Ledger blockchain.
 
 **Features:**
+
 - Connect to multiple XRPL networks (Mainnet, Testnet, Devnet, local)
 - Create and manage wallets
 - Send WebSocket requests with templates
@@ -21,9 +23,11 @@ Comprehensive interface for interacting with the XRP Ledger blockchain.
 ---
 
 ### 🧪 XRPL Batch Testing UI
+
 Specialized testing tool for XRPL Batch transactions.
 
 **Features:**
+
 - Create and manage test wallets
 - Build test cases with transaction templates
 - Multi-account batch transaction support
@@ -35,9 +39,11 @@ Specialized testing tool for XRPL Batch transactions.
 ---
 
 ### 📋 GitHub PR Dashboard
+
 Kanban-style dashboard for managing GitHub pull requests.
 
 **Features:**
+
 - Organize PRs with customizable Kanban columns
 - Track CI status and merge conflicts
 - Add notes and flags to PRs
@@ -50,9 +56,11 @@ Kanban-style dashboard for managing GitHub pull requests.
 ---
 
 ### 💬 PR Comments
+
 A clean, focused view of a single pull request's unresolved conversation.
 
 **Features:**
+
 - Load any PR by URL or `owner/repo#number` (shareable via `?pr=` link)
 - Shows unresolved inline review threads grouped by file, with code context
 - Includes top-level conversation comments and review summaries
@@ -71,9 +79,11 @@ A clean, focused view of a single pull request's unresolved conversation.
 ---
 
 ### 🔀 Smart Escrow PR Tracker
+
 Track the stacked PRs for the XRPL Smart Escrow feature.
 
 **Features:**
+
 - Visual stack showing PR dependencies with connecting lines
 - CI status with links to failed checks
 - Approval counts with reviewer names
@@ -86,9 +96,11 @@ Track the stacked PRs for the XRPL Smart Escrow feature.
 ---
 
 ### 🚢 rippled Release Tracker
+
 Track pull requests for an XRPLF/rippled release.
 
 **Features:**
+
 - Loads releases from open XRPLF/rippled milestones
 - Shows labels, CI status, merge state, and approval count
 - Assigns and removes PRs from the selected milestone
@@ -99,9 +111,11 @@ Track pull requests for an XRPLF/rippled release.
 ---
 
 ### 🧭 Base Branch PRs
+
 Find pull requests targeting a specific base branch in any repository.
 
 **Features:**
+
 - Search by `owner/repo` and `base:branch_name`
 - Shows PR title, number, link, draft state, author, and branch details
 - Flags merge conflicts using GitHub PR mergeability
@@ -114,9 +128,11 @@ Find pull requests targeting a specific base branch in any repository.
 ---
 
 ### 🔍 XRPL Server Changes
+
 Explore proposed changes to the XRP Ledger server (rippled) in a non-technical friendly interface.
 
 **Features:**
+
 - Browse all open, completed, and rejected proposals
 - Filter by category labels (Amendment, API Change)
 - Search across all proposals using GitHub's search
@@ -129,9 +145,11 @@ Explore proposed changes to the XRP Ledger server (rippled) in a non-technical f
 ---
 
 ### 📚 Stacked PR Dashboard
+
 Visualize and navigate stacked pull requests in a repository as a DAG (Directed Acyclic Graph).
 
 **Features:**
+
 - Automatically infers PR stacks from branch relationships
 - DAG visualization with collapsible branches
 - Filter between "My Stacks" and "All Stacks"
@@ -146,9 +164,11 @@ Visualize and navigate stacked pull requests in a repository as a DAG (Directed 
 ---
 
 ### ▦ JSON Table Viewer
+
 Validate and inspect AI-generated JSON arrays as tabular data.
 
 **Features:**
+
 - Checks that the JSON is a top-level list of objects
 - Detects exact, close, and mismatched object key sets
 - Highlights row-level missing and extra keys
@@ -165,25 +185,27 @@ Validate and inspect AI-generated JSON arrays as tabular data.
 All tools are self-contained HTML files. To run locally:
 
 1. Clone the repository:
-   ```bash
-   git clone https://github.com/mvadari/uis.git
-   cd uis
-   ```
+
+    ```bash
+    git clone https://github.com/mvadari/uis.git
+    cd uis
+    ```
 
 2. Open any HTML file in your browser:
-   ```bash
-   open index.html
-   # or
-   open ui.html
-   open batch-testing-ui.html
-   open github.html
-   open smart-escrow-prs.html
-   open xrpld.html
-   open stacked.html
-   open json-table.html
-   ```
+    ```bash
+    open index.html
+    # or
+    open ui.html
+    open batch-testing-ui.html
+    open github.html
+    open smart-escrow-prs.html
+    open xrpld.html
+    open stacked.html
+    open json-table.html
+    ```
 
 Alternatively, use a local server:
+
 ```bash
 python -m http.server 8000
 # Then visit http://localhost:8000

@@ -11,7 +11,8 @@
 
 /* Base Typography & Layout */
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+    font-family:
+        -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
     line-height: 1.6;
 }
 
@@ -82,10 +83,10 @@ body {
 }
 
 /* Form Elements */
-input[type="text"],
-input[type="password"],
-input[type="number"],
-input[type="search"],
+input[type='text'],
+input[type='password'],
+input[type='number'],
+input[type='search'],
 select,
 textarea {
     width: 100%;
@@ -294,8 +295,12 @@ textarea:focus {
 
 /* Animations */
 @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
 }
 
 @keyframes slideIn {
@@ -321,8 +326,12 @@ textarea:focus {
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 /* Utility Classes */
@@ -334,17 +343,35 @@ textarea:focus {
     text-align: right;
 }
 
-.mt-1 { margin-top: 8px; }
-.mt-2 { margin-top: 16px; }
-.mt-3 { margin-top: 24px; }
+.mt-1 {
+    margin-top: 8px;
+}
+.mt-2 {
+    margin-top: 16px;
+}
+.mt-3 {
+    margin-top: 24px;
+}
 
-.mb-1 { margin-bottom: 8px; }
-.mb-2 { margin-bottom: 16px; }
-.mb-3 { margin-bottom: 24px; }
+.mb-1 {
+    margin-bottom: 8px;
+}
+.mb-2 {
+    margin-bottom: 16px;
+}
+.mb-3 {
+    margin-bottom: 24px;
+}
 
-.p-1 { padding: 8px; }
-.p-2 { padding: 16px; }
-.p-3 { padding: 24px; }
+.p-1 {
+    padding: 8px;
+}
+.p-2 {
+    padding: 16px;
+}
+.p-3 {
+    padding: 24px;
+}
 
 .flex {
     display: flex;
@@ -354,9 +381,15 @@ textarea:focus {
     flex-direction: column;
 }
 
-.gap-1 { gap: 8px; }
-.gap-2 { gap: 16px; }
-.gap-3 { gap: 24px; }
+.gap-1 {
+    gap: 8px;
+}
+.gap-2 {
+    gap: 16px;
+}
+.gap-3 {
+    gap: 24px;
+}
 
 .hidden {
     display: none !important;
@@ -399,10 +432,10 @@ textarea:focus {
     .btn-danger:hover {
         background-color: #f85149;
     }
-    input[type="text"],
-    input[type="password"],
-    input[type="number"],
-    input[type="search"],
+    input[type='text'],
+    input[type='password'],
+    input[type='number'],
+    input[type='search'],
     select,
     textarea {
         background-color: #0d1117;
@@ -468,4 +501,3 @@ textarea:focus {
         border-top-color: #58a6ff;
     }
 }
-

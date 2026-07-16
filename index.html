@@ -1,200 +1,213 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>mvadari's UIs - User Interface Suite</title>
-    <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>mvadari's UIs - User Interface Suite</title>
+        <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
+            body {
+                font-family:
+                    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
+                    Cantarell, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+            }
 
-        .container {
-            max-width: 1400px;
-            width: 100%;
-        }
+            .container {
+                max-width: 1400px;
+                width: 100%;
+            }
 
-        h1 {
-            color: white;
-            text-align: center;
-            font-size: 48px;
-            margin-bottom: 16px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
+            h1 {
+                color: white;
+                text-align: center;
+                font-size: 48px;
+                margin-bottom: 16px;
+                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            }
 
-        .subtitle {
-            color: rgba(255, 255, 255, 0.9);
-            text-align: center;
-            font-size: 18px;
-            margin-bottom: 48px;
-        }
+            .subtitle {
+                color: rgba(255, 255, 255, 0.9);
+                text-align: center;
+                font-size: 18px;
+                margin-bottom: 48px;
+            }
 
-        .cards {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-            gap: 24px;
-        }
+            .cards {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+                gap: 24px;
+            }
 
-        .card {
-            background: white;
-            border-radius: 12px;
-            padding: 32px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-            transition: transform 0.2s, box-shadow 0.2s;
-            text-decoration: none;
-            color: inherit;
-            display: block;
-        }
+            .card {
+                background: white;
+                border-radius: 12px;
+                padding: 32px;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+                transition:
+                    transform 0.2s,
+                    box-shadow 0.2s;
+                text-decoration: none;
+                color: inherit;
+                display: block;
+            }
 
-        .card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 12px 32px rgba(0,0,0,0.2);
-        }
+            .card:hover {
+                transform: translateY(-4px);
+                box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+            }
 
-        .card-icon {
-            font-size: 48px;
-            margin-bottom: 16px;
-        }
+            .card-icon {
+                font-size: 48px;
+                margin-bottom: 16px;
+            }
 
-        .card-title {
-            font-size: 24px;
-            font-weight: 600;
-            margin-bottom: 12px;
-            color: #1f2937;
-        }
+            .card-title {
+                font-size: 24px;
+                font-weight: 600;
+                margin-bottom: 12px;
+                color: #1f2937;
+            }
 
-        .card-description {
-            font-size: 14px;
-            color: #6b7280;
-            line-height: 1.6;
-        }
+            .card-description {
+                font-size: 14px;
+                color: #6b7280;
+                line-height: 1.6;
+            }
 
-        .footer {
-            text-align: center;
-            margin-top: 48px;
-            color: rgba(255, 255, 255, 0.8);
-            font-size: 14px;
-        }
+            .footer {
+                text-align: center;
+                margin-top: 48px;
+                color: rgba(255, 255, 255, 0.8);
+                font-size: 14px;
+            }
 
-        .footer a {
-            color: white;
-            text-decoration: none;
-            font-weight: 600;
-        }
+            .footer a {
+                color: white;
+                text-decoration: none;
+                font-weight: 600;
+            }
 
-        .footer a:hover {
-            text-decoration: underline;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>mvadari's UIs</h1>
-        <p class="subtitle">User Interface Suite - Standalone Web Tools</p>
+            .footer a:hover {
+                text-decoration: underline;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>mvadari's UIs</h1>
+            <p class="subtitle">User Interface Suite - Standalone Web Tools</p>
 
-        <div class="cards">
-            <a href="ui.html" class="card">
-                <div class="card-icon">🔗</div>
-                <h2 class="card-title">XRPL Network UI</h2>
-                <p class="card-description">
-                    Interact with the XRP Ledger blockchain. Connect to networks, manage accounts, 
-                    send requests, and submit transactions with a user-friendly interface.
-                </p>
-            </a>
+            <div class="cards">
+                <a href="ui.html" class="card">
+                    <div class="card-icon">🔗</div>
+                    <h2 class="card-title">XRPL Network UI</h2>
+                    <p class="card-description">
+                        Interact with the XRP Ledger blockchain. Connect to networks, manage
+                        accounts, send requests, and submit transactions with a user-friendly
+                        interface.
+                    </p>
+                </a>
 
-            <a href="batch-testing-ui.html" class="card">
-                <div class="card-icon">🧪</div>
-                <h2 class="card-title">Batch Testing UI</h2>
-                <p class="card-description">
-                    Test XRPL Batch transactions with ease. Create test cases, manage wallets, 
-                    and run comprehensive tests with detailed reporting.
-                </p>
-            </a>
+                <a href="batch-testing-ui.html" class="card">
+                    <div class="card-icon">🧪</div>
+                    <h2 class="card-title">Batch Testing UI</h2>
+                    <p class="card-description">
+                        Test XRPL Batch transactions with ease. Create test cases, manage wallets,
+                        and run comprehensive tests with detailed reporting.
+                    </p>
+                </a>
 
-            <a href="github.html" class="card">
-                <div class="card-icon">📋</div>
-                <h2 class="card-title">GitHub PR Dashboard</h2>
-                <p class="card-description">
-                    Manage your GitHub pull requests with a Kanban board. Track CI status,
-                    add notes, organize with custom labels, and stay on top of your PRs.
-                </p>
-            </a>
+                <a href="github.html" class="card">
+                    <div class="card-icon">📋</div>
+                    <h2 class="card-title">GitHub PR Dashboard</h2>
+                    <p class="card-description">
+                        Manage your GitHub pull requests with a Kanban board. Track CI status, add
+                        notes, organize with custom labels, and stay on top of your PRs.
+                    </p>
+                </a>
 
-            <a href="smart-escrow-prs.html" class="card">
-                <div class="card-icon">🔀</div>
-                <h2 class="card-title">Smart Escrow PR Tracker</h2>
-                <p class="card-description">
-                    Track the stacked PRs for the XRPL Smart Escrow feature. View CI status,
-                    approvals, and update branches in stack order.
-                </p>
-            </a>
+                <a href="smart-escrow-prs.html" class="card">
+                    <div class="card-icon">🔀</div>
+                    <h2 class="card-title">Smart Escrow PR Tracker</h2>
+                    <p class="card-description">
+                        Track the stacked PRs for the XRPL Smart Escrow feature. View CI status,
+                        approvals, and update branches in stack order.
+                    </p>
+                </a>
 
-            <a href="release-tracker.html" class="card">
-                <div class="card-icon">🚢</div>
-                <h2 class="card-title">rippled Release Tracker</h2>
-                <p class="card-description">
-                    Track XRPLF/rippled PRs for a release milestone. See labels, CI,
-                    approvals, merge state, and update milestone membership.
-                </p>
-            </a>
+                <a href="release-tracker.html" class="card">
+                    <div class="card-icon">🚢</div>
+                    <h2 class="card-title">rippled Release Tracker</h2>
+                    <p class="card-description">
+                        Track XRPLF/rippled PRs for a release milestone. See labels, CI, approvals,
+                        merge state, and update milestone membership.
+                    </p>
+                </a>
 
-            <a href="feature-prs.html" class="card">
-                <div class="card-icon">🧭</div>
-                <h2 class="card-title">Base Branch PRs</h2>
-                <p class="card-description">
-                    Enter a repository and branch to see every pull request targeting that base,
-                    including draft state, conflicts, authors, and reviewer decisions.
-                </p>
-            </a>
+                <a href="feature-prs.html" class="card">
+                    <div class="card-icon">🧭</div>
+                    <h2 class="card-title">Base Branch PRs</h2>
+                    <p class="card-description">
+                        Enter a repository and branch to see every pull request targeting that base,
+                        including draft state, conflicts, authors, and reviewer decisions.
+                    </p>
+                </a>
 
-            <a href="xrpld.html" class="card">
-                <div class="card-icon">🔍</div>
-                <h2 class="card-title">XRPL Server Changes</h2>
-                <p class="card-description">Explore proposed changes to the XRP Ledger server (rippled). Browse current and past proposals, filter by category, and understand what each change does.</p>
-            </a>
+                <a href="xrpld.html" class="card">
+                    <div class="card-icon">🔍</div>
+                    <h2 class="card-title">XRPL Server Changes</h2>
+                    <p class="card-description">
+                        Explore proposed changes to the XRP Ledger server (rippled). Browse current
+                        and past proposals, filter by category, and understand what each change
+                        does.
+                    </p>
+                </a>
 
-            <a href="stacked.html" class="card">
-                <div class="card-icon">📚</div>
-                <h2 class="card-title">Stacked PR Dashboard</h2>
-                <p class="card-description">Visualize stacked pull requests as a DAG. See PR dependencies, collapse branches, track CI/review status, and navigate complex PR stacks with ease.</p>
-            </a>
+                <a href="stacked.html" class="card">
+                    <div class="card-icon">📚</div>
+                    <h2 class="card-title">Stacked PR Dashboard</h2>
+                    <p class="card-description">
+                        Visualize stacked pull requests as a DAG. See PR dependencies, collapse
+                        branches, track CI/review status, and navigate complex PR stacks with ease.
+                    </p>
+                </a>
 
-            <a href="pr.html" class="card">
-                <div class="card-icon">💬</div>
-                <h2 class="card-title">PR Comments</h2>
-                <p class="card-description">
-                    A clean, focused view of a single pull request's unresolved conversation.
-                    Read inline threads with code context, plus reply and resolve without leaving the page.
-                </p>
-            </a>
+                <a href="pr.html" class="card">
+                    <div class="card-icon">💬</div>
+                    <h2 class="card-title">PR Comments</h2>
+                    <p class="card-description">
+                        A clean, focused view of a single pull request's unresolved conversation.
+                        Read inline threads with code context, plus reply and resolve without
+                        leaving the page.
+                    </p>
+                </a>
 
-            <a href="json-table.html" class="card">
-                <div class="card-icon">▦</div>
-                <h2 class="card-title">JSON Table Viewer</h2>
-                <p class="card-description">
-                    Paste AI-generated JSON arrays, verify that each item is an object with matching keys,
-                    and inspect the data as a browser-only table with CSV export.
-                </p>
-            </a>
+                <a href="json-table.html" class="card">
+                    <div class="card-icon">▦</div>
+                    <h2 class="card-title">JSON Table Viewer</h2>
+                    <p class="card-description">
+                        Paste AI-generated JSON arrays, verify that each item is an object with
+                        matching keys, and inspect the data as a browser-only table with CSV export.
+                    </p>
+                </a>
+            </div>
+
+            <div class="footer">
+                <p>All tools run entirely in your browser - no backend required</p>
+                <p><a href="https://github.com/mvadari/uis" target="_blank">View on GitHub</a></p>
+            </div>
         </div>
-
-        <div class="footer">
-            <p>All tools run entirely in your browser - no backend required</p>
-            <p><a href="https://github.com/mvadari/uis" target="_blank">View on GitHub</a></p>
-        </div>
-    </div>
-</body>
+    </body>
 </html>
