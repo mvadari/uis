@@ -1,0 +1,24 @@
+# See https://pre-commit.com for more information
+# Install the git hook with: pre-commit install
+repos:
+    - repo: https://github.com/pre-commit/pre-commit-hooks
+      rev: v5.0.0
+      hooks:
+          - id: trailing-whitespace
+          - id: end-of-file-fixer
+          - id: check-yaml
+          - id: check-merge-conflict
+          - id: check-added-large-files
+            args: ['--maxkb=1024']
+          - id: mixed-line-ending
+            args: ['--fix=lf']
+
+    # Uses the locally-installed prettier (e.g. `brew install prettier`) instead of
+    # downloading its own copy, so it works behind a restricted npm registry.
+    - repo: local
+      hooks:
+          - id: prettier
+            name: prettier
+            entry: prettier --write --ignore-unknown
+            language: system
+            types_or: [html, css, javascript, json, markdown, yaml]
