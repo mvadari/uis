@@ -95,18 +95,20 @@ Track the stacked PRs for the XRPL Smart Escrow feature.
 
 ---
 
-### 🚢 rippled Release Tracker
+### 🚢 Release Tracker
 
-Track pull requests for an XRPLF/rippled release.
+Track pull requests for a release milestone in any GitHub repository (including private
+repos, using a token).
 
 **Features:**
 
-- Loads releases from open XRPLF/rippled milestones
+- Works with any `owner/repo` — defaults to XRPLF/rippled, shareable via the `repo` URL param
+- Loads releases from the repo's open milestones
 - Shows labels, CI status, merge state, and approval count
 - Assigns and removes PRs from the selected milestone
-- Shares GitHub token with PR Dashboard
+- Shares GitHub token with PR Dashboard (enables private repos)
 
-[**Launch rippled Release Tracker →**](https://mvadari.github.io/uis/release-tracker.html)
+[**Launch Release Tracker →**](https://mvadari.github.io/uis/release-tracker.html)
 
 ---
 

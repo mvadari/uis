@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>rippled Release Tracker</title>
+        <title>Release Tracker</title>
         <link rel="icon" type="image/svg+xml" href="favicon.svg" />
         <link rel="stylesheet" href="shared-styles.css" />
         <style>
@@ -79,7 +79,7 @@
 
             .release-form {
                 display: grid;
-                grid-template-columns: minmax(180px, 280px) 1fr;
+                grid-template-columns: minmax(160px, 240px) minmax(180px, 280px) 1fr;
                 gap: 10px;
                 align-items: end;
             }
@@ -646,8 +646,10 @@
                         ></path>
                     </svg>
                     <div class="title-block">
-                        <div class="header-title">rippled Release Tracker</div>
-                        <div class="header-subtitle">XRPLF/rippled release PR status</div>
+                        <div class="header-title">Release Tracker</div>
+                        <div class="header-subtitle" id="headerSubtitle">
+                            Release PR status by milestone
+                        </div>
                     </div>
                 </div>
                 <div class="header-controls">
@@ -660,6 +662,16 @@
 
             <div class="panel">
                 <div class="release-form">
+                    <div class="field">
+                        <label for="repoInput">Repository</label>
+                        <input
+                            type="text"
+                            id="repoInput"
+                            placeholder="owner/repo"
+                            autocomplete="off"
+                            spellcheck="false"
+                        />
+                    </div>
                     <div class="field">
                         <label for="releaseSelect">Release Milestone</label>
                         <select id="releaseSelect">
@@ -681,7 +693,7 @@
             <div class="panel status-bar">
                 <div class="status-item">
                     <span>Repository:</span>
-                    <strong>XRPLF/rippled</strong>
+                    <strong id="repoLabel">XRPLF/rippled</strong>
                 </div>
                 <div class="status-item">
                     <span>Last updated:</span>
@@ -761,9 +773,9 @@
 
         <script src="shared-utils.js"></script>
         <script>
-            const REPO_OWNER = 'XRPLF';
-            const REPO_NAME = 'rippled';
+            const DEFAULT_REPO = 'XRPLF/rippled';
             const TOKEN_KEY = 'github_token';
+            const REPO_KEY = 'release_tracker_repo';
             const RELEASE_KEY = 'rippled_release_tracker_release';
             const CACHE_KEY = 'rippled_release_tracker_cache';
             const CACHE_VERSION = 'all-prs-v5';
@@ -777,9 +789,29 @@
 
             let prs = [];
             let milestones = [];
+            let repoOwner = '';
+            let repoName = '';
             let releaseName = getReleaseFromHash() || localStorage.getItem(RELEASE_KEY) || '';
             let releaseCounts = null;
             let autoRefreshTimer = null;
+
+            function repoSlug() {
+                return `${repoOwner}/${repoName}`;
+            }
+
+            function normalizeRepo(value) {
+                return String(value || '')
+                    .trim()
+                    .replace(/^https?:\/\/github\.com\//i, '')
+                    .replace(/\.git$/i, '')
+                    .replace(/\/+$/, '');
+            }
+
+            function parseRepo(value) {
+                const match = normalizeRepo(value).match(/^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/);
+                if (!match) return null;
+                return { owner: match[1], repo: match[2], slug: `${match[1]}/${match[2]}` };
+            }
 
             function getReleaseFromHash() {
                 const hash = window.location.hash.replace(/^#/, '');
@@ -874,7 +906,7 @@
             }
 
             function cacheKey() {
-                return `${CACHE_KEY}:${CACHE_VERSION}:${releaseName.trim() || 'default'}`;
+                return `${CACHE_KEY}:${CACHE_VERSION}:${repoSlug()}:${releaseName.trim() || 'default'}`;
             }
 
             function compactPR(pr) {
@@ -952,7 +984,7 @@
             }
 
             function buildQuery(release, state) {
-                return `repo:${REPO_OWNER}/${REPO_NAME} is:pr is:${state} milestone:"${release.replace(/"/g, '\\"')}"`;
+                return `repo:${repoSlug()} is:pr is:${state} milestone:"${release.replace(/"/g, '\\"')}"`;
             }
 
             function buildLabelQuery(release, label, state = 'open') {
@@ -966,7 +998,13 @@
                     preview.textContent = 'Release lists are defined by GitHub milestones.';
                     return;
                 }
-                preview.innerHTML = `Searching all PRs in <code>milestone:"${escape(value)}"</code>.`;
+                preview.innerHTML = `Searching all PRs in <code>${escape(repoSlug())}</code> with <code>milestone:"${escape(value)}"</code>.`;
+            }
+
+            function updateRepoDisplay() {
+                document.getElementById('repoLabel').textContent = repoSlug();
+                document.getElementById('headerSubtitle').textContent =
+                    `${repoSlug()} release PR status`;
             }
 
             function selectedMilestone() {
@@ -996,7 +1034,7 @@
             async function fetchMilestones() {
                 const allMilestones = [];
                 for (let page = 1; page <= 5; page++) {
-                    const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/milestones?state=open&sort=due_on&direction=desc&per_page=100&page=${page}`;
+                    const url = `https://api.github.com/repos/${repoSlug()}/milestones?state=open&sort=due_on&direction=desc&per_page=100&page=${page}`;
                     const data = await githubRequest(url);
                     allMilestones.push(...data);
                     if (data.length < 100) break;
@@ -1017,11 +1055,14 @@
                 select.innerHTML = [
                     '<option value="">Choose a milestone...</option>',
                     ...milestones.map((milestone) => {
+                        // GitHub's milestone counts include both issues and PRs, so
+                        // they can differ from the PR-only totals in the summary tiles.
                         const details = [
                             `${milestone.open_issues} open`,
                             `${milestone.closed_issues} closed`,
                         ].join(', ');
-                        return `<option value="${escape(milestone.title)}" title="${escape(details)}">${escape(milestone.title)} (${escape(details)})</option>`;
+                        const detailsLabel = `${details} — issues + PRs`;
+                        return `<option value="${escape(milestone.title)}" title="${escape(detailsLabel)}">${escape(milestone.title)} (${escape(detailsLabel)})</option>`;
                     }),
                 ].join('');
 
@@ -1096,19 +1137,17 @@
             }
 
             async function fetchPR(number) {
-                return githubRequest(
-                    `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${number}`,
-                );
+                return githubRequest(`https://api.github.com/repos/${repoSlug()}/pulls/${number}`);
             }
 
             async function fetchCIStatus(sha) {
                 try {
                     const [checksData, statusData] = await Promise.all([
                         githubRequest(
-                            `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits/${sha}/check-runs`,
+                            `https://api.github.com/repos/${repoSlug()}/commits/${sha}/check-runs`,
                         ),
                         githubRequest(
-                            `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits/${sha}/status`,
+                            `https://api.github.com/repos/${repoSlug()}/commits/${sha}/status`,
                         ),
                     ]);
 
@@ -1172,7 +1211,7 @@
                     const reviews = [];
                     for (let page = 1; page <= 5; page++) {
                         const data = await githubRequest(
-                            `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${prNumber}/reviews?per_page=100&page=${page}`,
+                            `https://api.github.com/repos/${repoSlug()}/pulls/${prNumber}/reviews?per_page=100&page=${page}`,
                         );
                         reviews.push(...data);
                         if (data.length < 100) break;
@@ -1229,7 +1268,7 @@
                 const commits = [];
                 for (let page = 1; page <= 3; page++) {
                     const data = await githubRequest(
-                        `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${prNumber}/commits?per_page=100&page=${page}`,
+                        `https://api.github.com/repos/${repoSlug()}/pulls/${prNumber}/commits?per_page=100&page=${page}`,
                     );
                     commits.push(...data);
                     if (data.length < 100) break;
@@ -1690,9 +1729,7 @@
             function parsePRNumber(value) {
                 const trimmed = value.trim();
                 if (/^\d+$/.test(trimmed)) return Number(trimmed);
-                const match =
-                    trimmed.match(/github\.com\/XRPLF\/rippled\/pull\/(\d+)/i) ||
-                    trimmed.match(/\/pull\/(\d+)/i);
+                const match = trimmed.match(/\/pull\/(\d+)/i);
                 return match ? Number(match[1]) : null;
             }
 
@@ -1720,7 +1757,7 @@
                 }
                 try {
                     await githubRequest(
-                        `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${number}`,
+                        `https://api.github.com/repos/${repoSlug()}/issues/${number}`,
                         {
                             method: 'PATCH',
                             headers: { 'Content-Type': 'application/json' },
@@ -1748,7 +1785,7 @@
 
                 try {
                     await githubRequest(
-                        `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${number}`,
+                        `https://api.github.com/repos/${repoSlug()}/issues/${number}`,
                         {
                             method: 'PATCH',
                             headers: { 'Content-Type': 'application/json' },
@@ -1776,6 +1813,65 @@
             }
 
             document.getElementById('tokenStatus').textContent = getToken() ? 'Set' : 'Not set';
+
+            function getRepoFromURL() {
+                const params = new URLSearchParams(window.location.search);
+                return params.get('repo');
+            }
+
+            function setRepoParam(slug) {
+                const params = new URLSearchParams(window.location.search);
+                if (slug && slug !== DEFAULT_REPO) params.set('repo', slug);
+                else params.delete('repo');
+                const query = params.toString();
+                const newUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`;
+                history.replaceState(null, '', newUrl);
+            }
+
+            function applyRepo(slug) {
+                const parsed = parseRepo(slug);
+                if (!parsed) return false;
+                repoOwner = parsed.owner;
+                repoName = parsed.repo;
+                document.getElementById('repoInput').value = parsed.slug;
+                updateRepoDisplay();
+                return true;
+            }
+
+            async function handleRepoChange() {
+                const parsed = parseRepo(document.getElementById('repoInput').value);
+                if (!parsed) {
+                    notify('Enter a repository as owner/repo', 'error');
+                    return;
+                }
+                if (parsed.slug === repoSlug()) return;
+
+                applyRepo(parsed.slug);
+                localStorage.setItem(REPO_KEY, parsed.slug);
+                setRepoParam(parsed.slug);
+
+                // Milestones and PRs belong to the previous repo — reset everything.
+                prs = [];
+                milestones = [];
+                releaseCounts = null;
+                releaseName = '';
+                localStorage.removeItem(RELEASE_KEY);
+                setReleaseHash('');
+                document.getElementById('error').style.display = 'none';
+                document.getElementById('prList').innerHTML =
+                    '<div class="empty-state">Choose a release milestone to load matching pull requests.</div>';
+                renderSummary();
+                await loadMilestones();
+                if (releaseName) fetchAllPRs();
+            }
+
+            document.getElementById('repoInput').addEventListener('change', handleRepoChange);
+            document.getElementById('repoInput').addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    handleRepoChange();
+                }
+            });
 
             document.getElementById('releaseSelect').addEventListener('change', () => {
                 setReleaseHash(document.getElementById('releaseSelect').value);
@@ -1832,6 +1928,7 @@
 
             async function initialize() {
                 applyFiltersFromURL();
+                applyRepo(getRepoFromURL() || localStorage.getItem(REPO_KEY) || DEFAULT_REPO);
                 await loadMilestones();
                 if (!releaseName) {
                     setupAutoRefresh();
