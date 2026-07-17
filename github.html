@@ -1398,6 +1398,32 @@
                 border-radius: 6px;
             }
 
+            .query-item.dragging {
+                opacity: 0.5;
+            }
+
+            .query-item.drag-over-top {
+                box-shadow: inset 0 2px 0 0 #0969da;
+            }
+
+            .query-item.drag-over-bottom {
+                box-shadow: inset 0 -2px 0 0 #0969da;
+            }
+
+            .query-drag-handle {
+                flex-shrink: 0;
+                cursor: grab;
+                color: #8c959f;
+                font-size: 16px;
+                line-height: 1;
+                padding: 0 2px;
+                user-select: none;
+            }
+
+            .query-drag-handle:active {
+                cursor: grabbing;
+            }
+
             .query-checkbox {
                 flex-shrink: 0;
                 width: 16px;
@@ -2156,6 +2182,15 @@
                     background-color: #21262d;
                     border-color: #30363d;
                 }
+                .query-item.drag-over-top {
+                    box-shadow: inset 0 2px 0 0 #58a6ff;
+                }
+                .query-item.drag-over-bottom {
+                    box-shadow: inset 0 -2px 0 0 #58a6ff;
+                }
+                .query-drag-handle {
+                    color: #6e7681;
+                }
                 .query-name-input {
                     background-color: #0d1117;
                     color: #e6edf3;
@@ -2846,6 +2881,7 @@
             let currentSettingsTab = 'token'; // Track current settings tab
             let tempLabels = []; // Temporary labels for editing
             let tempQueries = []; // Temporary queries for editing
+            let draggedQueryIndex = null; // Index of query row being dragged in the editor
 
             // Load labels from localStorage
             function getLabels() {
@@ -4964,6 +5000,7 @@
                 tempQueries.forEach((query, index) => {
                     html += `
                     <div class="query-item" data-index="${index}">
+                        <span class="query-drag-handle" draggable="true" data-index="${index}" title="Drag to reorder" aria-label="Drag to reorder">⠿</span>
                         <input type="checkbox"
                                class="query-checkbox"
                                ${query.enabled ? 'checked' : ''}
@@ -5011,6 +5048,65 @@
                         deleteQuery(index);
                     });
                 });
+
+                const clearDropMarkers = () => {
+                    queryList
+                        .querySelectorAll('.drag-over-top, .drag-over-bottom')
+                        .forEach((el) => el.classList.remove('drag-over-top', 'drag-over-bottom'));
+                };
+
+                queryList.querySelectorAll('.query-drag-handle').forEach((handle) => {
+                    handle.addEventListener('dragstart', (e) => {
+                        draggedQueryIndex = parseInt(handle.dataset.index);
+                        e.dataTransfer.effectAllowed = 'move';
+                        // Some browsers require data to be set for dragging to start.
+                        e.dataTransfer.setData('text/plain', String(draggedQueryIndex));
+                        handle.closest('.query-item').classList.add('dragging');
+                    });
+                    handle.addEventListener('dragend', () => {
+                        clearDropMarkers();
+                        queryList
+                            .querySelectorAll('.dragging')
+                            .forEach((el) => el.classList.remove('dragging'));
+                        draggedQueryIndex = null;
+                    });
+                });
+
+                queryList.querySelectorAll('.query-item').forEach((item) => {
+                    item.addEventListener('dragover', (e) => {
+                        if (draggedQueryIndex === null) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                        const rect = item.getBoundingClientRect();
+                        const after = e.clientY > rect.top + rect.height / 2;
+                        item.classList.toggle('drag-over-bottom', after);
+                        item.classList.toggle('drag-over-top', !after);
+                    });
+                    item.addEventListener('dragleave', () => {
+                        item.classList.remove('drag-over-top', 'drag-over-bottom');
+                    });
+                    item.addEventListener('drop', (e) => {
+                        if (draggedQueryIndex === null) return;
+                        e.preventDefault();
+                        const rect = item.getBoundingClientRect();
+                        const after = e.clientY > rect.top + rect.height / 2;
+                        moveQuery(draggedQueryIndex, parseInt(item.dataset.index), after);
+                    });
+                });
+            }
+
+            function moveQuery(from, target, after) {
+                if (from === null || Number.isNaN(target)) return;
+                let insert = after ? target + 1 : target;
+                const [moved] = tempQueries.splice(from, 1);
+                // Removing the dragged item shifts later indices down by one.
+                if (from < insert) insert -= 1;
+                if (insert === from) {
+                    tempQueries.splice(from, 0, moved);
+                } else {
+                    tempQueries.splice(insert, 0, moved);
+                }
+                renderQueryEditor();
             }
 
             function addNewQuery() {
