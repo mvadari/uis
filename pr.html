@@ -2062,8 +2062,10 @@
             function renderPRHeader() {
                 if (!prMeta) {
                     els.prHeader.innerHTML = '';
+                    document.title = 'PR Review';
                     return;
                 }
+                document.title = `#${prMeta.number} ${prMeta.title} · PR Review`;
                 const st = stateInfo(prMeta);
                 const login = prMeta.author && prMeta.author.login ? prMeta.author.login : 'ghost';
                 const authorUrl =
