@@ -2460,7 +2460,8 @@
                                 <li><code>author:@me</code> - PRs you authored</li>
                                 <li><code>assignee:@me</code> - PRs assigned to you</li>
                                 <li>
-                                    <code>review-requested:@me</code> - PRs requesting your review
+                                    <code>user-review-requested:@me</code> - PRs requesting your
+                                    review
                                 </li>
                                 <li><code>reviewed-by:@me</code> - PRs you've reviewed</li>
                                 <li><code>milestone:"v1.0"</code> - PRs in a specific milestone</li>
@@ -2742,7 +2743,7 @@
                 {
                     id: 'q3',
                     name: 'Review requested',
-                    query: 'review-requested:@me',
+                    query: 'user-review-requested:@me',
                     enabled: true,
                 },
                 { id: 'q4', name: 'Reviewed by me', query: 'reviewed-by:@me', enabled: true },
