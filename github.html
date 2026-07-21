@@ -440,6 +440,34 @@
                 align-items: center;
             }
 
+            .pr-milestone {
+                display: inline-flex;
+                align-items: center;
+                gap: 3px;
+                padding: 1px 7px;
+                border-radius: 999px;
+                font-size: 10px;
+                font-weight: 500;
+                text-decoration: none;
+                background-color: #ddf4ff;
+                color: #0969da;
+                border: 1px solid #b6e3ff;
+                max-width: 220px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            a.pr-milestone:hover {
+                background-color: #b6e3ff;
+            }
+
+            .pr-milestone.none {
+                background-color: #f6f8fa;
+                color: #8c959f;
+                border: 1px dashed #d0d7de;
+            }
+
             .ci-status {
                 display: inline-flex;
                 align-items: center;
@@ -1930,6 +1958,19 @@
                 }
                 .pr-meta {
                     color: #8b949e;
+                }
+                .pr-milestone {
+                    background-color: #121d2f;
+                    color: #58a6ff;
+                    border-color: #1f3a5f;
+                }
+                a.pr-milestone:hover {
+                    background-color: #1f3a5f;
+                }
+                .pr-milestone.none {
+                    background-color: #161b22;
+                    color: #6e7681;
+                    border-color: #30363d;
                 }
                 .ci-success {
                     color: #3fb950;
@@ -3796,6 +3837,12 @@
                 </span>
             `;
 
+                // Milestone marker
+                const milestoneBadge =
+                    pr.milestone && pr.milestone.title
+                        ? `<a href="${pr.milestone.html_url}" target="_blank" class="pr-milestone" title="Milestone: ${escapeHtml(pr.milestone.title)}">🎯 ${escapeHtml(pr.milestone.title)}</a>`
+                        : `<span class="pr-milestone none" title="Not assigned to a milestone">🎯 No milestone</span>`;
+
                 // PR icon - draft, merge queue, or regular
                 const inMergeQueue = pr.mergeable_state === 'queued' || pr.auto_merge != null;
                 const prIcon = pr.draft
@@ -3828,6 +3875,7 @@
                                 #${pr.number} • Updated ${updatedText}
                             </span>
                             <div class="pr-status">
+                                ${milestoneBadge}
                                 ${ciIcon}
                                 ${conflictWarning}
                                 ${updateBranchBtn}
