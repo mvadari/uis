@@ -652,10 +652,16 @@
                                         Send Request
                                     </button>
                                     <button
+                                        onclick="copyLastOutput('requestOutput')"
+                                        aria-label="Copy last request output"
+                                    >
+                                        Copy Last
+                                    </button>
+                                    <button
                                         onclick="copyOutput('requestOutput')"
                                         aria-label="Copy request log"
                                     >
-                                        Copy
+                                        Copy All
                                     </button>
                                     <button
                                         onclick="document.getElementById('requestOutput').textContent = ''"
@@ -712,10 +718,16 @@
                                         Send Transaction
                                     </button>
                                     <button
+                                        onclick="copyLastOutput('txOutput')"
+                                        aria-label="Copy last transaction output"
+                                    >
+                                        Copy Last
+                                    </button>
+                                    <button
                                         onclick="copyOutput('txOutput')"
                                         aria-label="Copy transaction log"
                                     >
-                                        Copy
+                                        Copy All
                                     </button>
                                     <button
                                         onclick="document.getElementById('txOutput').textContent = ''"
@@ -904,7 +916,8 @@
                 </div>
                 <div style="display: flex; gap: 12px;">
                     <button onclick="sendRequest()" aria-label="Send WebSocket request">Send Request</button>
-                    <button onclick="copyOutput('requestOutput')" aria-label="Copy request log">Copy</button>
+                    <button onclick="copyLastOutput('requestOutput')" aria-label="Copy last request output">Copy Last</button>
+                    <button onclick="copyOutput('requestOutput')" aria-label="Copy request log">Copy All</button>
                     <button onclick="document.getElementById('requestOutput').textContent = ''" aria-label="Clear request log">Clear Log</button>
                 </div>
                 <div class="output" id="requestOutput" role="log" aria-live="polite"></div>
@@ -933,7 +946,8 @@
                 </div>
                 <div style="display: flex; gap: 12px;">
                     <button onclick="sendTransaction()" aria-label="Submit and sign transaction">Send Transaction</button>
-                    <button onclick="copyOutput('txOutput')" aria-label="Copy transaction log">Copy</button>
+                    <button onclick="copyLastOutput('txOutput')" aria-label="Copy last transaction output">Copy Last</button>
+                    <button onclick="copyOutput('txOutput')" aria-label="Copy transaction log">Copy All</button>
                     <button onclick="document.getElementById('txOutput').textContent = ''" aria-label="Clear transaction log">Clear Log</button>
                 </div>
                 <div class="output" id="txOutput" role="log" aria-live="polite"></div>
@@ -968,16 +982,8 @@
                 }, 5000);
             }
 
-            // Copy output to clipboard
-            async function copyOutput(elementId) {
-                const outputEl = document.getElementById(elementId);
-                const text = outputEl.textContent;
-
-                if (!text) {
-                    showToast('Nothing to copy', 'info');
-                    return;
-                }
-
+            // Write text to the clipboard, with a fallback for older browsers.
+            async function writeToClipboard(text) {
                 try {
                     await navigator.clipboard.writeText(text);
                     showToast('Copied to clipboard!', 'success');
@@ -997,6 +1003,34 @@
                     }
                     document.body.removeChild(textArea);
                 }
+            }
+
+            // Copy the entire output log to clipboard
+            async function copyOutput(elementId) {
+                const text = document.getElementById(elementId).textContent;
+                if (!text) {
+                    showToast('Nothing to copy', 'info');
+                    return;
+                }
+                await writeToClipboard(text);
+            }
+
+            // Copy only the most recent output entry. Entries are prepended
+            // newest-first and separated by a line of '=' characters, so the last
+            // output is everything before the first separator.
+            async function copyLastOutput(elementId) {
+                const text = document.getElementById(elementId).textContent;
+                if (!text) {
+                    showToast('Nothing to copy', 'info');
+                    return;
+                }
+                const separator = '='.repeat(80);
+                const last = text.split(separator)[0].trim();
+                if (!last) {
+                    showToast('Nothing to copy', 'info');
+                    return;
+                }
+                await writeToClipboard(last);
             }
 
             // Check if xrpl library is loaded
