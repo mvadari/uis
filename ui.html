@@ -631,7 +631,6 @@
                                         <option value="ledger_data">Ledger Data</option>
                                         <option value="ledger_entry">Ledger Entry</option>
                                         <option value="tx">Transaction</option>
-                                        <option value="simulate">Simulate</option>
                                         <option value="amm_info">AMM Info</option>
                                         <option value="fee">Fee</option>
                                         <option value="server_info">Server Info</option>
@@ -716,6 +715,12 @@
                                         aria-label="Submit and sign transaction"
                                     >
                                         Send Transaction
+                                    </button>
+                                    <button
+                                        onclick="simulateTransaction()"
+                                        aria-label="Simulate transaction without submitting"
+                                    >
+                                        Simulate
                                     </button>
                                     <button
                                         onclick="copyLastOutput('txOutput')"
@@ -903,7 +908,6 @@
                         <option value="ledger_data">Ledger Data</option>
                         <option value="ledger_entry">Ledger Entry</option>
                         <option value="tx">Transaction</option>
-                        <option value="simulate">Simulate</option>
                         <option value="amm_info">AMM Info</option>
                         <option value="fee">Fee</option>
                         <option value="server_info">Server Info</option>
@@ -946,6 +950,7 @@
                 </div>
                 <div style="display: flex; gap: 12px;">
                     <button onclick="sendTransaction()" aria-label="Submit and sign transaction">Send Transaction</button>
+                    <button onclick="simulateTransaction()" aria-label="Simulate transaction without submitting">Simulate</button>
                     <button onclick="copyLastOutput('txOutput')" aria-label="Copy last transaction output">Copy Last</button>
                     <button onclick="copyOutput('txOutput')" aria-label="Copy transaction log">Copy All</button>
                     <button onclick="document.getElementById('txOutput').textContent = ''" aria-label="Clear transaction log">Clear Log</button>
@@ -1282,7 +1287,6 @@
                         '{\n  "command": "ledger_data",\n  "ledger_index": "validated",\n  "limit": 10\n}',
                     ledger_entry: `{\n  "command": "ledger_entry",\n  "account_root": "${accountAddress}",\n  "ledger_index": "validated"\n}`,
                     tx: '{\n  "command": "tx",\n  "transaction": "TRANSACTION_HASH_HERE"\n}',
-                    simulate: `{\n  "command": "simulate",\n  "tx_json": {\n    "TransactionType": "Payment",\n    "Account": "${accountAddress}",\n    "Destination": "rLHzPsX6oXkzU9...",\n    "Amount": "1000000"\n  }\n}`,
                     amm_info:
                         '{\n  "command": "amm_info",\n  "asset": {\n    "currency": "XRP"\n  },\n  "asset2": {\n    "currency": "USD",\n    "issuer": "rLHzPsX6oXkzU9..."\n  }\n}',
                     fee: '{\n  "command": "fee"\n}',
@@ -1425,6 +1429,62 @@
                     const logEntry = `[${timestamp}] Error: ${error.message}\n\n${'='.repeat(80)}\n\n`;
                     outputEl.textContent = logEntry + outputEl.textContent;
                     showToast('Transaction failed: ' + error.message, 'error');
+                }
+            }
+
+            // Simulate a transaction via the `simulate` command without signing or
+            // submitting it. No secret is required.
+            async function simulateTransaction() {
+                if (!client) {
+                    showToast('Not connected to network', 'error');
+                    return;
+                }
+
+                const txBody = txEditor ? txEditor.getValue() : '';
+
+                // Validate JSON syntax
+                try {
+                    JSON.parse(txBody);
+                } catch (error) {
+                    const outputEl = document.getElementById('txOutput');
+                    const timestamp = new Date().toLocaleTimeString();
+                    const logEntry = `[${timestamp}] Invalid JSON: ${error.message}\n\n`;
+                    outputEl.textContent = logEntry + outputEl.textContent;
+                    outputEl.classList.add('error');
+                    showToast('Invalid JSON: ' + error.message, 'error');
+                    return;
+                }
+
+                try {
+                    const tx = JSON.parse(txBody);
+                    const response = await client.request({
+                        command: 'simulate',
+                        tx_json: tx,
+                    });
+
+                    const outputEl = document.getElementById('txOutput');
+                    const timestamp = new Date().toLocaleTimeString();
+                    const logEntry = `[${timestamp}] Simulate:\n${JSON.stringify(tx, null, 2)}\n\nResponse:\n${JSON.stringify(response, null, 2)}\n\n${'='.repeat(80)}\n\n`;
+                    outputEl.textContent = logEntry + outputEl.textContent;
+
+                    const engineResult =
+                        response.result?.engine_result || response.result?.meta?.TransactionResult;
+                    if (engineResult === 'tesSUCCESS') {
+                        outputEl.classList.remove('error');
+                        showToast(`Simulation succeeded: ${engineResult}`, 'success');
+                    } else if (engineResult) {
+                        outputEl.classList.add('error');
+                        showToast(`Simulation result: ${engineResult}`, 'error');
+                    } else {
+                        outputEl.classList.remove('error');
+                        showToast('Simulation complete', 'info');
+                    }
+                } catch (error) {
+                    const outputEl = document.getElementById('txOutput');
+                    const timestamp = new Date().toLocaleTimeString();
+                    const logEntry = `[${timestamp}] Error: ${error.message}\n\n${'='.repeat(80)}\n\n`;
+                    outputEl.textContent = logEntry + outputEl.textContent;
+                    showToast('Simulation failed: ' + error.message, 'error');
                 }
             }
 
