@@ -3022,6 +3022,18 @@
                     setupAutoRefresh();
                 });
                 els.prInput.addEventListener('input', updateQueryPreview);
+                els.prInput.addEventListener('paste', (event) => {
+                    const pasted = (event.clipboardData || window.clipboardData)?.getData('text');
+                    const parsed = parsePRInput(pasted);
+                    if (!parsed) return;
+                    // A pasted PR URL/reference should load immediately. Replace the
+                    // field with the pasted value and fetch, skipping the default paste
+                    // (which would otherwise splice into any existing text).
+                    event.preventDefault();
+                    els.prInput.value = pasted.trim();
+                    updateQueryPreview();
+                    loadPR();
+                });
                 els.filterInput.addEventListener('input', renderContent);
                 els.toggleResolvedButton.addEventListener('click', () => {
                     showResolved = !showResolved;
