@@ -424,20 +424,21 @@
                 line-height: 1.4;
                 margin-top: 2px;
                 display: flex;
-                align-items: center;
-                gap: 6px;
-                flex-wrap: wrap;
+                flex-direction: column;
+                gap: 4px;
             }
 
             .pr-meta-text {
-                flex: 1;
-                min-width: 0;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
             }
 
             .pr-status {
                 display: flex;
                 gap: 6px;
                 align-items: center;
+                flex-wrap: wrap;
             }
 
             .pr-milestone {
@@ -452,7 +453,7 @@
                 background-color: #ddf4ff;
                 color: #0969da;
                 border: 1px solid #b6e3ff;
-                max-width: 220px;
+                max-width: 130px;
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
