@@ -213,6 +213,12 @@ python -m http.server 8000
 # Then visit http://localhost:8000
 ```
 
+## Chrome Extension
+
+[`chrome-extension/`](chrome-extension/) is an unpacked Chrome extension that opens the GitHub
+pull request you're viewing in the PR Comments tool — click the toolbar icon, press `Alt+P`, or
+right-click a PR link. See its [README](chrome-extension/README.md) for install instructions.
+
 ## Deployment
 
 This project uses GitHub Actions to automatically deploy to GitHub Pages on every push to `main`.
