@@ -6084,27 +6084,25 @@
                 ${queriesHtml}
             `;
 
-                // Position the tooltip
+                // Position the tooltip. Measure it after the content is in place - it is
+                // hidden with opacity, not display, so it already has its final size here.
+                // (Using its real height matters for tall tooltips near the bottom edge:
+                // a fixed guess leaves them running off-screen and unreadable.)
+                const margin = 10;
                 const rect = prItem.getBoundingClientRect();
                 const tooltipRect = tooltip.getBoundingClientRect();
 
                 // Position to the right of the PR card if there's space, otherwise to the left
-                let left = rect.right + 10;
-                if (left + 350 > window.innerWidth) {
-                    left = rect.left - 360;
+                let left = rect.right + margin;
+                if (left + tooltipRect.width + margin > window.innerWidth) {
+                    left = rect.left - tooltipRect.width - margin;
                 }
-                if (left < 10) {
-                    left = 10;
-                }
+                left = Math.max(margin, left);
 
-                // Vertically center on the PR card
-                let top = rect.top + rect.height / 2 - 60;
-                if (top < 10) {
-                    top = 10;
-                }
-                if (top + 150 > window.innerHeight) {
-                    top = window.innerHeight - 160;
-                }
+                // Vertically center on the PR card, then keep it fully on screen
+                let top = rect.top + rect.height / 2 - tooltipRect.height / 2;
+                top = Math.min(top, window.innerHeight - tooltipRect.height - margin);
+                top = Math.max(margin, top);
 
                 tooltip.style.left = `${left}px`;
                 tooltip.style.top = `${top}px`;
