@@ -3003,6 +3003,24 @@
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(labels));
             }
 
+            // A PR with no label lives in the "unlabeled" column, which stores as ''.
+            function normalizeLabelId(labelId) {
+                return labelId === '' || labelId === undefined ? 'unlabeled' : labelId;
+            }
+
+            // The single way a PR changes column. Everything that moves a card (drag and drop,
+            // the right-click menu) goes through here and lets renderPRs() rebuild the board,
+            // so the board can't drift from the render rules - which columns are hidden when
+            // empty, which auto-collapse, header counts, empty states.
+            function movePRToColumn(prId, newLabelId) {
+                const currentLabelId = normalizeLabelId(getLabels()[prId]);
+                if (currentLabelId === newLabelId) return false;
+
+                saveLabel(prId, newLabelId === 'unlabeled' ? '' : newLabelId);
+                renderPRs();
+                return true;
+            }
+
             // PR Notes functions
             function getPRNotes() {
                 const stored = localStorage.getItem(NOTES_KEY);
@@ -4166,13 +4184,6 @@
                 columnItemCounts[labelId] = newCount;
             }
 
-            // Sync a column's DOM 'minimized' class with the current minimizedColumns state
-            function applyColumnMinimizedState(labelId) {
-                const column = document.querySelector(`.kanban-column[data-label="${labelId}"]`);
-                if (!column) return;
-                column.classList.toggle('minimized', minimizedColumns.has(labelId));
-            }
-
             // Render PRs in Kanban view
             function renderPRs() {
                 const prLabels = getLabels();
@@ -4610,7 +4621,6 @@
                             const draggingItem = document.querySelector('.dragging');
                             if (draggingItem) {
                                 const prId = draggingItem.dataset.prId;
-                                const oldLabel = getLabels()[prId] || '';
                                 const newLabel = column.dataset.label;
                                 const sortMode = columnSortModes[newLabel] || 'updated';
 
@@ -4631,18 +4641,8 @@
                                     }, 0);
                                 }
 
-                                // Save the new label if it changed
-                                const normalizedOldLabel = oldLabel === '' ? 'unlabeled' : oldLabel;
-                                if (normalizedOldLabel !== newLabel) {
-                                    if (newLabel === 'unlabeled') {
-                                        saveLabel(prId, '');
-                                    } else {
-                                        saveLabel(prId, newLabel);
-                                    }
-
-                                    // Re-render
-                                    renderPRs();
-                                }
+                                // Save the new label if it changed, and re-render
+                                movePRToColumn(prId, newLabel);
                             }
                         }
                     });
@@ -4668,31 +4668,6 @@
                     },
                     { offset: Number.NEGATIVE_INFINITY },
                 ).element;
-            }
-
-            // Update the count displayed in a column header
-            function updateColumnHeaderCount(contentElement) {
-                if (!contentElement) return;
-                const column = contentElement.closest('.kanban-column');
-                if (!column) return;
-                const labelId = column.dataset.label;
-                const label = LABELS.find((l) => l.id === labelId);
-                if (!label) return;
-                const count = contentElement.querySelectorAll('.pr-item').length;
-                const headerSpan = column.querySelector('.kanban-header-top span');
-                if (headerSpan) {
-                    headerSpan.textContent = `${label.name} (${count})`;
-                }
-                // Show empty state if column is now empty
-                if (count === 0 && !contentElement.querySelector('.empty-state')) {
-                    contentElement.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">📭</div>
-                        <div class="empty-state-text">No PRs here</div>
-                        <div class="empty-state-hint">Drag PRs here to organize them</div>
-                    </div>
-                `;
-                }
             }
 
             // Show a .context-menu at a point, flipping it upward and capping the scrollable
@@ -4781,63 +4756,7 @@
                 contextMenu.addEventListener('click', (e) => {
                     const menuItem = e.target.closest('.context-menu-item');
                     if (menuItem && currentPRId) {
-                        const newLabel = menuItem.dataset.label;
-                        const currentLabel = getLabels()[currentPRId] || '';
-                        const normalizedCurrentLabel =
-                            currentLabel === '' ? 'unlabeled' : currentLabel;
-
-                        // Only move if the label actually changed
-                        if (newLabel !== normalizedCurrentLabel) {
-                            // Save the new label
-                            if (newLabel === 'unlabeled') {
-                                saveLabel(currentPRId, '');
-                            } else {
-                                saveLabel(currentPRId, newLabel);
-                            }
-
-                            // Move the card in the DOM directly instead of re-rendering
-                            const prItem = document.querySelector(
-                                `.pr-item[data-pr-id="${currentPRId}"]`,
-                            );
-                            const targetContent = document.querySelector(
-                                `.kanban-content[data-label="${newLabel}"]`,
-                            );
-
-                            if (prItem && targetContent) {
-                                // Remove empty state from target column if present
-                                const emptyState = targetContent.querySelector('.empty-state');
-                                if (emptyState) emptyState.remove();
-
-                                // Remember source column to update its count and possibly show empty state
-                                const sourceContent = prItem.closest('.kanban-content');
-                                const sourceLabel = sourceContent
-                                    ? sourceContent.dataset.label
-                                    : null;
-
-                                // Move the card
-                                targetContent.appendChild(prItem);
-
-                                // Update column header counts
-                                updateColumnHeaderCount(sourceContent);
-                                updateColumnHeaderCount(targetContent);
-
-                                // Auto-collapse/expand columns that just crossed the zero-item boundary
-                                if (sourceLabel) {
-                                    applyAutoCollapseState(
-                                        sourceLabel,
-                                        sourceContent.querySelectorAll('.pr-item').length,
-                                    );
-                                    applyColumnMinimizedState(sourceLabel);
-                                }
-                                applyAutoCollapseState(
-                                    newLabel,
-                                    targetContent.querySelectorAll('.pr-item').length,
-                                );
-                                applyColumnMinimizedState(newLabel);
-                                saveMinimizedColumns();
-                                saveManuallyToggledColumns();
-                            }
-                        }
+                        movePRToColumn(currentPRId, menuItem.dataset.label);
 
                         // Close menu
                         contextMenu.classList.remove('show');
