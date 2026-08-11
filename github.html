@@ -244,6 +244,27 @@
                 border-color: #0969da;
             }
 
+            /* Tucked into the right end of the existing sort row, so it costs no extra space. */
+            .kanban-sort .copy-urls-btn {
+                margin-left: auto;
+                padding: 2px 5px;
+                line-height: 1;
+                opacity: 0.5;
+                transition: opacity 0.15s ease;
+            }
+
+            .kanban-column:hover .kanban-sort .copy-urls-btn,
+            .kanban-sort .copy-urls-btn:focus-visible {
+                opacity: 1;
+            }
+
+            .kanban-sort .copy-urls-btn svg {
+                display: block;
+                width: 12px;
+                height: 12px;
+                fill: currentColor;
+            }
+
             .kanban-column.minimized .kanban-header {
                 writing-mode: vertical-rl;
                 text-orientation: mixed;
@@ -2810,6 +2831,8 @@
             const QUERY_SETTINGS_KEY = 'github_pr_query_settings';
             const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
 
+            const ICON_COPY_LINK = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7.775 3.275a.75.75 0 001.06 1.06l1.25-1.25a2 2 0 112.83 2.83l-2.5 2.5a2 2 0 01-2.83 0 .75.75 0 00-1.06 1.06 3.5 3.5 0 004.95 0l2.5-2.5a3.5 3.5 0 00-4.95-4.95l-1.25 1.25zm-4.69 9.64a2 2 0 010-2.83l2.5-2.5a2 2 0 012.83 0 .75.75 0 001.06-1.06 3.5 3.5 0 00-4.95 0l-2.5 2.5a3.5 3.5 0 004.95 4.95l1.25-1.25a.75.75 0 00-1.06-1.06l-1.25 1.25a2 2 0 01-2.83 0z"></path></svg>`;
+
             // Default query settings - array of query objects
             const DEFAULT_QUERY_SETTINGS = [
                 { id: 'q1', name: 'My PRs', query: 'author:@me', enabled: true },
@@ -4244,6 +4267,7 @@
                                 <button class="sort-btn ${sortMode === 'updated' ? 'active' : ''}" data-label="${label.id}" data-mode="updated">Updated</button>
                                 <button class="sort-btn ${sortMode === 'created' ? 'active' : ''}" data-label="${label.id}" data-mode="created">Created</button>
                                 <button class="sort-btn ${sortMode === 'custom' ? 'active' : ''}" data-label="${label.id}" data-mode="custom">Custom</button>
+                                <button class="copy-urls-btn" data-label="${label.id}" type="button" title="Copy the URLs of every PR in this column (hold Shift for Markdown links)" aria-label="Copy PR URLs in this column">${ICON_COPY_LINK}</button>
                             </div>
                         </div>
                         <div class="kanban-content" data-label="${label.id}">
@@ -4376,6 +4400,46 @@
                         renderPRs();
                     });
                 });
+
+                // Setup per-column "copy URLs" buttons
+                document.querySelectorAll('.copy-urls-btn').forEach((btn) => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        copyColumnURLs(btn, e.shiftKey);
+                    });
+                });
+            }
+
+            // Copy every PR URL in a column, in the order currently displayed. Reads the
+            // rendered cards so filters and the active sort mode are reflected as-is.
+            async function copyColumnURLs(btn, asMarkdown) {
+                const column = btn.closest('.kanban-column');
+                const links = Array.from(column.querySelectorAll('.kanban-content .pr-title'));
+
+                if (links.length === 0) {
+                    showToast('No PRs in this column', 'error', 2000);
+                    return;
+                }
+
+                const text = links
+                    .map((link) =>
+                        asMarkdown ? `- [${link.textContent.trim()}](${link.href})` : link.href,
+                    )
+                    .join('\n');
+
+                // Not copyToClipboard() from shared-utils: it shows its own generic toast, and
+                // the count is the useful confirmation here.
+                try {
+                    await navigator.clipboard.writeText(text);
+                    showToast(
+                        `Copied ${links.length} URL${links.length === 1 ? '' : 's'}`,
+                        'success',
+                        2000,
+                    );
+                } catch (error) {
+                    console.error('Copy failed:', error);
+                    showToast('Failed to copy', 'error', 2000);
+                }
             }
 
             // Setup drag and drop
