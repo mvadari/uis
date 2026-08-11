@@ -490,6 +490,22 @@
                 border: 1px dashed #d0d7de;
             }
 
+            /* Both badge variants open the milestone picker on plain click. */
+            .pr-milestone.editable {
+                cursor: pointer;
+            }
+
+            .pr-milestone.none.editable:hover {
+                background-color: #eaeef2;
+                border-color: #afb8c1;
+                color: #57606a;
+            }
+
+            .pr-milestone.pending {
+                opacity: 0.6;
+                pointer-events: none;
+            }
+
             .ci-status {
                 display: inline-flex;
                 align-items: center;
@@ -1393,6 +1409,17 @@
                 font-weight: bold;
             }
 
+            /* Non-selectable rows: loading, errors, "no open milestones". */
+            .context-menu-item.muted {
+                color: #57606a;
+                font-size: 13px;
+                cursor: default;
+            }
+
+            .context-menu-item.muted:hover {
+                background-color: transparent;
+            }
+
             .note-textarea {
                 width: 100%;
                 min-height: 150px;
@@ -1990,6 +2017,14 @@
                     background-color: #161b22;
                     color: #6e7681;
                     border-color: #30363d;
+                }
+                .pr-milestone.none.editable:hover {
+                    background-color: #21262d;
+                    border-color: #484f58;
+                    color: #8b949e;
+                }
+                .context-menu-item.muted {
+                    color: #8b949e;
                 }
                 .ci-success {
                     color: #3fb950;
@@ -2804,6 +2839,12 @@
         <div id="prContextMenu" class="context-menu">
             <div class="context-menu-header">Move to Column</div>
             <div id="contextMenuItems" class="context-menu-items"></div>
+        </div>
+
+        <!-- Milestone picker, opened by clicking a card's milestone badge -->
+        <div id="milestoneMenu" class="context-menu">
+            <div class="context-menu-header">Set Milestone</div>
+            <div id="milestoneMenuItems" class="context-menu-items"></div>
         </div>
 
         <script src="shared-utils.js"></script>
@@ -3861,11 +3902,12 @@
                 </span>
             `;
 
-                // Milestone marker
+                // Milestone marker - click opens the picker, ⌘/Ctrl-click still opens GitHub
+                const milestoneData = `data-pr-id="${pr.id}" data-pr-number="${pr.number}" data-repo-url="${pr.repository_url}"`;
                 const milestoneBadge =
                     pr.milestone && pr.milestone.title
-                        ? `<a href="${pr.milestone.html_url}" target="_blank" class="pr-milestone" title="Milestone: ${escapeHtml(pr.milestone.title)}">🎯 ${escapeHtml(pr.milestone.title)}</a>`
-                        : `<span class="pr-milestone none" title="Not assigned to a milestone">🎯 No milestone</span>`;
+                        ? `<a href="${pr.milestone.html_url}" target="_blank" class="pr-milestone editable" ${milestoneData} data-milestone-number="${pr.milestone.number}" title="Milestone: ${escapeHtml(pr.milestone.title)} (click to change, ⌘/Ctrl-click to open on GitHub)">🎯 ${escapeHtml(pr.milestone.title)}</a>`
+                        : `<span class="pr-milestone none editable" ${milestoneData} title="Not assigned to a milestone (click to set one)">🎯 No milestone</span>`;
 
                 // PR icon - draft, merge queue, or regular
                 const inMergeQueue = pr.mergeable_state === 'queued' || pr.auto_merge != null;
@@ -4317,6 +4359,9 @@
                 // Setup context menu
                 setupContextMenu();
 
+                // Setup milestone picker
+                setupMilestoneMenu();
+
                 // Setup scroll indicator
                 setupScrollIndicator();
             }
@@ -4650,6 +4695,48 @@
                 }
             }
 
+            // Show a .context-menu at a point, flipping it upward and capping the scrollable
+            // item list when it would run past the bottom of the viewport.
+            function positionContextMenu(menu, itemsElement, anchorX, anchorY) {
+                const viewportPadding = 8;
+                const viewportWidth = document.documentElement.clientWidth;
+                const viewportHeight = document.documentElement.clientHeight;
+                const header = menu.querySelector('.context-menu-header');
+
+                menu.style.visibility = 'hidden';
+                menu.style.left = '0px';
+                menu.style.top = '0px';
+                itemsElement.style.maxHeight = '';
+                menu.classList.add('show');
+
+                const naturalRect = menu.getBoundingClientRect();
+                const spaceBelow = viewportHeight - anchorY - viewportPadding;
+                const spaceAbove = anchorY - viewportPadding;
+                const openUpward = naturalRect.height > spaceBelow && spaceAbove > spaceBelow;
+                const availableHeight = Math.max(120, openUpward ? spaceAbove : spaceBelow);
+                const headerHeight = header ? header.offsetHeight : 0;
+                const itemsMaxHeight = Math.max(80, Math.min(400, availableHeight - headerHeight));
+
+                itemsElement.style.maxHeight = `${itemsMaxHeight}px`;
+
+                const menuRect = menu.getBoundingClientRect();
+                let left = anchorX;
+                let top = openUpward ? anchorY - menuRect.height : anchorY;
+
+                left = Math.min(
+                    Math.max(left, viewportPadding),
+                    viewportWidth - menuRect.width - viewportPadding,
+                );
+                top = Math.min(
+                    Math.max(top, viewportPadding),
+                    viewportHeight - menuRect.height - viewportPadding,
+                );
+
+                menu.style.left = `${left}px`;
+                menu.style.top = `${top}px`;
+                menu.style.visibility = '';
+            }
+
             // Setup context menu for PR items
             function setupContextMenu() {
                 const contextMenu = document.getElementById('prContextMenu');
@@ -4657,49 +4744,6 @@
                 if (contextMenu.dataset.initialized === 'true') return;
                 contextMenu.dataset.initialized = 'true';
                 let currentPRId = null;
-
-                function positionContextMenu(anchorX, anchorY) {
-                    const viewportPadding = 8;
-                    const viewportWidth = document.documentElement.clientWidth;
-                    const viewportHeight = document.documentElement.clientHeight;
-                    const header = contextMenu.querySelector('.context-menu-header');
-
-                    contextMenu.style.visibility = 'hidden';
-                    contextMenu.style.left = '0px';
-                    contextMenu.style.top = '0px';
-                    contextMenuItems.style.maxHeight = '';
-                    contextMenu.classList.add('show');
-
-                    const naturalRect = contextMenu.getBoundingClientRect();
-                    const spaceBelow = viewportHeight - anchorY - viewportPadding;
-                    const spaceAbove = anchorY - viewportPadding;
-                    const openUpward = naturalRect.height > spaceBelow && spaceAbove > spaceBelow;
-                    const availableHeight = Math.max(120, openUpward ? spaceAbove : spaceBelow);
-                    const headerHeight = header ? header.offsetHeight : 0;
-                    const itemsMaxHeight = Math.max(
-                        80,
-                        Math.min(400, availableHeight - headerHeight),
-                    );
-
-                    contextMenuItems.style.maxHeight = `${itemsMaxHeight}px`;
-
-                    const menuRect = contextMenu.getBoundingClientRect();
-                    let left = anchorX;
-                    let top = openUpward ? anchorY - menuRect.height : anchorY;
-
-                    left = Math.min(
-                        Math.max(left, viewportPadding),
-                        viewportWidth - menuRect.width - viewportPadding,
-                    );
-                    top = Math.min(
-                        Math.max(top, viewportPadding),
-                        viewportHeight - menuRect.height - viewportPadding,
-                    );
-
-                    contextMenu.style.left = `${left}px`;
-                    contextMenu.style.top = `${top}px`;
-                    contextMenu.style.visibility = '';
-                }
 
                 // Handle right-click on PR items
                 document.addEventListener('contextmenu', (e) => {
@@ -4729,7 +4773,7 @@
                         }).join('');
 
                         // Position the menu
-                        positionContextMenu(e.clientX, e.clientY);
+                        positionContextMenu(contextMenu, contextMenuItems, e.clientX, e.clientY);
                     }
                 });
 
@@ -4815,6 +4859,195 @@
                         contextMenu.classList.remove('show');
                         currentPRId = null;
                     }
+                });
+            }
+
+            // Open milestones per "owner/repo", cached for the session so reopening the
+            // picker on the same repo is instant.
+            const milestonesByRepo = new Map();
+
+            async function fetchOpenMilestones(repoFullName) {
+                if (milestonesByRepo.has(repoFullName)) {
+                    return milestonesByRepo.get(repoFullName);
+                }
+
+                const response = await fetch(
+                    `https://api.github.com/repos/${repoFullName}/milestones?state=open&per_page=100`,
+                    {
+                        headers: {
+                            Authorization: `token ${getStoredToken()}`,
+                            Accept: 'application/vnd.github.v3+json',
+                        },
+                    },
+                );
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.message || `HTTP ${response.status}`);
+                }
+
+                const milestones = await response.json();
+                milestonesByRepo.set(repoFullName, milestones);
+                return milestones;
+            }
+
+            // Setup the milestone picker (click a card's milestone badge)
+            function setupMilestoneMenu() {
+                const menu = document.getElementById('milestoneMenu');
+                const menuItems = document.getElementById('milestoneMenuItems');
+                if (menu.dataset.initialized === 'true') return;
+                menu.dataset.initialized = 'true';
+
+                // The badge whose menu is open, plus where it was opened from
+                let target = null;
+
+                function closeMenu() {
+                    menu.classList.remove('show');
+                    target = null;
+                }
+
+                function showMessage(message) {
+                    menuItems.innerHTML = `<div class="context-menu-item muted">${escapeHtml(message)}</div>`;
+                }
+
+                function renderMenuItems(milestones) {
+                    const rows = [
+                        `<div class="context-menu-item ${target.currentNumber === null ? 'current' : ''}" data-milestone-number="">No milestone</div>`,
+                        ...milestones.map(
+                            (milestone) =>
+                                `<div class="context-menu-item ${milestone.number === target.currentNumber ? 'current' : ''}" data-milestone-number="${milestone.number}">${escapeHtml(milestone.title)}</div>`,
+                        ),
+                    ];
+
+                    if (milestones.length === 0) {
+                        rows.push(
+                            `<div class="context-menu-item muted">No open milestones in ${escapeHtml(target.repoFullName)}</div>`,
+                        );
+                    }
+
+                    menuItems.innerHTML = rows.join('');
+                }
+
+                async function openMenu(badge, event) {
+                    const repoFullName = badge.dataset.repoUrl.split('/').slice(-2).join('/');
+                    const opened = {
+                        badge,
+                        prId: badge.dataset.prId,
+                        prNumber: Number(badge.dataset.prNumber),
+                        repoFullName,
+                        currentNumber: badge.dataset.milestoneNumber
+                            ? Number(badge.dataset.milestoneNumber)
+                            : null,
+                        anchorX: event.clientX,
+                        anchorY: event.clientY,
+                    };
+                    target = opened;
+
+                    showMessage('Loading milestones...');
+                    positionContextMenu(menu, menuItems, opened.anchorX, opened.anchorY);
+
+                    if (!getStoredToken()) {
+                        showMessage('A GitHub token is required to change milestones');
+                        return;
+                    }
+
+                    try {
+                        const milestones = await fetchOpenMilestones(repoFullName);
+                        // The picker may have been closed or reopened elsewhere while loading
+                        if (target !== opened) return;
+                        renderMenuItems(milestones);
+                    } catch (error) {
+                        console.error('Failed to load milestones:', error);
+                        if (target !== opened) return;
+                        showMessage(`Failed to load milestones: ${error.message}`);
+                    }
+
+                    // Content changed height, so place the menu again
+                    positionContextMenu(menu, menuItems, opened.anchorX, opened.anchorY);
+                }
+
+                async function assignMilestone(pick, milestoneNumber) {
+                    const badge = document.querySelector(
+                        `.pr-milestone[data-pr-id="${pick.prId}"]`,
+                    );
+                    if (badge) badge.classList.add('pending');
+
+                    try {
+                        const response = await fetch(
+                            `https://api.github.com/repos/${pick.repoFullName}/issues/${pick.prNumber}`,
+                            {
+                                method: 'PATCH',
+                                headers: {
+                                    Authorization: `token ${getStoredToken()}`,
+                                    Accept: 'application/vnd.github.v3+json',
+                                },
+                                body: JSON.stringify({ milestone: milestoneNumber }),
+                            },
+                        );
+
+                        if (!response.ok) {
+                            const errorData = await response.json().catch(() => ({}));
+                            throw new Error(errorData.message || `HTTP ${response.status}`);
+                        }
+
+                        const issue = await response.json();
+                        const pr = allPRs.find((candidate) => String(candidate.id) === pick.prId);
+                        if (pr) {
+                            pr.milestone = issue.milestone;
+                            localStorage.setItem(CACHE_KEY, JSON.stringify(allPRs));
+                        }
+
+                        showNotification(
+                            issue.milestone
+                                ? `Milestone set to "${issue.milestone.title}"`
+                                : 'Milestone cleared',
+                            'success',
+                        );
+
+                        populateMilestoneFilter();
+                        renderPRs();
+                    } catch (error) {
+                        console.error('Failed to set milestone:', error);
+                        showNotification(`Failed to set milestone: ${error.message}`, 'error');
+                        if (badge) badge.classList.remove('pending');
+                    }
+                }
+
+                document.addEventListener('click', (e) => {
+                    const badge = e.target.closest('.pr-milestone.editable');
+                    if (!badge) return;
+                    // Let ⌘/Ctrl/middle-click keep opening the milestone page on GitHub
+                    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+                    e.preventDefault();
+                    openMenu(badge, e);
+                });
+
+                menu.addEventListener('click', (e) => {
+                    const item = e.target.closest('.context-menu-item');
+                    if (!item || item.classList.contains('muted') || !target) return;
+
+                    const pick = target;
+                    const milestoneNumber =
+                        item.dataset.milestoneNumber === ''
+                            ? null
+                            : Number(item.dataset.milestoneNumber);
+                    closeMenu();
+
+                    if (milestoneNumber !== pick.currentNumber) {
+                        assignMilestone(pick, milestoneNumber);
+                    }
+                });
+
+                document.addEventListener('click', (e) => {
+                    if (menu.contains(e.target) || e.target.closest('.pr-milestone.editable')) {
+                        return;
+                    }
+                    closeMenu();
+                });
+
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') closeMenu();
                 });
             }
 
