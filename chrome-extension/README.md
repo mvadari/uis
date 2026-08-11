@@ -15,6 +15,17 @@ A small Chrome extension that opens the GitHub pull request you're looking at in
 
 It's unpacked-only — no store submission needed for personal use.
 
+### Firefox
+
+The manifest carries what Firefox needs: `background.scripts` alongside `service_worker`
+(Firefox [doesn't support](https://bugzil.la/1573659) `service_worker`, and ignores the key when
+`scripts` is present), and a `browser_specific_settings.gecko.id`, which Firefox's `storage.sync`
+implementation requires. Chrome ignores both additions.
+
+Load it at `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on** → pick
+`manifest.json`. Temporary is the only unsigned option; it's wiped when Firefox restarts. A
+permanent install needs a signed `.xpi` from AMO (an unlisted add-on is enough).
+
 ## Use
 
 - **Toolbar icon** — click it while on a PR page (any sub-tab: Files changed, Commits, a

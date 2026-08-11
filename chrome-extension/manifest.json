@@ -5,7 +5,14 @@
     "version": "1.0",
     "permissions": ["activeTab", "contextMenus", "storage"],
     "background": {
-        "service_worker": "background.js"
+        "service_worker": "background.js",
+        "scripts": ["background.js"]
+    },
+    "browser_specific_settings": {
+        "gecko": {
+            "id": "open-in-pr-html@mvadari",
+            "strict_min_version": "121.0"
+        }
     },
     "action": {
         "default_title": "Open this PR in pr.html",
