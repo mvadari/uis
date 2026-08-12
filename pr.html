@@ -2105,17 +2105,26 @@
             const ICON_EXTERNAL =
                 '<svg class="link-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M3.75 2h3.5a.75.75 0 0 1 0 1.5h-3.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25v-3.5a.75.75 0 0 1 1.5 0v3.5A1.75 1.75 0 0 1 12.25 14h-8.5A1.75 1.75 0 0 1 2 12.25v-8.5C2 2.784 2.784 2 3.75 2Zm6.854-1h4.146a.25.25 0 0 1 .25.25v4.146a.25.25 0 0 1-.427.177L13.03 4.03 9.28 7.78a.751.751 0 0 1-1.06-1.06l3.75-3.75-1.543-1.543A.25.25 0 0 1 10.604 1Z"></path></svg>';
 
+            const ICON_QUOTE =
+                '<svg class="link-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M1.75 2.5h10.5a.75.75 0 0 1 0 1.5H1.75a.75.75 0 0 1 0-1.5Zm4 5h6.5a.75.75 0 0 1 0 1.5h-6.5a.75.75 0 0 1 0-1.5Zm0 5h6.5a.75.75 0 0 1 0 1.5h-6.5a.75.75 0 0 1 0-1.5ZM2.5 7.75v6a.75.75 0 0 1-1.5 0v-6a.75.75 0 0 1 1.5 0Z"></path></svg>';
+
             // A copy-link button plus an external-link icon, shown top-right of each comment/review.
-            function commentLinkActions(url) {
+            // quoteId, when given, adds a quote-reply button that drops the comment into the
+            // thread's reply box - only threads have one, so only they pass it.
+            function commentLinkActions(url, quoteId = '') {
                 const safe = escapeAttribute(url || (prMeta && prMeta.url) || '');
+                const quoteBtn = quoteId
+                    ? `<button class="comment-link-btn quote-btn" type="button" data-quote-id="${escapeAttribute(quoteId)}" title="Quote reply" aria-label="Quote reply">${ICON_QUOTE}</button>`
+                    : '';
                 return `
                 <span class="comment-links">
+                    ${quoteBtn}
                     <button class="comment-link-btn copy-link-btn" type="button" data-url="${safe}" title="Copy link" aria-label="Copy link">${ICON_LINK}</button>
                     <a class="comment-link-btn" href="${safe}" target="_blank" rel="noopener noreferrer" title="Open on GitHub" aria-label="Open on GitHub">${ICON_EXTERNAL}</a>
                 </span>`;
             }
 
-            function renderComment(c, badgeHtml = '', isReply = false) {
+            function renderComment(c, badgeHtml = '', isReply = false, canQuote = false) {
                 const login = c.author && c.author.login ? c.author.login : 'ghost';
                 const authorUrl =
                     c.author && c.author.url ? c.author.url : `https://github.com/${login}`;
@@ -2133,7 +2142,7 @@
                         ${replyTag}
                         <span class="comment-time">${escape(formatRelative(c.createdAt))}</span>
                         ${badgeHtml}
-                        ${commentLinkActions(c.url)}
+                        ${commentLinkActions(c.url, canQuote ? c.id : '')}
                     </div>
                     <div class="comment-body">${body}</div>
                 </div>`;
@@ -2187,7 +2196,10 @@
                 if (!t.resolutionUnknown && t.isResolved)
                     badges.push('<span class="tag tag-resolved">Resolved</span>');
 
-                const commentsHtml = comments.map((c, i) => renderComment(c, '', i > 0)).join('');
+                // Quoting is only offered when there is a reply box to quote into
+                const commentsHtml = comments
+                    .map((c, i) => renderComment(c, '', i > 0, !readOnly))
+                    .join('');
 
                 // For outdated threads, label the diff as "when commented" and offer the current code.
                 let currentCodeBtn = '';
@@ -2649,6 +2661,39 @@
                 }
             }
 
+            // Markdown blockquote, the way GitHub's own "Quote reply" builds it: every line
+            // prefixed, blank lines kept as bare '>', and a blank line after so the cursor
+            // lands outside the quote.
+            function toBlockquote(body) {
+                const lines = (body || '').replace(/\r\n/g, '\n').trimEnd().split('\n');
+                return `${lines.map((line) => (line.trim() ? `> ${line}` : '>')).join('\n')}\n\n`;
+            }
+
+            function quoteIntoReply(commentId, button) {
+                const article = button.closest('.thread');
+                const textarea = article && article.querySelector('.reply-input');
+                if (!textarea) return;
+
+                const thread = threads.find((t) => t.id === article.dataset.threadId);
+                const comment =
+                    thread && (thread.comments || []).find((c) => String(c.id) === commentId);
+                if (!comment || !(comment.body || '').trim()) {
+                    showToast('Nothing to quote', 'error');
+                    return;
+                }
+
+                // Keep whatever is already typed, separated by a blank line
+                const existing = textarea.value.replace(/\s+$/, '');
+                textarea.value = existing
+                    ? `${existing}\n\n${toBlockquote(comment.body)}`
+                    : toBlockquote(comment.body);
+
+                textarea.focus();
+                textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+                textarea.scrollTop = textarea.scrollHeight;
+                textarea.scrollIntoView({ block: 'nearest' });
+            }
+
             async function submitReply(threadId, textarea, button) {
                 const body = textarea.value.trim();
                 if (!body) {
@@ -3102,6 +3147,12 @@
                     if (unhideBtn) {
                         const card = unhideBtn.closest('.conversation-card');
                         unhideItem(card.dataset.commentId, unhideBtn);
+                        return;
+                    }
+
+                    const quoteBtn = event.target.closest('.quote-btn');
+                    if (quoteBtn) {
+                        quoteIntoReply(quoteBtn.dataset.quoteId, quoteBtn);
                         return;
                     }
 

@@ -66,6 +66,7 @@ A clean, focused view of a single pull request's unresolved conversation.
 - Includes top-level conversation comments and review summaries
 - Groups each thread's sub-comments (root + replies) in chronological order
 - Reply to threads and mark them resolved/unresolved directly from the view
+- Quote reply: drop any thread comment into that thread's reply box as a Markdown blockquote
 - Hide comments and review summaries with a reason (spam, off topic, resolved, etc.)
 - Bulk-select comments/reviews with checkboxes to hide or unhide many at once
 - Filter by file, author, or text; toggle resolved/hidden items and filter outdated threads
