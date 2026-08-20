@@ -1760,7 +1760,7 @@
 
             async function restGetAll(url) {
                 const results = [];
-                for (let page = 1; page <= 10; page++) {
+                for (let page = 1; page <= 30; page++) {
                     const sep = url.includes('?') ? '&' : '?';
                     const data = await restGet(`${url}${sep}per_page=100&page=${page}`);
                     if (!Array.isArray(data)) return data;
