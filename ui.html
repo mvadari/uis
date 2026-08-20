@@ -663,7 +663,10 @@
                                         Copy All
                                     </button>
                                     <button
-                                        onclick="document.getElementById('requestOutput').textContent = ''"
+                                        onclick="
+                                            document.getElementById('requestOutput').textContent =
+                                                ''
+                                        "
                                         aria-label="Clear request log"
                                     >
                                         Clear Log
@@ -735,7 +738,9 @@
                                         Copy All
                                     </button>
                                     <button
-                                        onclick="document.getElementById('txOutput').textContent = ''"
+                                        onclick="
+                                            document.getElementById('txOutput').textContent = ''
+                                        "
                                         aria-label="Clear transaction log"
                                     >
                                         Clear Log
@@ -963,7 +968,8 @@
                 }
             }
 
-            // Toast notification system
+            // Toast notification system. Intentionally shadows shared-utils.js's showToast:
+            // this version renders into #toastContainer with an icon and close button.
             function showToast(message, type = 'info') {
                 const container = document.getElementById('toastContainer');
                 const toast = document.createElement('div');
