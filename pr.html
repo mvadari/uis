@@ -1058,6 +1058,42 @@
                 color: var(--color-accent-fg);
             }
 
+            .diff-code {
+                position: relative;
+            }
+
+            .diff-comment-btn {
+                background: var(--color-accent-fg);
+                border: none;
+                border-radius: 3px;
+                color: #fff;
+                cursor: pointer;
+                display: none;
+                font-size: 12px;
+                height: 16px;
+                left: 2px;
+                line-height: 16px;
+                padding: 0;
+                position: absolute;
+                text-align: center;
+                top: 1px;
+                width: 16px;
+            }
+
+            .diff-row:hover .diff-comment-btn {
+                display: block;
+            }
+
+            .diff-comment-form-row td {
+                background: var(--color-canvas-default);
+                border-top: 1px solid var(--color-border-muted);
+                padding: 12px;
+            }
+
+            .diff-comment-form .reply-input {
+                width: 100%;
+            }
+
             .file-diff-note {
                 color: var(--color-fg-muted);
                 font-size: 13px;
@@ -1608,6 +1644,15 @@
             mutation($threadId:ID!, $body:String!) {
               addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$threadId, body:$body}) {
                 comment { id ${AUTHOR_FRAGMENT} bodyHTML body createdAt url diffHunk path }
+              }
+            }`;
+
+            // Publishes immediately (event:COMMENT) as a single review comment, matching GitHub's
+            // "Add single comment" option rather than opening a pending review.
+            const ADD_INLINE_COMMENT_MUTATION = `
+            mutation($prId:ID!, $path:String!, $line:Int!, $side:DiffSide!, $body:String!) {
+              addPullRequestReview(input:{pullRequestId:$prId, event:COMMENT, threads:[{path:$path, line:$line, side:$side, body:$body}]}) {
+                pullRequestReview { id }
               }
             }`;
 
@@ -2474,7 +2519,8 @@
 
             // ---------- Files rendering ----------
 
-            function renderPatch(patch) {
+            function renderPatch(f) {
+                const patch = f.patch;
                 if (!patch) return '';
                 let oldLn = 0;
                 let newLn = 0;
@@ -2499,17 +2545,24 @@
                         let cls = 'diff-ctx';
                         let oldNum = '';
                         let newNum = '';
+                        let side = 'RIGHT';
                         if (marker === '+') {
                             cls = 'diff-add';
                             newNum = newLn++;
                         } else if (marker === '-') {
                             cls = 'diff-del';
                             oldNum = oldLn++;
+                            side = 'LEFT';
                         } else {
                             oldNum = oldLn++;
                             newNum = newLn++;
                         }
-                        return `<tr class="diff-row ${cls}"><td class="diff-gutter">${oldNum}</td><td class="diff-gutter">${newNum}</td><td class="diff-code">${escape(line) || '&nbsp;'}</td></tr>`;
+                        // Comments are keyed on the diff line, so a deleted line comments against
+                        // the old-file line number (side:LEFT); everything else against the new one.
+                        const commentBtn = readOnly
+                            ? ''
+                            : `<button type="button" class="diff-comment-btn" data-path="${escapeAttribute(f.path)}" data-line="${side === 'LEFT' ? oldNum : newNum}" data-side="${side}" title="Add a comment on this line">+</button>`;
+                        return `<tr class="diff-row ${cls}"><td class="diff-gutter">${oldNum}</td><td class="diff-gutter">${newNum}</td><td class="diff-code">${commentBtn}${escape(line) || '&nbsp;'}</td></tr>`;
                     });
                 return `<table class="diff-table"><tbody>${rows.join('')}</tbody></table>`;
             }
@@ -2517,7 +2570,7 @@
             function renderFileDiff(f) {
                 if (!f.expanded) return '';
                 if (f.patch) {
-                    return `<div class="file-diff">${renderPatch(f.patch)}</div>`;
+                    return `<div class="file-diff">${renderPatch(f)}</div>`;
                 }
                 const reason =
                     f.status === 'renamed'
@@ -2776,6 +2829,74 @@
                     console.error('Failed to update viewed state:', error);
                     setError(error.message);
                     if (checkbox) checkbox.disabled = false;
+                }
+            }
+
+            function openInlineCommentForm(button) {
+                const row = button.closest('tr');
+                const existing = row.nextElementSibling;
+                if (existing && existing.classList.contains('diff-comment-form-row')) {
+                    existing.remove();
+                    return;
+                }
+                row.closest('table')
+                    .querySelectorAll('.diff-comment-form-row')
+                    .forEach((el) => el.remove());
+
+                const formRow = document.createElement('tr');
+                formRow.className = 'diff-comment-form-row';
+                formRow.innerHTML = `
+                <td colspan="3">
+                    <div class="diff-comment-form" data-path="${escapeAttribute(button.dataset.path)}" data-line="${escapeAttribute(button.dataset.line)}" data-side="${escapeAttribute(button.dataset.side)}">
+                        <textarea class="reply-input diff-comment-input" placeholder="Leave a comment on this line..."></textarea>
+                        <div class="thread-buttons">
+                            <button class="btn btn-small diff-comment-cancel-btn" type="button">Cancel</button>
+                            <button class="btn btn-small btn-primary diff-comment-post-btn" type="button">Comment</button>
+                        </div>
+                    </div>
+                </td>`;
+                row.after(formRow);
+                formRow.querySelector('textarea').focus();
+            }
+
+            async function submitInlineComment(button) {
+                const formEl = button.closest('.diff-comment-form');
+                const textarea = formEl.querySelector('.diff-comment-input');
+                const body = textarea.value.trim();
+                if (!body) {
+                    textarea.focus();
+                    return;
+                }
+                const { path, line, side } = formEl.dataset;
+                setError('');
+                button.disabled = true;
+                const previous = button.textContent;
+                button.textContent = 'Commenting...';
+                try {
+                    await graphql(ADD_INLINE_COMMENT_MUTATION, {
+                        prId: prMeta.id,
+                        path,
+                        line: parseInt(line, 10),
+                        side,
+                        body,
+                    });
+                    showToast('Comment posted', 'success');
+                    // Refetching is the only way to get the new thread's id/isResolved/etc, so
+                    // reload wholesale — but the reload rebuilds `files` from scratch, so restore
+                    // whichever files were expanded rather than collapsing the view on the user.
+                    const expandedPaths = new Set(
+                        files.filter((f) => f.expanded).map((f) => f.path),
+                    );
+                    await loadPR();
+                    files.forEach((f) => {
+                        if (expandedPaths.has(f.path)) f.expanded = true;
+                    });
+                    renderFilesContent();
+                } catch (error) {
+                    console.error('Failed to post inline comment:', error);
+                    setError(error.message);
+                    button.disabled = false;
+                    button.textContent = previous;
                 }
             }
 
@@ -3117,6 +3238,25 @@
                 els.filesContent.addEventListener('click', (event) => {
                     // Clicks on the GitHub link or the viewed checkbox act on their own; don't expand.
                     if (event.target.closest('.file-actions')) return;
+
+                    const addBtn = event.target.closest('.diff-comment-btn');
+                    if (addBtn) {
+                        openInlineCommentForm(addBtn);
+                        return;
+                    }
+                    const cancelBtn = event.target.closest('.diff-comment-cancel-btn');
+                    if (cancelBtn) {
+                        cancelBtn.closest('.diff-comment-form-row').remove();
+                        return;
+                    }
+                    const postBtn = event.target.closest('.diff-comment-post-btn');
+                    if (postBtn) {
+                        submitInlineComment(postBtn);
+                        return;
+                    }
+                    // Clicking inside the open comment form (e.g. the textarea) shouldn't collapse the file.
+                    if (event.target.closest('.diff-comment-form-row')) return;
+
                     const row = event.target.closest('.file-row');
                     if (row) toggleFileExpanded(row.dataset.filePath);
                 });
