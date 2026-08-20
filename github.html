@@ -2986,6 +2986,17 @@
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(labels));
             }
 
+            // Clear the stored label for any PR whose label ID no longer matches a column in
+            // LABELS (e.g. the column was deleted), so it falls back to Unlabeled.
+            function pruneInvalidPRLabels(prs, prLabels) {
+                prs.forEach((pr) => {
+                    const labelId = prLabels[pr.id];
+                    if (labelId && !LABELS.some((label) => label.id === labelId)) {
+                        saveLabel(pr.id, '');
+                    }
+                });
+            }
+
             // A PR with no label lives in the "unlabeled" column, which stores as ''.
             function normalizeLabelId(labelId) {
                 return labelId === '' || labelId === undefined ? 'unlabeled' : labelId;
@@ -4260,19 +4271,17 @@
                     columns[label.id] = [];
                 });
 
-                // Group PRs by label ID
+                // Reconcile PRs whose stored label no longer exists in LABELS (e.g. its column
+                // was deleted) by clearing the stale reference, as a separate step from bucketing
+                // below so the persistence side effect isn't buried inside the grouping loop.
+                pruneInvalidPRLabels(filteredPRs, prLabels);
+
+                // Group PRs by label ID; anything left without a valid label falls to Unlabeled
                 filteredPRs.forEach((pr) => {
                     const labelId = prLabels[pr.id];
-                    // Check if label is valid (exists in current LABELS array)
-                    const labelExists = LABELS.find((l) => l.id === labelId);
-                    if (labelId && labelExists) {
+                    if (labelId && columns[labelId]) {
                         columns[labelId].push(pr);
                     } else {
-                        // If label is invalid or doesn't exist, move to Unlabeled
-                        if (labelId && !labelExists) {
-                            // Clean up invalid label from localStorage
-                            saveLabel(pr.id, '');
-                        }
                         columns['unlabeled'].push(pr);
                     }
                 });
