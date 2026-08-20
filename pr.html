@@ -1500,7 +1500,7 @@
             query($owner:String!, $repo:String!, $number:Int!) {
               repository(owner:$owner, name:$repo) {
                 pullRequest(number:$number) {
-                  id number title url state isDraft headRefOid
+                  id number title url state isDraft headRefOid additions deletions
                   ${AUTHOR_FRAGMENT}
                   reviewThreads(first:50) {
                     pageInfo { hasNextPage endCursor }
@@ -1707,6 +1707,8 @@
                         isDraft: p.isDraft,
                         headSha: p.headRefOid,
                         author: p.author,
+                        additions: p.additions,
+                        deletions: p.deletions,
                     },
                     threads: threadNodes.map((t) => ({
                         id: t.id,
@@ -1868,6 +1870,8 @@
                         isDraft: pr.draft,
                         headSha: pr.head && pr.head.sha,
                         author: mapRestUser(pr.user),
+                        additions: pr.additions,
+                        deletions: pr.deletions,
                     },
                     threads,
                     comments: issueComments.map(mapRestIssueComment).sort(byCreatedAt),
@@ -2571,8 +2575,16 @@
             function updateFilesSummary() {
                 const total = files.length;
                 const viewed = files.filter((f) => f.viewed === 'VIEWED').length;
-                const adds = files.reduce((n, f) => n + (f.additions || 0), 0);
-                const dels = files.reduce((n, f) => n + (f.deletions || 0), 0);
+                // Prefer the PR-level totals: GitHub's per-file REST stats can read 0/0 for files
+                // it considers too large to diff, even though the PR-level total counts them.
+                const adds =
+                    prMeta.additions != null
+                        ? prMeta.additions
+                        : files.reduce((n, f) => n + (f.additions || 0), 0);
+                const dels =
+                    prMeta.deletions != null
+                        ? prMeta.deletions
+                        : files.reduce((n, f) => n + (f.deletions || 0), 0);
                 const viewedText = readOnly ? '' : ` · ${viewed}/${total} viewed`;
                 els.filesSummary.innerHTML = `${total} file${total === 1 ? '' : 's'} · <span style="color:var(--color-diff-add-fg)">+${adds}</span> <span style="color:var(--color-diff-del-fg)">−${dels}</span>${viewedText}`;
             }
