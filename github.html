@@ -2828,7 +2828,7 @@
         <script src="shared-utils.js"></script>
         <script>
             const DEFAULT_LABELS = [
-                { id: 'unlabeled', name: 'Unlabeled', locked: true },
+                { id: 'unlabeled', name: 'Unlabeled', locked: true, hideWhenEmpty: true },
                 { id: 'in-progress', name: 'In Progress', locked: false },
                 { id: 'to-review', name: 'To Review', locked: false },
                 { id: 'to-discuss', name: 'To Discuss', locked: false },
@@ -4296,8 +4296,13 @@
                     const prs = columns[label.id];
                     const count = prs.length;
 
-                    // Hide "Unlabeled" column if it's empty
-                    if (label.id === 'unlabeled' && count === 0) {
+                    // Hide empty columns that are marked hideWhenEmpty (e.g. Unlabeled). Labels
+                    // saved before this field existed fall back to the old unlabeled-only rule.
+                    const hideWhenEmpty =
+                        label.hideWhenEmpty !== undefined
+                            ? label.hideWhenEmpty
+                            : label.id === 'unlabeled';
+                    if (hideWhenEmpty && count === 0) {
                         return '';
                     }
 
