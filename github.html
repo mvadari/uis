@@ -2965,9 +2965,14 @@
             let draggedQueryIndex = null; // Index of query row being dragged in the editor
 
             // Load labels from localStorage
+            let labelsCache = null;
+
             function getLabels() {
-                const stored = localStorage.getItem(STORAGE_KEY);
-                return stored ? JSON.parse(stored) : {};
+                if (labelsCache === null) {
+                    const stored = localStorage.getItem(STORAGE_KEY);
+                    labelsCache = stored ? JSON.parse(stored) : {};
+                }
+                return labelsCache;
             }
 
             // Save labels to localStorage
@@ -3148,12 +3153,18 @@
             // Save sort modes to localStorage
             function saveSortModes() {
                 localStorage.setItem(SORT_KEY, JSON.stringify(columnSortModes));
+                sortModesCache = columnSortModes;
             }
 
             // Get sort modes from localStorage
+            let sortModesCache = null;
+
             function getSortModes() {
-                const stored = localStorage.getItem(SORT_KEY);
-                return stored ? JSON.parse(stored) : {};
+                if (sortModesCache === null) {
+                    const stored = localStorage.getItem(SORT_KEY);
+                    sortModesCache = stored ? JSON.parse(stored) : {};
+                }
+                return sortModesCache;
             }
 
             // Save custom order to localStorage
