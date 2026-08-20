@@ -1680,67 +1680,65 @@
                 ['LOW_QUALITY', 'Low Quality'],
             ];
 
+            // Fetches every remaining page of a paginated connection, given its first page's
+            // nodes/pageInfo, the query to fetch subsequent pages, and a getter that pulls the
+            // connection back out of each page's response.
+            async function paginateAll(
+                initialNodes,
+                initialPageInfo,
+                pageQuery,
+                vars,
+                getConnection,
+            ) {
+                const nodes = [...initialNodes];
+                let pageInfo = initialPageInfo;
+                while (pageInfo && pageInfo.hasNextPage) {
+                    const d = await graphql(pageQuery, { ...vars, cursor: pageInfo.endCursor });
+                    const connection = getConnection(d);
+                    nodes.push(...connection.nodes);
+                    pageInfo = connection.pageInfo;
+                }
+                return nodes;
+            }
+
             async function fetchPR(owner, repo, number) {
                 const data = await graphql(PR_QUERY, { owner, repo, number });
                 const p = data.repository && data.repository.pullRequest;
                 if (!p)
                     throw new Error('Pull request not found. Check the owner, repo, and number.');
 
-                const threadNodes = [...p.reviewThreads.nodes];
-                let ti = p.reviewThreads.pageInfo;
-                while (ti.hasNextPage) {
-                    const d = await graphql(THREADS_PAGE_QUERY, {
-                        owner,
-                        repo,
-                        number,
-                        cursor: ti.endCursor,
-                    });
-                    const rt = d.repository.pullRequest.reviewThreads;
-                    threadNodes.push(...rt.nodes);
-                    ti = rt.pageInfo;
-                }
+                const vars = { owner, repo, number };
+                const threadNodes = await paginateAll(
+                    p.reviewThreads.nodes,
+                    p.reviewThreads.pageInfo,
+                    THREADS_PAGE_QUERY,
+                    vars,
+                    (d) => d.repository.pullRequest.reviewThreads,
+                );
 
-                const commentNodes = [...p.comments.nodes];
-                let ci = p.comments.pageInfo;
-                while (ci.hasNextPage) {
-                    const d = await graphql(COMMENTS_PAGE_QUERY, {
-                        owner,
-                        repo,
-                        number,
-                        cursor: ci.endCursor,
-                    });
-                    const c = d.repository.pullRequest.comments;
-                    commentNodes.push(...c.nodes);
-                    ci = c.pageInfo;
-                }
+                const commentNodes = await paginateAll(
+                    p.comments.nodes,
+                    p.comments.pageInfo,
+                    COMMENTS_PAGE_QUERY,
+                    vars,
+                    (d) => d.repository.pullRequest.comments,
+                );
 
-                const reviewNodes = [...p.reviews.nodes];
-                let ri = p.reviews.pageInfo;
-                while (ri.hasNextPage) {
-                    const d = await graphql(REVIEWS_PAGE_QUERY, {
-                        owner,
-                        repo,
-                        number,
-                        cursor: ri.endCursor,
-                    });
-                    const rv = d.repository.pullRequest.reviews;
-                    reviewNodes.push(...rv.nodes);
-                    ri = rv.pageInfo;
-                }
+                const reviewNodes = await paginateAll(
+                    p.reviews.nodes,
+                    p.reviews.pageInfo,
+                    REVIEWS_PAGE_QUERY,
+                    vars,
+                    (d) => d.repository.pullRequest.reviews,
+                );
 
-                const fileNodes = [...(p.files ? p.files.nodes : [])];
-                let fi = p.files && p.files.pageInfo;
-                while (fi && fi.hasNextPage) {
-                    const d = await graphql(FILES_PAGE_QUERY, {
-                        owner,
-                        repo,
-                        number,
-                        cursor: fi.endCursor,
-                    });
-                    const fl = d.repository.pullRequest.files;
-                    fileNodes.push(...fl.nodes);
-                    fi = fl.pageInfo;
-                }
+                const fileNodes = await paginateAll(
+                    p.files ? p.files.nodes : [],
+                    p.files && p.files.pageInfo,
+                    FILES_PAGE_QUERY,
+                    vars,
+                    (d) => d.repository.pullRequest.files,
+                );
 
                 return {
                     meta: {
