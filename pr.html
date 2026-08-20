@@ -2900,6 +2900,10 @@
                 }
             }
 
+            function formatMinimizedReason(classifier) {
+                return classifier.toLowerCase().replace(/_/g, ' ');
+            }
+
             // Conversation comments and review summaries are both Minimizable; look up in either list.
             function findMinimizable(id) {
                 return (
@@ -2917,7 +2921,7 @@
                     const item = findMinimizable(id);
                     if (item) {
                         item.isMinimized = true;
-                        item.minimizedReason = classifier.toLowerCase().replace(/_/g, ' ');
+                        item.minimizedReason = formatMinimizedReason(classifier);
                     }
                     showToast('Comment hidden', 'success');
                     renderAll();
@@ -2995,7 +2999,7 @@
                     try {
                         await graphql(MINIMIZE_MUTATION, { id: item.id, classifier });
                         item.isMinimized = true;
-                        item.minimizedReason = classifier.toLowerCase().replace(/_/g, ' ');
+                        item.minimizedReason = formatMinimizedReason(classifier);
                         done++;
                     } catch (error) {
                         console.error('Bulk hide failed for', item.id, error);
