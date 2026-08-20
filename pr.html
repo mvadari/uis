@@ -2993,18 +2993,21 @@
                 setBulkBusy(true);
                 const label = els.bulkHide.textContent;
                 els.bulkHide.textContent = 'Hiding...';
+                const results = await Promise.allSettled(
+                    targets.map((item) => graphql(MINIMIZE_MUTATION, { id: item.id, classifier })),
+                );
                 let done = 0;
-                for (const item of targets) {
-                    try {
-                        await graphql(MINIMIZE_MUTATION, { id: item.id, classifier });
+                results.forEach((result, i) => {
+                    const item = targets[i];
+                    if (result.status === 'fulfilled') {
                         item.isMinimized = true;
                         item.minimizedReason = formatMinimizedReason(classifier);
                         done++;
-                    } catch (error) {
-                        console.error('Bulk hide failed for', item.id, error);
-                        setError(error.message);
+                    } else {
+                        console.error('Bulk hide failed for', item.id, result.reason);
+                        setError(result.reason.message);
                     }
-                }
+                });
                 selectedIds.clear();
                 els.bulkHide.textContent = label;
                 showToast(
@@ -3026,18 +3029,21 @@
                 setBulkBusy(true);
                 const label = els.bulkUnhide.textContent;
                 els.bulkUnhide.textContent = 'Unhiding...';
+                const results = await Promise.allSettled(
+                    targets.map((item) => graphql(UNMINIMIZE_MUTATION, { id: item.id })),
+                );
                 let done = 0;
-                for (const item of targets) {
-                    try {
-                        await graphql(UNMINIMIZE_MUTATION, { id: item.id });
+                results.forEach((result, i) => {
+                    const item = targets[i];
+                    if (result.status === 'fulfilled') {
                         item.isMinimized = false;
                         item.minimizedReason = null;
                         done++;
-                    } catch (error) {
-                        console.error('Bulk unhide failed for', item.id, error);
-                        setError(error.message);
+                    } else {
+                        console.error('Bulk unhide failed for', item.id, result.reason);
+                        setError(result.reason.message);
                     }
-                }
+                });
                 selectedIds.clear();
                 els.bulkUnhide.textContent = label;
                 showToast(
