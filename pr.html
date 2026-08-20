@@ -1708,37 +1708,38 @@
                     throw new Error('Pull request not found. Check the owner, repo, and number.');
 
                 const vars = { owner, repo, number };
-                const threadNodes = await paginateAll(
-                    p.reviewThreads.nodes,
-                    p.reviewThreads.pageInfo,
-                    THREADS_PAGE_QUERY,
-                    vars,
-                    (d) => d.repository.pullRequest.reviewThreads,
-                );
-
-                const commentNodes = await paginateAll(
-                    p.comments.nodes,
-                    p.comments.pageInfo,
-                    COMMENTS_PAGE_QUERY,
-                    vars,
-                    (d) => d.repository.pullRequest.comments,
-                );
-
-                const reviewNodes = await paginateAll(
-                    p.reviews.nodes,
-                    p.reviews.pageInfo,
-                    REVIEWS_PAGE_QUERY,
-                    vars,
-                    (d) => d.repository.pullRequest.reviews,
-                );
-
-                const fileNodes = await paginateAll(
-                    p.files ? p.files.nodes : [],
-                    p.files && p.files.pageInfo,
-                    FILES_PAGE_QUERY,
-                    vars,
-                    (d) => d.repository.pullRequest.files,
-                );
+                // Each connection paginates independently, so fetch all four concurrently
+                // instead of waiting for one to finish before starting the next.
+                const [threadNodes, commentNodes, reviewNodes, fileNodes] = await Promise.all([
+                    paginateAll(
+                        p.reviewThreads.nodes,
+                        p.reviewThreads.pageInfo,
+                        THREADS_PAGE_QUERY,
+                        vars,
+                        (d) => d.repository.pullRequest.reviewThreads,
+                    ),
+                    paginateAll(
+                        p.comments.nodes,
+                        p.comments.pageInfo,
+                        COMMENTS_PAGE_QUERY,
+                        vars,
+                        (d) => d.repository.pullRequest.comments,
+                    ),
+                    paginateAll(
+                        p.reviews.nodes,
+                        p.reviews.pageInfo,
+                        REVIEWS_PAGE_QUERY,
+                        vars,
+                        (d) => d.repository.pullRequest.reviews,
+                    ),
+                    paginateAll(
+                        p.files ? p.files.nodes : [],
+                        p.files && p.files.pageInfo,
+                        FILES_PAGE_QUERY,
+                        vars,
+                        (d) => d.repository.pullRequest.files,
+                    ),
+                ]);
 
                 return {
                     meta: {
