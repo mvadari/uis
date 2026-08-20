@@ -1331,7 +1331,6 @@
 
                             // Submit the signed transaction
                             const submitResult = await this.client.submitAndWait(prepared);
-                            console.log(submitResult);
 
                             // Process result
                             result.actualResult = submitResult.result.meta.TransactionResult;
@@ -1357,7 +1356,6 @@
                                 autofill: true,
                                 wallet: walletObj,
                             });
-                            console.log(submitResult);
 
                             // Process result
                             result.actualResult = submitResult.result.meta.TransactionResult;
@@ -1369,7 +1367,7 @@
                             result.success = result.actualResult === testCase.expectedResult;
                         }
                     } catch (error) {
-                        console.log(error);
+                        console.error(error);
                         result.error = error.message;
                         result.actualResult = 'ERROR';
                         result.success = false;
