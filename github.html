@@ -2786,28 +2786,6 @@
             </div>
         </div>
 
-        <!-- Label Editor Modal (kept for backwards compatibility, but hidden) -->
-        <div id="labelEditorModal" class="modal" style="display: none">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2>Manage Kanban Columns</h2>
-                    <button class="modal-close" id="closeModal">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <div id="labelListOld" class="label-list"></div>
-                    <button id="addLabelBtnOld" class="add-label-btn">+ Add New Label</button>
-                    <div class="modal-note">
-                        Note: "Unlabeled" cannot be deleted or reordered. PRs in deleted columns
-                        will move to "Unlabeled".
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button id="cancelLabelsBtn" class="btn-secondary">Cancel</button>
-                    <button id="saveLabelsBtn" class="btn-primary">Save Changes</button>
-                </div>
-            </div>
-        </div>
-
         <!-- PR Note Editor Modal -->
         <div id="noteEditorModal" class="modal">
             <div class="modal-content">
@@ -3043,9 +3021,14 @@
             }
 
             // PR Flagged functions
+            let flaggedPRsCache = null;
+
             function getFlaggedPRs() {
-                const stored = localStorage.getItem(FLAGGED_KEY);
-                return stored ? JSON.parse(stored) : {};
+                if (flaggedPRsCache === null) {
+                    const stored = localStorage.getItem(FLAGGED_KEY);
+                    flaggedPRsCache = stored ? JSON.parse(stored) : {};
+                }
+                return flaggedPRsCache;
             }
 
             function isPRFlagged(prId) {
@@ -3321,9 +3304,10 @@
                 }
 
                 // Always put flagged PRs at the top
+                const flaggedPRs = getFlaggedPRs();
                 sorted.sort((a, b) => {
-                    const aFlagged = isPRFlagged(a.id);
-                    const bFlagged = isPRFlagged(b.id);
+                    const aFlagged = flaggedPRs[a.id] === true;
+                    const bFlagged = flaggedPRs[b.id] === true;
                     if (aFlagged && !bFlagged) return -1;
                     if (!aFlagged && bFlagged) return 1;
                     return 0;
@@ -3417,7 +3401,7 @@
                             }
                         }
                     } catch (e) {
-                        console.log('Check runs not available:', e);
+                        // Check runs not available; fall through to legacy commit status
                     }
 
                     // If no check runs, try commit status (legacy CI)
@@ -3440,7 +3424,7 @@
                                 }
                             }
                         } catch (e) {
-                            console.log('Commit status not available:', e);
+                            // Commit status not available
                         }
                     }
 
@@ -3924,7 +3908,7 @@
                 const milestoneData = `data-pr-id="${pr.id}" data-pr-number="${pr.number}" data-repo-url="${pr.repository_url}"`;
                 const milestoneBadge =
                     pr.milestone && pr.milestone.title
-                        ? `<a href="${pr.milestone.html_url}" target="_blank" class="pr-milestone editable" ${milestoneData} data-milestone-number="${pr.milestone.number}" title="Milestone: ${escapeHtml(pr.milestone.title)} (click to change, ⌘/Ctrl-click to open on GitHub)">🎯 ${escapeHtml(pr.milestone.title)}</a>`
+                        ? `<a href="${pr.milestone.html_url}" target="_blank" class="pr-milestone editable" ${milestoneData} data-milestone-number="${pr.milestone.number}" title="Milestone: ${escapeAttribute(pr.milestone.title)} (click to change, ⌘/Ctrl-click to open on GitHub)">🎯 ${escapeAttribute(pr.milestone.title)}</a>`
                         : `<span class="pr-milestone none editable" ${milestoneData} title="Not assigned to a milestone (click to set one)">🎯 No milestone</span>`;
 
                 // PR icon - draft, merge queue, or regular
@@ -4020,7 +4004,7 @@
                             (query) => `
                     <label class="multiselect-option">
                         <input type="checkbox" data-query-id="${query.id}" ${currentQueryFilters.has(query.id) ? 'checked' : ''}>
-                        <span>${escapeHtml(query.name)}</span>
+                        <span>${escapeAttribute(query.name)}</span>
                     </label>
                 `,
                         )
@@ -4826,7 +4810,7 @@
                 }
 
                 function showMessage(message) {
-                    menuItems.innerHTML = `<div class="context-menu-item muted">${escapeHtml(message)}</div>`;
+                    menuItems.innerHTML = `<div class="context-menu-item muted">${escapeAttribute(message)}</div>`;
                 }
 
                 function renderMenuItems(milestones) {
@@ -4834,13 +4818,13 @@
                         `<div class="context-menu-item ${target.currentNumber === null ? 'current' : ''}" data-milestone-number="">No milestone</div>`,
                         ...milestones.map(
                             (milestone) =>
-                                `<div class="context-menu-item ${milestone.number === target.currentNumber ? 'current' : ''}" data-milestone-number="${milestone.number}">${escapeHtml(milestone.title)}</div>`,
+                                `<div class="context-menu-item ${milestone.number === target.currentNumber ? 'current' : ''}" data-milestone-number="${milestone.number}">${escapeAttribute(milestone.title)}</div>`,
                         ),
                     ];
 
                     if (milestones.length === 0) {
                         rows.push(
-                            `<div class="context-menu-item muted">No open milestones in ${escapeHtml(target.repoFullName)}</div>`,
+                            `<div class="context-menu-item muted">No open milestones in ${escapeAttribute(target.repoFullName)}</div>`,
                         );
                     }
 
@@ -5273,13 +5257,13 @@
                         <div class="query-inputs">
                             <input type="text"
                                    class="query-name-input"
-                                   value="${escapeHtml(query.name)}"
+                                   value="${escapeAttribute(query.name)}"
                                    placeholder="Query name"
                                    data-index="${index}"
                                    data-field="name">
                             <input type="text"
                                    class="query-input"
-                                   value="${escapeHtml(query.query)}"
+                                   value="${escapeAttribute(query.query)}"
                                    placeholder="e.g., author:@me"
                                    data-index="${index}"
                                    data-field="query">
@@ -5388,26 +5372,6 @@
             function deleteQuery(index) {
                 tempQueries.splice(index, 1);
                 renderQueryEditor();
-            }
-
-            function resetQuerySettingsToDefaults() {
-                tempQueries = JSON.parse(JSON.stringify(DEFAULT_QUERY_SETTINGS));
-                renderQueryEditor();
-            }
-
-            function openLabelEditor() {
-                // Copy current labels to temp array
-                tempLabels = [...LABELS];
-                renderLabelEditor();
-                document.getElementById('labelEditorModal').classList.add('show');
-            }
-
-            function closeLabelEditor() {
-                document.getElementById('labelEditorModal').classList.remove('show');
-                if (labelScrollInterval) {
-                    clearInterval(labelScrollInterval);
-                    labelScrollInterval = null;
-                }
             }
 
             function renderLabelEditor() {
@@ -5629,42 +5593,6 @@
                     });
                     renderLabelEditor();
                 }
-            }
-
-            function saveLabels() {
-                // Find deleted labels by comparing IDs
-                const tempLabelIds = new Set(tempLabels.map((l) => l.id));
-                const deletedLabels = LABELS.filter(
-                    (label) => !tempLabelIds.has(label.id) && !label.locked,
-                );
-
-                // Migrate PRs from deleted labels to Unlabeled
-                if (deletedLabels.length > 0) {
-                    const prLabels = getLabels();
-                    let updated = false;
-
-                    Object.keys(prLabels).forEach((prId) => {
-                        const deletedLabel = deletedLabels.find((l) => l.id === prLabels[prId]);
-                        if (deletedLabel) {
-                            prLabels[prId] = '';
-                            updated = true;
-                        }
-                    });
-
-                    if (updated) {
-                        localStorage.setItem(STORAGE_KEY, JSON.stringify(prLabels));
-                    }
-                }
-
-                // Update LABELS array in place
-                LABELS.length = 0;
-                LABELS.push(...tempLabels);
-
-                // Save labels list to localStorage
-                saveLabelsList(LABELS);
-
-                closeLabelEditor();
-                renderPRs();
             }
 
             // Event listeners
@@ -5971,14 +5899,14 @@
                         <span class="pr-tooltip-icon">🔍</span>
                         <span class="pr-tooltip-label">Matched:</span>
                         <span class="pr-tooltip-queries">
-                            ${matchedQueries.map((name) => `<span class="pr-tooltip-query-badge">${escapeHtml(name)}</span>`).join('')}
+                            ${matchedQueries.map((name) => `<span class="pr-tooltip-query-badge">${escapeAttribute(name)}</span>`).join('')}
                         </span>
                     </div>
                 `
                         : '';
 
                 tooltip.innerHTML = `
-                <div class="pr-tooltip-title">${escapeHtml(pr.title)}${draftBadge}</div>
+                <div class="pr-tooltip-title">${escapeAttribute(pr.title)}${draftBadge}</div>
                 <div class="pr-tooltip-row">
                     <span class="pr-tooltip-icon">👤</span>
                     <span class="pr-tooltip-label">Author:</span>
@@ -6028,8 +5956,10 @@
                 tooltip.classList.add('show');
             }
 
-            // Helper function to escape HTML (safe for both text content and attribute values)
-            function escapeHtml(text) {
+            // Escapes HTML plus quotes, safe for both text content and attribute values.
+            // Named distinctly from shared-utils.js's escapeHtml (which doesn't escape quotes)
+            // so it doesn't silently shadow it.
+            function escapeAttribute(text) {
                 const div = document.createElement('div');
                 div.textContent = text;
                 return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
