@@ -556,11 +556,7 @@
                         aria-label="Select network"
                         onchange="handleNetworkChange()"
                     >
-                        <option value="wss://xrplcluster.com">Mainnet</option>
-                        <option value="wss://s.altnet.rippletest.net:51233">Testnet</option>
-                        <option value="wss://s.devnet.rippletest.net:51233">Devnet</option>
-                        <option value="wss://wasm.devnet.rippletest.net:51233">WASM Devnet</option>
-                        <option value="ws://localhost:6006">Local Standalone</option>
+                        <!-- Options are generated from NETWORKS in populateNetworkSelect() -->
                         <option value="custom">Custom</option>
                     </select>
                     <input
@@ -785,8 +781,68 @@
                 network: 'standalone',
             };
 
+            // Every network the picker offers, and everything the app needs to know about it.
+            // `kind` drives account creation: 'live' blocks it, 'standalone' funds from the
+            // genesis account, 'faucet' calls fundWallet. A custom URL not listed here is
+            // 'custom' (created unfunded) unless it looks like a local node.
+            const NETWORKS = [
+                {
+                    url: 'wss://xrplcluster.com',
+                    label: 'Mainnet',
+                    kind: 'live',
+                    explorer: 'https://livenet.xrpl.org/',
+                },
+                {
+                    url: 'wss://s.altnet.rippletest.net:51233',
+                    label: 'Testnet',
+                    kind: 'faucet',
+                    explorer: 'https://testnet.xrpl.org/',
+                },
+                {
+                    url: 'wss://s.devnet.rippletest.net:51233',
+                    label: 'Devnet',
+                    kind: 'faucet',
+                    explorer: 'https://devnet.xrpl.org/',
+                },
+                {
+                    url: 'wss://wasm.devnet.rippletest.net:51233',
+                    label: 'WASM Devnet',
+                    kind: 'faucet',
+                },
+                { url: 'ws://localhost:6006', label: 'Local Standalone', kind: 'standalone' },
+            ];
+
+            function networkFor(url) {
+                return NETWORKS.find((network) => network.url === url) || null;
+            }
+
+            function networkKind(url) {
+                const known = networkFor(url);
+                if (known) return known.kind;
+                // Custom URL: only the local-node shape is worth guessing at.
+                return url.includes('localhost') || url.includes('127.0.0.1')
+                    ? 'standalone'
+                    : 'custom';
+            }
+
             function isStandalone(url) {
-                return url.includes('localhost') || url.includes('127.0.0.1');
+                return networkKind(url) === 'standalone';
+            }
+
+            // Insert the known networks above the trailing "Custom" option.
+            function populateNetworkSelect() {
+                const select = document.getElementById('networkSelect');
+                const custom = select.querySelector('option[value="custom"]');
+                NETWORKS.forEach((network) => {
+                    const option = document.createElement('option');
+                    option.value = network.url;
+                    option.textContent = network.label;
+                    select.insertBefore(option, custom);
+                });
+                // The options are added after parse, so the browser has already settled on
+                // the only one present ("Custom"). Select the first network, as the static
+                // markup used to.
+                select.value = NETWORKS[0].url;
             }
 
             // Account storage functions (network-specific)
@@ -1133,14 +1189,9 @@
             }
 
             function updateExplorer(url) {
-                const explorerMap = {
-                    'wss://xrplcluster.com': 'https://livenet.xrpl.org/',
-                    'wss://s.altnet.rippletest.net:51233': 'https://testnet.xrpl.org/',
-                    'wss://s.devnet.rippletest.net:51233': 'https://devnet.xrpl.org/',
-                };
-
                 const strippedUrl = url.replace(/^wss?:\/\//, '');
-                const explorerUrl = explorerMap[url] ?? `https://custom.xrpl.org/${strippedUrl}`;
+                const explorerUrl =
+                    networkFor(url)?.explorer ?? `https://custom.xrpl.org/${strippedUrl}`;
                 const sidebar = document.getElementById('explorerSidebar');
                 const iframe = document.getElementById('explorerFrame');
 
@@ -1160,21 +1211,17 @@
                 }
 
                 try {
-                    // Block account creation on mainnet
-                    if (currentNetworkUrl === 'wss://xrplcluster.com') {
+                    const kind = networkKind(currentNetworkUrl);
+
+                    // Block account creation on a live network
+                    if (kind === 'live') {
                         showToast('Account creation is disabled on Mainnet for safety', 'error');
                         return;
                     }
 
                     const wallet = xrpl.Wallet.generate();
 
-                    // Check network type
-                    const isStandaloneNet = isStandalone(currentNetworkUrl);
-                    const isTestnet =
-                        currentNetworkUrl.includes('testnet') ||
-                        currentNetworkUrl.includes('devnet');
-
-                    if (isStandaloneNet) {
+                    if (kind === 'standalone') {
                         // Use genesis account to fund new account
                         showToast('Creating and funding account from genesis...', 'info');
 
@@ -1208,7 +1255,7 @@
                         } catch (fundError) {
                             showToast('Account creation failed: ' + fundError.message, 'error');
                         }
-                    } else if (isTestnet) {
+                    } else if (kind === 'faucet') {
                         showToast('Creating and funding account...', 'info');
 
                         try {
@@ -1483,6 +1530,7 @@
 
             // Initialize on page load
             window.addEventListener('DOMContentLoaded', () => {
+                populateNetworkSelect();
                 capturePanelHtml();
                 renderAccountList();
                 updateTabsVisibility();
