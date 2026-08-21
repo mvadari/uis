@@ -5629,26 +5629,34 @@
                 .getElementById('importSettingsFile')
                 .addEventListener('change', handleImportFile);
 
+            // Modals Esc can dismiss, outermost first. Add new modals here rather than to the
+            // keydown handler.
+            const MODAL_CLOSERS = [
+                ['settingsModal', closeSettings],
+                ['welcomeModal', hideWelcomeModal],
+                ['noteEditorModal', closeNoteEditor],
+            ];
+
+            function closeTopModal() {
+                for (const [id, close] of MODAL_CLOSERS) {
+                    const modal = document.getElementById(id);
+                    if (modal && modal.classList.contains('show')) {
+                        close();
+                        return;
+                    }
+                }
+            }
+
             // Keyboard shortcuts
             document.addEventListener('keydown', (e) => {
-                // Don't trigger shortcuts when typing in inputs
-                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-                    // Allow Esc to close modals even when in input
-                    if (e.key === 'Escape') {
-                        const settingsModal = document.getElementById('settingsModal');
-                        const welcomeModal = document.getElementById('welcomeModal');
-                        const noteModal = document.getElementById('noteEditorModal');
-
-                        if (settingsModal.classList.contains('show')) {
-                            closeSettings();
-                        } else if (welcomeModal.classList.contains('show')) {
-                            hideWelcomeModal();
-                        } else if (noteModal.classList.contains('show')) {
-                            closeNoteEditor();
-                        }
-                    }
+                // Esc closes modals even while typing in an input
+                if (e.key === 'Escape') {
+                    closeTopModal();
                     return;
                 }
+
+                // Don't trigger the rest of the shortcuts when typing in inputs
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
                 // Global shortcuts
                 switch (e.key.toLowerCase()) {
@@ -5659,19 +5667,6 @@
                     case 'r':
                         e.preventDefault();
                         fetchPRs(false);
-                        break;
-                    case 'escape':
-                        const settingsModal = document.getElementById('settingsModal');
-                        const welcomeModal = document.getElementById('welcomeModal');
-                        const noteModal = document.getElementById('noteEditorModal');
-
-                        if (settingsModal.classList.contains('show')) {
-                            closeSettings();
-                        } else if (welcomeModal.classList.contains('show')) {
-                            hideWelcomeModal();
-                        } else if (noteModal.classList.contains('show')) {
-                            closeNoteEditor();
-                        }
                         break;
                 }
             });
