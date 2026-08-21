@@ -61,25 +61,6 @@
                 align-items: center;
             }
 
-            .btn {
-                background-color: #f6f8fa;
-                color: #1f2328;
-                border: 1px solid #d0d7de;
-                padding: 5px 14px;
-                border-radius: 6px;
-                cursor: pointer;
-                font-size: 14px;
-                font-weight: 500;
-                display: inline-flex;
-                align-items: center;
-                gap: 5px;
-            }
-
-            .btn:hover {
-                background-color: #f3f4f6;
-                border-color: #1f2328;
-            }
-
             .btn-primary {
                 background-color: #1f883d;
                 color: #ffffff;
@@ -437,25 +418,6 @@
                 cursor: not-allowed;
             }
 
-            .stats-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                gap: 12px;
-                margin-top: 8px;
-            }
-
-            .stat-item {
-                display: flex;
-                align-items: center;
-                gap: 6px;
-                font-size: 13px;
-                color: #656d76;
-            }
-
-            .stat-item .icon {
-                font-size: 15px;
-            }
-
             .loading {
                 display: flex;
                 align-items: center;
@@ -701,19 +663,22 @@
 
             async function fetchCIStatus(sha) {
                 try {
-                    // Fetch check runs
-                    const checksResponse = await fetch(
-                        `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits/${sha}/check-runs`,
-                        { headers: getHeaders() },
-                    );
-                    const checksData = await checksResponse.json();
-
-                    // Fetch commit status (for older CI systems)
-                    const statusResponse = await fetch(
-                        `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits/${sha}/status`,
-                        { headers: getHeaders() },
-                    );
-                    const statusData = await statusResponse.json();
+                    // Check runs, plus commit status for older CI systems. Independent
+                    // requests, so don't make the second one wait on the first.
+                    const [checksResponse, statusResponse] = await Promise.all([
+                        fetch(
+                            `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits/${sha}/check-runs`,
+                            { headers: getHeaders() },
+                        ),
+                        fetch(
+                            `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits/${sha}/status`,
+                            { headers: getHeaders() },
+                        ),
+                    ]);
+                    const [checksData, statusData] = await Promise.all([
+                        checksResponse.json(),
+                        statusResponse.json(),
+                    ]);
 
                     // Combine results
                     let totalCount =
@@ -1037,13 +1002,7 @@
                 try {
                     const response = await fetch(
                         `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${prNumber}/update-branch`,
-                        {
-                            method: 'PUT',
-                            headers: {
-                                Authorization: `token ${token}`,
-                                Accept: 'application/vnd.github.v3+json',
-                            },
-                        },
+                        { method: 'PUT', headers: getHeaders() },
                     );
 
                     if (response.status === 202) {
