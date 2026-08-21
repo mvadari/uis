@@ -125,14 +125,6 @@
                 color: var(--text-muted);
             }
 
-            .user-info {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                color: var(--text-secondary);
-                font-size: 13px;
-            }
-
             /* Main Layout */
             .main-container {
                 display: flex;
@@ -451,12 +443,6 @@
 
             .tree-branch.collapsed .tree-branch-header {
                 margin-bottom: 0;
-            }
-
-            .pr-position {
-                font-size: 11px;
-                color: var(--text-muted);
-                margin-bottom: 4px;
             }
 
             .pr-branch-name {
@@ -849,7 +835,7 @@
         <div
             id="authModal"
             class="modal-overlay hidden"
-            onclick="if(event.target === this) hideAuthModal()"
+            onclick="if (event.target === this) hideAuthModal();"
         >
             <div class="modal">
                 <button class="modal-close" onclick="hideAuthModal()" title="Close">&times;</button>
@@ -1032,6 +1018,13 @@
                 }
             });
 
+            // Select the stack containing a ?pr= deep-link target, if we can find it.
+            function focusPR(prNumber) {
+                if (!prNumber) return;
+                const stack = state.stacks.find((s) => s.prs.some((pr) => pr.number === prNumber));
+                if (stack) selectStack(stack.id, prNumber);
+            }
+
             async function init(focusPrNumber = null) {
                 try {
                     await fetchCurrentUser();
@@ -1045,27 +1038,14 @@
                         renderStacksList();
                         updateLastUpdatedTime();
 
-                        if (focusPrNumber) {
-                            const stack = state.stacks.find((s) =>
-                                s.prs.some((pr) => pr.number === focusPrNumber),
-                            );
-                            if (stack) {
-                                selectStack(stack.id, focusPrNumber);
-                            }
-                        }
+                        focusPR(focusPrNumber);
                     }
 
                     // Then fetch fresh data in background
                     await fetchPRs(!cached);
 
-                    if (focusPrNumber && !cached) {
-                        const stack = state.stacks.find((s) =>
-                            s.prs.some((pr) => pr.number === focusPrNumber),
-                        );
-                        if (stack) {
-                            selectStack(stack.id, focusPrNumber);
-                        }
-                    }
+                    // Focus again: the PR's stack may only exist in the fresh data.
+                    focusPR(focusPrNumber);
 
                     // Setup auto-refresh
                     setupAutoRefresh();
@@ -1328,45 +1308,58 @@
         `;
 
                 try {
-                    let allPRs = [];
+                    const maxPages = 3; // Limit pages to avoid rate limiting
 
-                    for (const repo of REPOS) {
-                        let cursor = null;
-                        let pageCount = 0;
-                        const maxPages = 3; // Limit pages to avoid rate limiting
+                    // Repos are independent, so page through them concurrently.
+                    const perRepo = await Promise.all(
+                        REPOS.map(async (repo) => {
+                            const repoPRs = [];
+                            let cursor = null;
+                            let hasNextPage = true;
+                            let pageCount = 0;
 
-                        do {
-                            const data = await graphqlQuery(query, {
-                                owner: repo.owner,
-                                name: repo.name,
-                                cursor: cursor,
-                            });
+                            while (hasNextPage && pageCount < maxPages) {
+                                const data = await graphqlQuery(query, {
+                                    owner: repo.owner,
+                                    name: repo.name,
+                                    cursor: cursor,
+                                });
 
-                            const prs = data.repository.pullRequests.nodes.map((pr) => ({
-                                number: pr.number,
-                                title: pr.title,
-                                state: pr.state,
-                                isDraft: pr.isDraft,
-                                author: pr.author?.login || 'unknown',
-                                headRefName: pr.headRefName,
-                                baseRefName: pr.baseRefName,
-                                headSha: pr.headRefOid,
-                                mergeable: pr.mergeable,
-                                reviewDecision: pr.reviewDecision,
-                                updatedAt: pr.updatedAt,
-                                ciStatus:
-                                    pr.commits.nodes[0]?.commit?.statusCheckRollup?.state ||
-                                    'UNKNOWN',
-                                repoOwner: repo.owner,
-                                repoName: repo.name,
-                                defaultBranch: repo.defaultBranch,
-                            }));
+                                const connection = data.repository.pullRequests;
+                                connection.nodes.forEach((pr) => {
+                                    repoPRs.push({
+                                        number: pr.number,
+                                        title: pr.title,
+                                        state: pr.state,
+                                        isDraft: pr.isDraft,
+                                        author: pr.author?.login || 'unknown',
+                                        headRefName: pr.headRefName,
+                                        baseRefName: pr.baseRefName,
+                                        headSha: pr.headRefOid,
+                                        mergeable: pr.mergeable,
+                                        reviewDecision: pr.reviewDecision,
+                                        updatedAt: pr.updatedAt,
+                                        ciStatus:
+                                            pr.commits.nodes[0]?.commit?.statusCheckRollup?.state ||
+                                            'UNKNOWN',
+                                        repoOwner: repo.owner,
+                                        repoName: repo.name,
+                                        defaultBranch: repo.defaultBranch,
+                                    });
+                                });
 
-                            allPRs = allPRs.concat(prs);
-                            cursor = data.repository.pullRequests.pageInfo.endCursor;
-                            pageCount++;
-                        } while (cursor && pageCount < maxPages);
-                    }
+                                // endCursor stays non-null on the last page, so trust
+                                // hasNextPage or we'd fetch empty pages every refresh.
+                                hasNextPage = connection.pageInfo.hasNextPage;
+                                cursor = connection.pageInfo.endCursor;
+                                pageCount++;
+                            }
+
+                            return repoPRs;
+                        }),
+                    );
+
+                    const allPRs = perRepo.flat();
 
                     state.prs = allPRs;
                     state.lastUpdateTime = Date.now();
@@ -1903,10 +1896,17 @@
             // ============================================================
             // UTILITIES
             // ============================================================
+            // This tool doesn't load shared-utils.js, so it keeps its own copy.
+            const HTML_ESCAPES = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+            };
+
             function escapeHtml(text) {
-                const div = document.createElement('div');
-                div.textContent = text;
-                return div.innerHTML;
+                return String(text ?? '').replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
             }
         </script>
     </body>
