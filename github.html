@@ -593,42 +593,15 @@
                 text-decoration: underline;
             }
 
-            .label-selector {
-                display: flex;
-                gap: 8px;
-                align-items: center;
-                font-size: 12px;
-            }
-
-            .label-selector select {
-                background-color: #ffffff;
-                color: #24292f;
-                border: 1px solid #d0d7de;
-                padding: 4px 8px;
-                border-radius: 6px;
-                font-size: 12px;
-                cursor: pointer;
-            }
-
-            .label-selector select:focus {
-                outline: none;
-                border-color: #0969da;
-            }
-
-            .label-badge {
-                display: inline-block;
-                padding: 2px 8px;
-                border-radius: 12px;
-                font-size: 12px;
-                font-weight: 500;
-                background-color: #ddf4ff;
-                border: 1px solid #54aeff;
-                color: #0969da;
-            }
-
             .loading {
                 text-align: center;
                 color: #57606a;
+            }
+
+            .refreshing-note {
+                color: #0969da;
+                font-size: 12px;
+                margin-top: 4px;
             }
 
             .error {
@@ -970,16 +943,6 @@
                 cursor: pointer;
                 user-select: none;
                 margin-bottom: 0;
-            }
-
-            .sort-controls {
-                display: flex;
-                gap: 8px;
-                align-items: center;
-            }
-
-            .sort-controls label {
-                font-size: 14px;
             }
 
             /* Modal customizations for github.html */
@@ -1437,21 +1400,6 @@
                 outline: none;
                 border-color: #0969da;
                 box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.1);
-            }
-
-            .sort-controls select {
-                background-color: #ffffff;
-                color: #24292f;
-                border: 1px solid #d0d7de;
-                padding: 5px 12px;
-                border-radius: 6px;
-                font-size: 14px;
-                cursor: pointer;
-            }
-
-            .sort-controls select:focus {
-                outline: none;
-                border-color: #0969da;
             }
 
             /* Query Settings Modal Styles */
@@ -1980,6 +1928,9 @@
                     border-color: #21262d;
                     border-top-color: #58a6ff;
                 }
+                .refreshing-note {
+                    color: #58a6ff;
+                }
                 .pr-item:hover {
                     background-color: #161b22;
                 }
@@ -2058,16 +2009,6 @@
                     color: #8b949e;
                 }
                 .pr-repo {
-                    color: #58a6ff;
-                }
-                .label-selector select {
-                    background-color: #0d1117;
-                    color: #e6edf3;
-                    border-color: #30363d;
-                }
-                .label-badge {
-                    background-color: #1c2a3d;
-                    border-color: #1f6feb;
                     color: #58a6ff;
                 }
                 .error {
@@ -2267,11 +2208,6 @@
                 .note-textarea:focus {
                     border-color: #58a6ff;
                     box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
-                }
-                .sort-controls select {
-                    background-color: #0d1117;
-                    color: #e6edf3;
-                    border-color: #30363d;
                 }
                 .query-item {
                     background-color: #21262d;
