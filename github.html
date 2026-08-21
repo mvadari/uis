@@ -3807,23 +3807,10 @@
                 const repoName = repoNameFromUrl(pr.repository_url);
                 const createdDate = formatShortDate(pr.created_at);
 
-                const updatedDate = new Date(pr.updated_at);
-                const now = new Date();
-                const diffMs = now - updatedDate;
-                const diffMins = Math.floor(diffMs / 60000);
-                const diffHours = Math.floor(diffMs / 3600000);
-                const diffDays = Math.floor(diffMs / 86400000);
-
-                let updatedText;
-                if (diffMins < 1) updatedText = 'just now';
-                else if (diffMins < 60) updatedText = `${diffMins}m ago`;
-                else if (diffHours < 24) updatedText = `${diffHours}h ago`;
-                else if (diffDays < 30) updatedText = `${diffDays}d ago`;
-                else
-                    updatedText = updatedDate.toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                    });
+                const updatedText = timeAgoShort(pr.updated_at, {
+                    month: 'short',
+                    day: 'numeric',
+                });
 
                 // CI status icon
                 const ci = CI_ICONS[pr.ciStatus];

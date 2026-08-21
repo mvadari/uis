@@ -19,77 +19,6 @@ function showToast(message, type = 'info', duration = 3000) {
 }
 
 // ============================================
-// GitHub API Utilities
-// ============================================
-
-const GitHubAPI = {
-    // Get authentication headers
-    getAuthHeaders(token) {
-        if (!token) {
-            token = localStorage.getItem('github_token');
-        }
-        return {
-            Authorization: `token ${token}`,
-            Accept: 'application/vnd.github.v3+json',
-        };
-    },
-
-    // Check if token is valid
-    async validateToken(token) {
-        try {
-            const response = await fetch('https://api.github.com/user', {
-                headers: this.getAuthHeaders(token),
-            });
-            return response.ok;
-        } catch (error) {
-            console.error('Token validation error:', error);
-            return false;
-        }
-    },
-
-    // Get rate limit info
-    async getRateLimit(token) {
-        try {
-            const response = await fetch('https://api.github.com/rate_limit', {
-                headers: this.getAuthHeaders(token),
-            });
-            if (response.ok) {
-                return await response.json();
-            }
-        } catch (error) {
-            console.error('Rate limit check error:', error);
-        }
-        return null;
-    },
-
-    // Generic API request with error handling
-    async request(url, options = {}) {
-        const token = localStorage.getItem('github_token');
-        const headers = {
-            ...this.getAuthHeaders(token),
-            ...options.headers,
-        };
-
-        try {
-            const response = await fetch(url, {
-                ...options,
-                headers,
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.message || `HTTP ${response.status}`);
-            }
-
-            return await response.json();
-        } catch (error) {
-            console.error('GitHub API request error:', error);
-            throw error;
-        }
-    },
-};
-
-// ============================================
 // Time Formatting Utilities
 // ============================================
 
@@ -113,6 +42,27 @@ function timeAgo(date) {
     }
 
     return 'just now';
+}
+
+// Abbreviated relative time: "just now", "5m ago", "3h ago", "12d ago", falling back to
+// an absolute date past 30 days. Complements timeAgo, which spells the units out.
+// `absoluteOptions` are toLocaleDateString options for that fallback.
+function timeAgoShort(date, absoluteOptions = null) {
+    const d = new Date(date);
+    const minutes = Math.floor((new Date() - d) / 60000);
+
+    if (minutes < 1) return 'just now';
+    if (minutes < 60) return `${minutes}m ago`;
+
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days}d ago`;
+
+    return absoluteOptions
+        ? d.toLocaleDateString('en-US', absoluteOptions)
+        : d.toLocaleDateString();
 }
 
 function formatDate(date, includeTime = false) {

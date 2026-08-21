@@ -45,13 +45,18 @@ the CSS — new components need an entry there unless they inherit from a styled
 **Two shared files**, included by most (not all — `index.html` and `stacked.html` skip them) tools:
 
 - `shared-styles.css` — `.btn`, `.modal`, `.toast`, `.card`, `.badge`, `.spinner`
-- `shared-utils.js` — `showToast`, `escapeHtml`, `timeAgo`, `debounce`, `getQueryParam`/`setQueryParam`,
-  `copyToClipboard`, and the `GitHubAPI`, `Storage`, `Modal` objects
+- `shared-utils.js` — `showToast`, `escapeHtml`, `timeAgo`/`timeAgoShort`, `formatDate`, `debounce`,
+  `getQueryParam`/`setQueryParam`, `copyToClipboard`, and the `Storage`, `Modal` objects
 
-Tools frequently define their own local equivalent instead of using the shared one (`github.html`
-has `showNotification` and `getStoredToken`; `pr.html` has its own `TOKEN_KEY`). Match whatever the
-file you're editing already does rather than importing the shared version into a file that isn't
-using it.
+`escapeHtml` escapes quotes as well as tags, so it's safe in attribute values too; the local
+`escapeAttribute` helpers in `github.html` and `pr.html` are just aliases that document intent at
+the call site.
+
+Some tools define their own local equivalent instead of using the shared one — sometimes
+deliberately (`github.html`'s `showNotification`, `ui.html`'s `showToast`, which renders into its
+own container with an icon and close button), sometimes just because nobody wired the shared one
+up. Prefer the shared version in a file that already loads `shared-utils.js`, and match the
+surrounding file when you don't.
 
 **The scripts are classic scripts, not modules.** Top-level `function` declarations land on
 `window`; top-level `let`/`const` do **not** — they're script-scoped and unreachable from the
