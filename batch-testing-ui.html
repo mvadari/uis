@@ -330,41 +330,6 @@
                 color: #1f2937;
             }
 
-            .result-item {
-                padding: 15px;
-                border: 1px solid #e5e7eb;
-                border-radius: 6px;
-                margin-bottom: 10px;
-            }
-
-            .result-success {
-                border-left: 4px solid #10b981;
-                background: #f0fdf4;
-            }
-
-            .result-failure {
-                border-left: 4px solid #ef4444;
-                background: #fef2f2;
-            }
-
-            .result-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 10px;
-            }
-
-            .result-status {
-                font-weight: 600;
-                font-size: 14px;
-            }
-
-            .result-details {
-                font-size: 13px;
-                color: #6b7280;
-                font-family: 'Courier New', monospace;
-            }
-
             .template-grid {
                 display: grid;
                 grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -1288,6 +1253,9 @@
                         // Prepare the transaction
                         const tx = JSON.parse(JSON.stringify(testCase.transaction)); // Deep copy
 
+                        // Set by whichever submit path runs; processed once below.
+                        let submitResult;
+
                         // Check if this is a multi-account Batch transaction
                         const isMultiAccountBatch =
                             tx.TransactionType === 'Batch' &&
@@ -1330,16 +1298,7 @@
                             prepared.BatchSigners = allBatchSigners;
 
                             // Submit the signed transaction
-                            const submitResult = await this.client.submitAndWait(prepared);
-
-                            // Process result
-                            result.actualResult = submitResult.result.meta.TransactionResult;
-                            result.hash = submitResult.result.hash;
-                            result.ledgerIndex = submitResult.result.ledger_index;
-                            result.fee = xrpl.dropsToXrp(
-                                submitResult.result.tx_json?.Fee || submitResult.result.Fee || '0',
-                            );
-                            result.success = result.actualResult === testCase.expectedResult;
+                            submitResult = await this.client.submitAndWait(prepared);
                         } else {
                             // Single-account transaction or regular Batch: use submitAndWait with wallet
                             const accountAddress = tx.Account;
@@ -1352,20 +1311,20 @@
                             const walletObj = xrpl.Wallet.fromSeed(wallet.seed);
 
                             // submitAndWait handles autofilling, signing, and submitting
-                            const submitResult = await this.client.submitAndWait(tx, {
+                            submitResult = await this.client.submitAndWait(tx, {
                                 autofill: true,
                                 wallet: walletObj,
                             });
-
-                            // Process result
-                            result.actualResult = submitResult.result.meta.TransactionResult;
-                            result.hash = submitResult.result.hash;
-                            result.ledgerIndex = submitResult.result.ledger_index;
-                            result.fee = xrpl.dropsToXrp(
-                                submitResult.result.tx_json?.Fee || submitResult.result.Fee || '0',
-                            );
-                            result.success = result.actualResult === testCase.expectedResult;
                         }
+
+                        // Process result
+                        result.actualResult = submitResult.result.meta.TransactionResult;
+                        result.hash = submitResult.result.hash;
+                        result.ledgerIndex = submitResult.result.ledger_index;
+                        result.fee = xrpl.dropsToXrp(
+                            submitResult.result.tx_json?.Fee || submitResult.result.Fee || '0',
+                        );
+                        result.success = result.actualResult === testCase.expectedResult;
                     } catch (error) {
                         console.error(error);
                         result.error = error.message;
