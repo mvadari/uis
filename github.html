@@ -2920,8 +2920,7 @@
 
             let allPRs = [];
             let autoRefreshTimer = null;
-            let lastUpdateTime = null;
-            let columnSortModes = {}; // Track sort mode per column
+            let columnSortModes = null; // Sort mode per column; lazily loaded from SORT_KEY
             let minimizedColumns = new Set(); // Track minimized columns
             let manuallyToggledColumns = new Set(); // Track which columns user manually toggled
             let columnItemCounts = {}; // Track last-known item count per column, to detect zero-crossings
@@ -2929,8 +2928,6 @@
             let currentQueryFilters = new Set(); // Track currently selected query filters (empty = all queries)
             let currentMilestoneFilter = ''; // Track current milestone filter
             let currentUser = null; // Cache current user login
-            let tokenValid = false; // Track if token is valid
-            let currentSettingsTab = 'token'; // Track current settings tab
             let tempLabels = []; // Temporary labels for editing
             let tempQueries = []; // Temporary queries for editing
             let draggedQueryIndex = null; // Index of query row being dragged in the editor
@@ -2987,9 +2984,13 @@
             }
 
             // PR Notes functions
+            let notesCache = null;
+
             function getPRNotes() {
-                const stored = localStorage.getItem(NOTES_KEY);
-                return stored ? JSON.parse(stored) : {};
+                if (notesCache === null) {
+                    notesCache = Storage.get(NOTES_KEY, {});
+                }
+                return notesCache;
             }
 
             function getPRNote(prId) {
@@ -3004,7 +3005,8 @@
                 } else {
                     notes[prId] = note;
                 }
-                localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
+                notesCache = notes;
+                Storage.set(NOTES_KEY, notes);
             }
 
             // PR Flagged functions
@@ -3097,11 +3099,9 @@
             };
 
             let currentNotePRId = null;
-            let currentNotePRTitle = '';
 
             window.openNoteEditor = function (prId, prTitle) {
                 currentNotePRId = prId;
-                currentNotePRTitle = prTitle;
 
                 const note = getPRNote(prId);
                 document.getElementById('noteTextarea').value = note;
@@ -3112,7 +3112,6 @@
             function closeNoteEditor() {
                 document.getElementById('noteEditorModal').classList.remove('show');
                 currentNotePRId = null;
-                currentNotePRTitle = '';
             }
 
             function saveNote() {
@@ -3126,19 +3125,16 @@
 
             // Save sort modes to localStorage
             function saveSortModes() {
-                localStorage.setItem(SORT_KEY, JSON.stringify(columnSortModes));
-                sortModesCache = columnSortModes;
+                Storage.set(SORT_KEY, columnSortModes);
             }
 
-            // Get sort modes from localStorage
-            let sortModesCache = null;
-
+            // Get sort modes, loading them from localStorage on first use.
+            // `columnSortModes` is its own cache — read it through here, not directly.
             function getSortModes() {
-                if (sortModesCache === null) {
-                    const stored = localStorage.getItem(SORT_KEY);
-                    sortModesCache = stored ? JSON.parse(stored) : {};
+                if (columnSortModes === null) {
+                    columnSortModes = Storage.get(SORT_KEY, {});
                 }
-                return sortModesCache;
+                return columnSortModes;
             }
 
             // Save custom order to localStorage
@@ -3321,7 +3317,6 @@
             // Update last updated time
             function updateLastUpdatedTime() {
                 const now = new Date();
-                lastUpdateTime = now;
                 const timeString = now.toLocaleTimeString('en-US', {
                     hour: 'numeric',
                     minute: '2-digit',
@@ -4179,15 +4174,14 @@
                 }
 
                 // Load sort modes (but not minimized state - that's managed in memory)
-                columnSortModes = getSortModes();
+                const sortModes = getSortModes();
                 // Don't reload minimizedColumns or manuallyToggledColumns - they persist in memory
 
                 // Filter PRs by repository if a filter is active
                 let filteredPRs = allPRs;
                 if (currentRepoFilter) {
                     filteredPRs = allPRs.filter((pr) => {
-                        const repoName = pr.repository_url.split('/').slice(-2).join('/');
-                        return repoName === currentRepoFilter;
+                        return repoNameFromUrl(pr.repository_url) === currentRepoFilter;
                     });
                 }
 
@@ -4248,7 +4242,7 @@
 
                 // Sort PRs in each column
                 LABELS.forEach((label) => {
-                    const mode = columnSortModes[label.id] || 'updated';
+                    const mode = sortModes[label.id] || 'updated';
                     columns[label.id] = sortPRs(columns[label.id], mode, label.id);
                 });
 
@@ -4265,17 +4259,13 @@
                     const prs = columns[label.id];
                     const count = prs.length;
 
-                    // Hide empty columns that are marked hideWhenEmpty (e.g. Unlabeled). Labels
-                    // saved before this field existed fall back to the old unlabeled-only rule.
-                    const hideWhenEmpty =
-                        label.hideWhenEmpty !== undefined
-                            ? label.hideWhenEmpty
-                            : label.id === 'unlabeled';
-                    if (hideWhenEmpty && count === 0) {
+                    // Hide empty columns that are marked hideWhenEmpty (e.g. Unlabeled);
+                    // loadLabelsList backfills the field for older saved lists.
+                    if (label.hideWhenEmpty && count === 0) {
                         return '';
                     }
 
-                    const sortMode = columnSortModes[label.id] || 'updated';
+                    const sortMode = sortModes[label.id] || 'updated';
                     const isMinimized = minimizedColumns.has(label.id);
 
                     return `
@@ -4420,7 +4410,7 @@
                             }
                         }
 
-                        columnSortModes[label] = mode;
+                        getSortModes()[label] = mode;
                         saveSortModes();
                         renderPRs();
                     });
@@ -4544,7 +4534,7 @@
                         const draggingItem = document.querySelector('.dragging');
                         if (draggingItem && element.classList.contains('kanban-content')) {
                             const label = element.dataset.label;
-                            const sortMode = columnSortModes[label] || 'updated';
+                            const sortMode = getSortModes()[label] || 'updated';
 
                             if (sortMode === 'custom') {
                                 const afterElement = getDragAfterElement(element, e.clientY);
@@ -4591,7 +4581,7 @@
                             if (draggingItem) {
                                 const prId = draggingItem.dataset.prId;
                                 const newLabel = column.dataset.label;
-                                const sortMode = columnSortModes[newLabel] || 'updated';
+                                const sortMode = getSortModes()[newLabel] || 'updated';
 
                                 // Get the content element
                                 const contentElement = element.classList.contains('kanban-content')
@@ -4943,8 +4933,6 @@
             let labelScrollInterval = null;
 
             function openSettings(tab = 'token') {
-                currentSettingsTab = tab;
-
                 // Load current values into temp variables
                 tempLabels = JSON.parse(JSON.stringify(LABELS));
                 tempQueries = JSON.parse(JSON.stringify(getQuerySettings()));
@@ -5066,8 +5054,6 @@
             }
 
             function switchSettingsTab(tabName) {
-                currentSettingsTab = tabName;
-
                 // Update tab buttons
                 document.querySelectorAll('.settings-tab').forEach((tab) => {
                     if (tab.dataset.tab === tabName) {
