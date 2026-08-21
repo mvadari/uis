@@ -184,6 +184,37 @@
                 color: var(--color-fg-muted);
             }
 
+            .pr-header-stats {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                margin-top: 10px;
+            }
+
+            .stat-pill {
+                background: var(--color-canvas-subtle);
+                border: 1px solid var(--color-border-default);
+                border-radius: 999px;
+                color: var(--color-fg-muted);
+                font-size: 12px;
+                font-weight: 500;
+                padding: 3px 10px;
+                white-space: nowrap;
+            }
+
+            .stat-pill.success {
+                background: var(--color-success-subtle);
+                color: var(--color-success-fg);
+            }
+            .stat-pill.failure {
+                background: var(--color-danger-subtle);
+                color: var(--color-danger-fg);
+            }
+            .stat-pill.pending {
+                background: var(--color-attention-subtle);
+                color: var(--color-attention-fg);
+            }
+
             .summary-grid {
                 display: grid;
                 grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1421,7 +1452,16 @@
               repository(owner:$owner, name:$repo) {
                 pullRequest(number:$number) {
                   id number title url state isDraft headRefOid additions deletions
+                  createdAt updatedAt reviewDecision
                   ${AUTHOR_FRAGMENT}
+                  reviewRequests(first:25) {
+                    nodes { requestedReviewer { ... on User { login } ... on Team { name } } }
+                  }
+                  approvedReviews: reviews(states:[APPROVED]) { totalCount }
+                  changesRequestedReviews: reviews(states:[CHANGES_REQUESTED]) { totalCount }
+                  commits(last:1) {
+                    nodes { commit { statusCheckRollup { state } } }
+                  }
                   reviewThreads(first:50) {
                     pageInfo { hasNextPage endCursor }
                     nodes {
@@ -1637,6 +1677,22 @@
                         author: p.author,
                         additions: p.additions,
                         deletions: p.deletions,
+                        createdAt: p.createdAt,
+                        updatedAt: p.updatedAt,
+                        reviewDecision: p.reviewDecision,
+                        approvedCount: p.approvedReviews ? p.approvedReviews.totalCount : 0,
+                        changesRequestedCount: p.changesRequestedReviews
+                            ? p.changesRequestedReviews.totalCount
+                            : 0,
+                        reviewRequests: (p.reviewRequests ? p.reviewRequests.nodes : [])
+                            .map((n) => n.requestedReviewer)
+                            .filter(Boolean)
+                            .map((r) => r.login || r.name),
+                        ciState:
+                            p.commits && p.commits.nodes[0] && p.commits.nodes[0].commit
+                                ? p.commits.nodes[0].commit.statusCheckRollup &&
+                                  p.commits.nodes[0].commit.statusCheckRollup.state
+                                : null,
                     },
                     threads: threadNodes.map((t) => ({
                         id: t.id,
@@ -1743,14 +1799,62 @@
                 };
             }
 
+            // Combines commit statuses and check-runs into one rollup state, mirroring GitHub's
+            // own statusCheckRollup: any failure wins, then any in-progress, else success.
+            function computeCiState(combinedStatus, checkRuns) {
+                const hasAny =
+                    (combinedStatus && combinedStatus.statuses && combinedStatus.statuses.length) ||
+                    (checkRuns && checkRuns.check_runs && checkRuns.check_runs.length);
+                if (!hasAny) return null;
+                const runs = (checkRuns && checkRuns.check_runs) || [];
+                const failed = runs.some((r) =>
+                    ['failure', 'timed_out', 'cancelled', 'action_required'].includes(r.conclusion),
+                );
+                const pending = runs.some((r) => r.status !== 'completed');
+                const statusState = combinedStatus ? combinedStatus.state : 'success';
+                if (failed || statusState === 'failure' || statusState === 'error')
+                    return 'FAILURE';
+                if (pending || statusState === 'pending') return 'PENDING';
+                return 'SUCCESS';
+            }
+
+            // Reduces a flat review list to one decision per reviewer (their most recent
+            // submission), so re-review after "changes requested" doesn't double count.
+            function latestReviewStatesByUser(reviewList) {
+                const latest = new Map();
+                reviewList
+                    .filter((r) => r.state !== 'COMMENTED' && r.state !== 'PENDING')
+                    .slice()
+                    .sort(byCreatedAtRest)
+                    .forEach((r) => {
+                        const login = r.user && r.user.login;
+                        if (login) latest.set(login, r.state);
+                    });
+                return [...latest.values()];
+            }
+
+            function byCreatedAtRest(a, b) {
+                return new Date(a.submitted_at) - new Date(b.submitted_at);
+            }
+
             async function fetchPRRest(owner, repo, number) {
                 const base = `${REST_BASE}/repos/${owner}/${repo}`;
-                const [pr, reviewComments, issueComments, reviewList] = await Promise.all([
-                    restGet(`${base}/pulls/${number}`),
-                    restGetAll(`${base}/pulls/${number}/comments`),
-                    restGetAll(`${base}/issues/${number}/comments`),
-                    restGetAll(`${base}/pulls/${number}/reviews`),
-                ]);
+                const [pr, reviewComments, issueComments, reviewList, requestedReviewers] =
+                    await Promise.all([
+                        restGet(`${base}/pulls/${number}`),
+                        restGetAll(`${base}/pulls/${number}/comments`),
+                        restGetAll(`${base}/issues/${number}/comments`),
+                        restGetAll(`${base}/pulls/${number}/reviews`),
+                        restGet(`${base}/pulls/${number}/requested_reviewers`),
+                    ]);
+                const headSha = pr.head && pr.head.sha;
+                const [combinedStatus, checkRuns] = headSha
+                    ? await Promise.all([
+                          restGet(`${base}/commits/${headSha}/status`).catch(() => null),
+                          restGet(`${base}/commits/${headSha}/check-runs`).catch(() => null),
+                      ])
+                    : [null, null];
+                const reviewStates = latestReviewStatesByUser(reviewList);
 
                 // Rebuild review threads from flat comments using in_reply_to_id chains.
                 const byId = new Map();
@@ -1800,6 +1904,18 @@
                         author: mapRestUser(pr.user),
                         additions: pr.additions,
                         deletions: pr.deletions,
+                        createdAt: pr.created_at,
+                        updatedAt: pr.updated_at,
+                        approvedCount: reviewStates.filter((s) => s === 'APPROVED').length,
+                        changesRequestedCount: reviewStates.filter((s) => s === 'CHANGES_REQUESTED')
+                            .length,
+                        reviewRequests: requestedReviewers
+                            ? [
+                                  ...(requestedReviewers.users || []).map((u) => u.login),
+                                  ...(requestedReviewers.teams || []).map((t) => t.name),
+                              ]
+                            : [],
+                        ciState: computeCiState(combinedStatus, checkRuns),
                     },
                     threads,
                     comments: issueComments.map(mapRestIssueComment).sort(byCreatedAt),
@@ -1991,6 +2107,14 @@
                 return { cls: 'open', label: 'Open' };
             }
 
+            const CI_STATE_INFO = {
+                SUCCESS: { cls: 'success', label: '✓ Checks passing' },
+                FAILURE: { cls: 'failure', label: '✗ Checks failing' },
+                ERROR: { cls: 'failure', label: '✗ Checks errored' },
+                PENDING: { cls: 'pending', label: '● Checks pending' },
+                EXPECTED: { cls: 'pending', label: '● Checks pending' },
+            };
+
             function renderPRHeader() {
                 if (!prMeta) {
                     els.prHeader.innerHTML = '';
@@ -2004,6 +2128,26 @@
                     prMeta.author && prMeta.author.url
                         ? prMeta.author.url
                         : `https://github.com/${login}`;
+
+                const stats = [];
+                const ci = prMeta.ciState && CI_STATE_INFO[prMeta.ciState];
+                if (ci) stats.push(`<span class="stat-pill ${ci.cls}">${ci.label}</span>`);
+                if (prMeta.approvedCount)
+                    stats.push(
+                        `<span class="stat-pill success">✓ ${prMeta.approvedCount} approved</span>`,
+                    );
+                if (prMeta.changesRequestedCount)
+                    stats.push(
+                        `<span class="stat-pill failure">✗ ${prMeta.changesRequestedCount} changes requested</span>`,
+                    );
+                if (prMeta.reviewRequests && prMeta.reviewRequests.length)
+                    stats.push(
+                        `<span class="stat-pill pending">● Review requested: ${escapeHtml(prMeta.reviewRequests.join(', '))}</span>`,
+                    );
+                const statsRow = stats.length
+                    ? `<div class="pr-header-stats">${stats.join('')}</div>`
+                    : '';
+
                 els.prHeader.innerHTML = `
                 <div class="pr-header">
                     <div class="pr-header-title">
@@ -2014,8 +2158,11 @@
                     <div class="pr-header-meta">
                         <span class="state-pill ${st.cls}">${st.label}</span>
                         <span>by <a href="${escapeHtml(authorUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(login)}</a></span>
+                        ${prMeta.createdAt ? `<span>opened ${escapeHtml(formatRelative(prMeta.createdAt))}</span>` : ''}
+                        ${prMeta.updatedAt ? `<span>updated ${escapeHtml(formatRelative(prMeta.updatedAt))}</span>` : ''}
                         <a href="${escapeHtml(prMeta.url)}" target="_blank" rel="noopener noreferrer">View on GitHub</a>
                     </div>
+                    ${statsRow}
                 </div>`;
             }
 
