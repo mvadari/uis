@@ -378,12 +378,6 @@
                 border-color: #ff8182;
             }
 
-            .badge-info {
-                background-color: #ddf4ff;
-                color: #0969da;
-                border-color: #54aeff;
-            }
-
             .badge-merged {
                 background-color: #fbefff;
                 color: #8250df;
@@ -477,41 +471,6 @@
                 padding: 12px 16px;
                 margin-top: 12px;
                 line-height: 1.5;
-            }
-
-            .notification {
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                padding: 12px 16px;
-                border-radius: 6px;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-                z-index: 1000;
-                animation: slideIn 0.25s ease-out;
-                font-size: 14px;
-                color: #ffffff;
-                max-width: 420px;
-            }
-
-            .notification.success {
-                background-color: #1f883d;
-            }
-            .notification.error {
-                background-color: #d1242f;
-            }
-            .notification.info {
-                background-color: #0969da;
-            }
-
-            @keyframes slideIn {
-                from {
-                    transform: translateX(100%);
-                    opacity: 0;
-                }
-                to {
-                    transform: translateX(0);
-                    opacity: 1;
-                }
             }
 
             @media (max-width: 900px) {
@@ -742,6 +701,7 @@
                         <option value="merged">Merged</option>
                         <option value="closed">Closed</option>
                         <option value="attention">Needs attention</option>
+                        <option value="ready">Ready to merge</option>
                     </select>
                     <select id="sortMode" aria-label="Sort pull requests">
                         <option value="number-desc">Newest first</option>
@@ -780,7 +740,10 @@
             const CACHE_KEY = 'rippled_release_tracker_cache';
             const CACHE_VERSION = 'all-prs-v5';
             const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000;
+            const FETCH_CONCURRENCY = 8;
+            const API_BASE = 'https://api.github.com';
             const APPROVAL_EXCLUDED_REVIEWERS = new Set(['xrplf-ai-reviewer[bot]', 'Copilot']);
+            const READY_LABEL = 'Ready to merge';
             const COPILOT_REVIEWERS = new Set([
                 'Copilot',
                 'copilot-pull-request-reviewer[bot]',
@@ -876,14 +839,6 @@
                 };
                 if (token) headers.Authorization = `token ${token}`;
                 return headers;
-            }
-
-            function notify(message, type = 'info') {
-                const notification = document.createElement('div');
-                notification.className = `notification ${type}`;
-                notification.textContent = message;
-                document.body.appendChild(notification);
-                setTimeout(() => notification.remove(), 3200);
             }
 
             function escape(value) {
@@ -987,6 +942,16 @@
                 return `repo:${repoSlug()} is:pr is:${state} milestone:"${release.replace(/"/g, '\\"')}"`;
             }
 
+            // Matches the API-side count, which is scoped to open PRs (buildLabelQuery(..., 'open')),
+            // so the summary tile's number and the list it filters to always agree.
+            function isReadyToMerge(pr) {
+                return (
+                    pr.state === 'open' &&
+                    !pr.merged_at &&
+                    (pr.labels || []).some((label) => label.name === READY_LABEL)
+                );
+            }
+
             function buildLabelQuery(release, label, state = 'open') {
                 return `${buildQuery(release, state)} label:"${label.replace(/"/g, '\\"')}"`;
             }
@@ -1034,7 +999,7 @@
             async function fetchMilestones() {
                 const allMilestones = [];
                 for (let page = 1; page <= 5; page++) {
-                    const url = `https://api.github.com/repos/${repoSlug()}/milestones?state=open&sort=due_on&direction=desc&per_page=100&page=${page}`;
+                    const url = `${API_BASE}/repos/${repoSlug()}/milestones?state=open&sort=due_on&direction=desc&per_page=100&page=${page}`;
                     const data = await githubRequest(url);
                     allMilestones.push(...data);
                     if (data.length < 100) break;
@@ -1096,7 +1061,7 @@
                 const query = buildQuery(release, state);
                 const maxPages = Number.isFinite(limit) ? Math.ceil(limit / 100) : 10;
                 for (let page = 1; page <= maxPages; page++) {
-                    const url = `https://api.github.com/search/issues?q=${encodeURIComponent(query)}&per_page=100&page=${page}&sort=updated&order=desc`;
+                    const url = `${API_BASE}/search/issues?q=${encodeURIComponent(query)}&per_page=100&page=${page}&sort=updated&order=desc`;
                     const data = await githubRequest(url);
                     for (const item of data.items || []) {
                         if (found.size >= limit) break;
@@ -1116,7 +1081,7 @@
             }
 
             async function searchCount(query) {
-                const url = `https://api.github.com/search/issues?q=${encodeURIComponent(query)}&per_page=1`;
+                const url = `${API_BASE}/search/issues?q=${encodeURIComponent(query)}&per_page=1`;
                 const data = await githubRequest(url);
                 return data.total_count || 0;
             }
@@ -1126,7 +1091,7 @@
                     searchCount(buildQuery(release, 'open')),
                     searchCount(buildQuery(release, 'closed')),
                     searchCount(`${buildQuery(release, 'closed')} is:merged`),
-                    searchCount(buildLabelQuery(release, 'Ready to merge', 'open')),
+                    searchCount(buildLabelQuery(release, READY_LABEL, 'open')),
                 ]);
                 return {
                     total: open + closed,
@@ -1137,18 +1102,14 @@
             }
 
             async function fetchPR(number) {
-                return githubRequest(`https://api.github.com/repos/${repoSlug()}/pulls/${number}`);
+                return githubRequest(`${API_BASE}/repos/${repoSlug()}/pulls/${number}`);
             }
 
             async function fetchCIStatus(sha) {
                 try {
                     const [checksData, statusData] = await Promise.all([
-                        githubRequest(
-                            `https://api.github.com/repos/${repoSlug()}/commits/${sha}/check-runs`,
-                        ),
-                        githubRequest(
-                            `https://api.github.com/repos/${repoSlug()}/commits/${sha}/status`,
-                        ),
+                        githubRequest(`${API_BASE}/repos/${repoSlug()}/commits/${sha}/check-runs`),
+                        githubRequest(`${API_BASE}/repos/${repoSlug()}/commits/${sha}/status`),
                     ]);
 
                     let successCount = 0;
@@ -1211,7 +1172,7 @@
                     const reviews = [];
                     for (let page = 1; page <= 5; page++) {
                         const data = await githubRequest(
-                            `https://api.github.com/repos/${repoSlug()}/pulls/${prNumber}/reviews?per_page=100&page=${page}`,
+                            `${API_BASE}/repos/${repoSlug()}/pulls/${prNumber}/reviews?per_page=100&page=${page}`,
                         );
                         reviews.push(...data);
                         if (data.length < 100) break;
@@ -1268,7 +1229,7 @@
                 const commits = [];
                 for (let page = 1; page <= 3; page++) {
                     const data = await githubRequest(
-                        `https://api.github.com/repos/${repoSlug()}/pulls/${prNumber}/commits?per_page=100&page=${page}`,
+                        `${API_BASE}/repos/${repoSlug()}/pulls/${prNumber}/commits?per_page=100&page=${page}`,
                     );
                     commits.push(...data);
                     if (data.length < 100) break;
@@ -1329,6 +1290,24 @@
                 };
             }
 
+            // Run `mapper` over `items` with at most `limit` in flight. enrichPR fans out
+            // three more requests per PR, so an unbounded Promise.all over a big milestone
+            // trips GitHub's secondary rate limit.
+            async function mapWithConcurrency(items, limit, mapper) {
+                const results = new Array(items.length);
+                let nextIndex = 0;
+
+                async function worker() {
+                    while (nextIndex < items.length) {
+                        const index = nextIndex++;
+                        results[index] = await mapper(items[index], index);
+                    }
+                }
+
+                await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+                return results;
+            }
+
             async function enrichPR(pr) {
                 // Merged/closed PRs are done — CI and Copilot freshness are no longer
                 // actionable, so skip those calls. Reviews are kept for approval history.
@@ -1352,7 +1331,7 @@
             async function fetchAllPRs(isAutoRefresh = false) {
                 const release = normalizeRelease(document.getElementById('releaseSelect').value);
                 if (!release) {
-                    notify('Choose a milestone first', 'error');
+                    showToast('Choose a milestone first', 'error');
                     return;
                 }
 
@@ -1379,20 +1358,21 @@
                         return;
                     }
 
-                    const fetched = await Promise.all(numbers.map(fetchPR));
-                    prs = await Promise.all(fetched.map(enrichPR));
+                    prs = await mapWithConcurrency(numbers, FETCH_CONCURRENCY, async (number) =>
+                        enrichPR(await fetchPR(number)),
+                    );
                     savePRsToCache();
                     document.getElementById('lastUpdated').textContent =
                         new Date().toLocaleTimeString();
                     renderPRs();
-                    if (isAutoRefresh) notify('Release tracker refreshed', 'success');
+                    if (isAutoRefresh) showToast('Release tracker refreshed', 'success');
                 } catch (error) {
                     console.error('Error fetching release PRs:', error);
                     document.getElementById('error').textContent = error.message;
                     document.getElementById('error').style.display = 'block';
 
                     if (loadPRsFromCache()) {
-                        notify('Showing cached release data', 'info');
+                        showToast('Showing cached release data', 'info');
                     } else {
                         document.getElementById('prList').innerHTML =
                             '<div class="empty-state">Failed to load release PRs.</div>';
@@ -1589,7 +1569,8 @@
                             (status === 'draft' && pr.draft) ||
                             (status === 'merged' && pr.merged_at) ||
                             (status === 'closed' && pr.state === 'closed' && !pr.merged_at) ||
-                            (status === 'attention' && needsAttention(pr));
+                            (status === 'attention' && needsAttention(pr)) ||
+                            (status === 'ready' && isReadyToMerge(pr));
 
                         const haystack = [
                             pr.number,
@@ -1611,12 +1592,7 @@
                 const open = releaseCounts?.open ?? prs.filter((pr) => pr.state === 'open').length;
                 const merged = releaseCounts?.merged ?? prs.filter((pr) => pr.merged_at).length;
                 const readyToMerge =
-                    releaseCounts?.readyToMerge ??
-                    prs.filter(
-                        (pr) =>
-                            !pr.merged_at &&
-                            (pr.labels || []).some((label) => label.name === 'Ready to merge'),
-                    ).length;
+                    releaseCounts?.readyToMerge ?? prs.filter(isReadyToMerge).length;
                 const attention = prs.filter(needsAttention).length;
 
                 document.getElementById('totalCount').textContent = total;
@@ -1631,18 +1607,10 @@
                 const searchInput = document.getElementById('searchInput');
                 searchInput.value = '';
 
-                if (filter === 'open') {
-                    statusFilter.value = 'open';
-                } else if (filter === 'merged') {
-                    statusFilter.value = 'merged';
-                } else if (filter === 'attention') {
-                    statusFilter.value = 'attention';
-                } else {
-                    statusFilter.value = 'all';
-                    if (filter === 'ready') {
-                        searchInput.value = 'Ready to merge';
-                    }
-                }
+                const isStatus = [...statusFilter.options].some(
+                    (option) => option.value === filter,
+                );
+                statusFilter.value = isStatus ? filter : 'all';
 
                 updateFilterParams();
                 renderPRs();
@@ -1733,72 +1701,67 @@
                 return match ? Number(match[1]) : null;
             }
 
+            // Set or clear a PR's milestone; pass null to remove it.
+            function patchMilestone(number, milestoneNumber) {
+                return githubRequest(`${API_BASE}/repos/${repoSlug()}/issues/${number}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ milestone: milestoneNumber }),
+                });
+            }
+
             async function addPRToMilestone(value) {
                 if (!getToken()) {
-                    notify('GitHub token required to edit milestones', 'error');
+                    showToast('GitHub token required to edit milestones', 'error');
                     return;
                 }
                 const release = normalizeRelease(document.getElementById('releaseSelect').value);
                 if (!release) {
-                    notify('Choose a milestone before adding PRs', 'error');
+                    showToast('Choose a milestone before adding PRs', 'error');
                     return;
                 }
                 releaseName = release;
                 localStorage.setItem(RELEASE_KEY, releaseName);
                 const milestone = selectedMilestone();
                 if (!milestone) {
-                    notify('Selected milestone is not available', 'error');
+                    showToast('Selected milestone is not available', 'error');
                     return;
                 }
                 const number = parsePRNumber(value);
                 if (!number) {
-                    notify('Enter a PR number or GitHub PR URL', 'error');
+                    showToast('Enter a PR number or GitHub PR URL', 'error');
                     return;
                 }
                 try {
-                    await githubRequest(
-                        `https://api.github.com/repos/${repoSlug()}/issues/${number}`,
-                        {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ milestone: milestone.number }),
-                        },
-                    );
+                    await patchMilestone(number, milestone.number);
                     document.getElementById('addPrInput').value = '';
-                    notify(`Added PR #${number} to ${releaseName}`, 'success');
+                    showToast(`Added PR #${number} to ${releaseName}`, 'success');
                     await fetchAllPRs();
                 } catch (error) {
                     console.error('Error adding milestone:', error);
-                    notify(error.message || 'Failed to add PR to milestone', 'error');
+                    showToast(error.message || 'Failed to add PR to milestone', 'error');
                 }
             }
 
             async function removeFromMilestone(number) {
                 if (!getToken()) {
-                    notify('GitHub token required to edit milestones', 'error');
+                    showToast('GitHub token required to edit milestones', 'error');
                     return;
                 }
                 if (!releaseName.trim()) {
-                    notify('Choose a milestone first', 'error');
+                    showToast('Choose a milestone first', 'error');
                     return;
                 }
 
                 try {
-                    await githubRequest(
-                        `https://api.github.com/repos/${repoSlug()}/issues/${number}`,
-                        {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ milestone: null }),
-                        },
-                    );
+                    await patchMilestone(number, null);
                     prs = prs.filter((pr) => pr.number !== number);
                     savePRsToCache();
                     renderPRs();
-                    notify(`Removed PR #${number} from ${releaseName}`, 'success');
+                    showToast(`Removed PR #${number} from ${releaseName}`, 'success');
                 } catch (error) {
                     console.error('Error removing milestone:', error);
-                    notify(error.message || 'Failed to remove PR from milestone', 'error');
+                    showToast(error.message || 'Failed to remove PR from milestone', 'error');
                 }
             }
 
@@ -1841,7 +1804,7 @@
             async function handleRepoChange() {
                 const parsed = parseRepo(document.getElementById('repoInput').value);
                 if (!parsed) {
-                    notify('Enter a repository as owner/repo', 'error');
+                    showToast('Enter a repository as owner/repo', 'error');
                     return;
                 }
                 if (parsed.slug === repoSlug()) return;
@@ -1900,7 +1863,7 @@
                 else localStorage.removeItem(TOKEN_KEY);
                 document.getElementById('tokenContainer').classList.remove('visible');
                 document.getElementById('tokenStatus').textContent = getToken() ? 'Set' : 'Not set';
-                notify('Token saved', 'success');
+                showToast('Token saved', 'success');
                 loadMilestones();
             });
             document.getElementById('autoRefresh').addEventListener('change', setupAutoRefresh);
