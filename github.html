@@ -2797,6 +2797,25 @@
                 manuallyToggledColumns: [MANUALLY_TOGGLED_KEY, []],
             };
 
+            // Keyed by the ciStatus values fetchPRDetails produces; anything else renders no icon.
+            const CI_ICONS = {
+                success: {
+                    className: 'ci-success',
+                    title: 'CI passed',
+                    paths: `<path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"></path>`,
+                },
+                failure: {
+                    className: 'ci-failure',
+                    title: 'CI failed',
+                    paths: `<path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z"></path>`,
+                },
+                pending: {
+                    className: 'ci-pending',
+                    title: 'CI in progress',
+                    paths: `<path d="M8 9.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"></path><path fill-rule="evenodd" d="M8 0a8 8 0 100 16A8 8 0 008 0zM1.5 8a6.5 6.5 0 1113 0 6.5 6.5 0 01-13 0z"></path>`,
+                },
+            };
+
             const ICON_COPY_LINK = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7.775 3.275a.75.75 0 001.06 1.06l1.25-1.25a2 2 0 112.83 2.83l-2.5 2.5a2 2 0 01-2.83 0 .75.75 0 00-1.06 1.06 3.5 3.5 0 004.95 0l2.5-2.5a3.5 3.5 0 00-4.95-4.95l-1.25 1.25zm-4.69 9.64a2 2 0 010-2.83l2.5-2.5a2 2 0 012.83 0 .75.75 0 001.06-1.06 3.5 3.5 0 00-4.95 0l-2.5 2.5a3.5 3.5 0 004.95 4.95l1.25-1.25a.75.75 0 00-1.06-1.06l-1.25 1.25a2 2 0 01-2.83 0z"></path></svg>`;
 
             // Default query settings - array of query objects
@@ -3793,33 +3812,14 @@
                     });
 
                 // CI status icon
-                let ciIcon = '';
-                if (pr.ciStatus === 'success') {
-                    ciIcon = `
-                    <div class="ci-status ci-success" title="CI passed">
-                        <svg class="ci-icon" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"></path>
-                        </svg>
+                const ci = CI_ICONS[pr.ciStatus];
+                const ciIcon = ci
+                    ? `
+                    <div class="ci-status ${ci.className}" title="${ci.title}">
+                        <svg class="ci-icon" viewBox="0 0 16 16" fill="currentColor">${ci.paths}</svg>
                     </div>
-                `;
-                } else if (pr.ciStatus === 'failure') {
-                    ciIcon = `
-                    <div class="ci-status ci-failure" title="CI failed">
-                        <svg class="ci-icon" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z"></path>
-                        </svg>
-                    </div>
-                `;
-                } else if (pr.ciStatus === 'pending') {
-                    ciIcon = `
-                    <div class="ci-status ci-pending" title="CI in progress">
-                        <svg class="ci-icon" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M8 9.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"></path>
-                            <path fill-rule="evenodd" d="M8 0a8 8 0 100 16A8 8 0 008 0zM1.5 8a6.5 6.5 0 1113 0 6.5 6.5 0 01-13 0z"></path>
-                        </svg>
-                    </div>
-                `;
-                }
+                `
+                    : '';
 
                 // Conflict warning
                 const conflictWarning = pr.hasConflicts
