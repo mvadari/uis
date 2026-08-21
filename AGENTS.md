@@ -39,8 +39,15 @@ committing or the hook will reformat and abort the commit.
 **Each tool is one file.** Inline `<style>` and inline `<script>`, in that order, inside a single
 HTML document. Files run 1000–6000 lines; `github.html` and `pr.html` are the big ones. Adding a
 feature means editing three separate regions of the same file: the CSS block, the HTML markup, and
-the script block. Dark mode lives in one `@media (prefers-color-scheme: dark)` block near the end of
-the CSS — new components need an entry there unless they inherit from a styled ancestor.
+the script block.
+
+**Colours go through CSS custom properties.** `github.html`, `pr.html` and `feature-prs.html` define
+a `:root` token block (`--color-canvas-default`, `--color-fg-muted`, `--color-border-default`, …) and
+a `@media (prefers-color-scheme: dark)` block that overrides _only those tokens_. A new component
+styled with `var(--color-…)` gets dark mode for free — reach for a raw hex only when no token fits,
+and then add the token rather than adding a rule to the dark block. The remaining per-selector rules
+in those dark blocks are the handful of cases with no light-mode counterpart. `release-tracker.html`
+and `stacked.html` still use raw hexes throughout.
 
 **Two shared files**, included by most (not all — `index.html` and `stacked.html` skip them) tools:
 
