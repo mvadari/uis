@@ -820,10 +820,12 @@
                 return new Promise((resolve) => setTimeout(resolve, ms));
             }
 
+            // Reviewers whose type/login doesn't mark them as a bot, but who are one.
+            const BOT_LOGINS = new Set(['Copilot']);
+
             function isBotReviewer(user) {
-                const login = typeof user === 'string' ? user : user?.login;
-                const type = typeof user === 'string' ? '' : user?.type;
-                return type === 'Bot' || /\[bot\]$/i.test(login || '') || login === 'Copilot';
+                const login = user?.login || '';
+                return user?.type === 'Bot' || /\[bot\]$/i.test(login) || BOT_LOGINS.has(login);
             }
 
             function normalizeRepo(value) {
@@ -1279,14 +1281,20 @@
                 return classes[state] || 'none';
             }
 
+            const TIME_UNIT_ABBREVIATIONS = {
+                minute: 'm',
+                hour: 'h',
+                day: 'd',
+                week: 'w',
+                month: 'mo',
+                year: 'y',
+            };
+
             function formatRelativeTime(dateString) {
-                return timeAgo(dateString)
-                    .replace(' minutes', 'm')
-                    .replace(' minute', 'm')
-                    .replace(' hours', 'h')
-                    .replace(' hour', 'h')
-                    .replace(' days', 'd')
-                    .replace(' day', 'd');
+                return timeAgo(dateString).replace(
+                    /\s(minute|hour|day|week|month|year)s?\b/,
+                    (_, unit) => TIME_UNIT_ABBREVIATIONS[unit],
+                );
             }
 
             function branchUrl(branch) {
@@ -1371,15 +1379,22 @@
                 return row.user;
             }
 
-            function buildReportPREntry(pr) {
-                const author = pr.user?.login || 'unknown';
-                const conflictNote = pr.mergeDisplay?.hasConflict
-                    ? ' (needs to update to fix merge conflicts)'
-                    : '';
+            // Shared by both report formats so they can't start saying different things.
+            function reportFields(pr) {
                 const reviewers = pr.reviewRows || [];
-                const reviewerText = reviewers.length
-                    ? reviewers.map(formatReviewerForReport).join(', ')
-                    : 'None';
+                return {
+                    author: pr.user?.login || 'unknown',
+                    conflictNote: pr.mergeDisplay?.hasConflict
+                        ? ' (needs to update to fix merge conflicts)'
+                        : '',
+                    reviewerText: reviewers.length
+                        ? reviewers.map(formatReviewerForReport).join(', ')
+                        : 'None',
+                };
+            }
+
+            function buildReportPREntry(pr) {
+                const { author, conflictNote, reviewerText } = reportFields(pr);
 
                 return `* #${pr.number}: ${pr.title}\n   * Author: ${author}${conflictNote}\n   * Reviewers: ${reviewerText}`;
             }
@@ -1399,14 +1414,7 @@
             }
 
             function buildReportHtmlEntry(pr) {
-                const author = pr.user?.login || 'unknown';
-                const conflictNote = pr.mergeDisplay?.hasConflict
-                    ? ' (needs to update to fix merge conflicts)'
-                    : '';
-                const reviewers = pr.reviewRows || [];
-                const reviewerText = reviewers.length
-                    ? reviewers.map(formatReviewerForReport).join(', ')
-                    : 'None';
+                const { author, conflictNote, reviewerText } = reportFields(pr);
                 const numberLink = `<a href="${escapeAttribute(pr.html_url)}">#${pr.number}</a>`;
 
                 return `<li>${numberLink}: ${titleToHtml(pr.title)}<ul><li>Author: ${escape(author)}${escape(conflictNote)}</li><li>Reviewers: ${escape(reviewerText)}</li></ul></li>`;
