@@ -939,9 +939,7 @@
             let isLoading = false;
             let hasMore = true;
             const AUTO_REFRESH_KEY = 'xrpld_auto_refresh';
-            const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000;
             let autoRefresh = localStorage.getItem(AUTO_REFRESH_KEY) !== 'false';
-            let autoRefreshTimer = null;
 
             // Friendly status info
             const statusInfo = {
@@ -952,7 +950,7 @@
 
             // GitHub token from localStorage
             function getAuthHeaders() {
-                const token = localStorage.getItem('github_token');
+                const token = getGitHubToken();
                 if (token) {
                     return { Authorization: `token ${token}` };
                 }
@@ -965,7 +963,7 @@
 
             // Settings functions
             function updateSettingsUI() {
-                const token = localStorage.getItem('github_token');
+                const token = getGitHubToken();
                 const btn = document.getElementById('settingsBtn');
                 const label = document.getElementById('settingsLabel');
                 const clearBtn = document.getElementById('clearTokenBtn');
@@ -984,7 +982,7 @@
             function openSettings() {
                 const modal = document.getElementById('settingsModal');
                 const input = document.getElementById('tokenInput');
-                const token = localStorage.getItem('github_token');
+                const token = getGitHubToken();
                 input.value = token || '';
                 document.getElementById('clearTokenBtn').style.display = token ? 'block' : 'none';
                 modal.style.display = 'flex';
@@ -995,12 +993,7 @@
             }
 
             function saveToken() {
-                const token = document.getElementById('tokenInput').value.trim();
-                if (token) {
-                    localStorage.setItem('github_token', token);
-                } else {
-                    localStorage.removeItem('github_token');
-                }
+                setGitHubToken(document.getElementById('tokenInput').value);
                 updateSettingsUI();
                 closeSettings();
                 // Refresh data with new token
@@ -1011,7 +1004,7 @@
             }
 
             function clearToken() {
-                localStorage.removeItem('github_token');
+                setGitHubToken('');
                 document.getElementById('tokenInput').value = '';
                 updateSettingsUI();
                 closeSettings();
@@ -1616,10 +1609,7 @@
             }
 
             function setupAutoRefresh() {
-                if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-                if (autoRefresh) {
-                    autoRefreshTimer = setInterval(refreshCurrentView, AUTO_REFRESH_INTERVAL);
-                }
+                setAutoRefresh(autoRefresh, refreshCurrentView);
             }
 
             const autoRefreshCheckbox = document.getElementById('autoRefresh');

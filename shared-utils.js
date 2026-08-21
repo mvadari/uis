@@ -19,6 +19,103 @@ function showToast(message, type = 'info', duration = 3000) {
 }
 
 // ============================================
+// GitHub API
+// ============================================
+
+// One key for every GitHub tool, so a token entered in one works in the others.
+const GITHUB_TOKEN_KEY = 'github_token';
+
+function getGitHubToken() {
+    return (localStorage.getItem(GITHUB_TOKEN_KEY) || '').trim();
+}
+
+// An empty value forgets the token.
+function setGitHubToken(token) {
+    const trimmed = (token || '').trim();
+    if (trimmed) localStorage.setItem(GITHUB_TOKEN_KEY, trimmed);
+    else localStorage.removeItem(GITHUB_TOKEN_KEY);
+}
+
+function githubHeaders(extra) {
+    const token = getGitHubToken();
+    return {
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        ...(token ? { Authorization: `token ${token}` } : {}),
+        ...extra,
+    };
+}
+
+// fetch plus GitHub's error shape, returning parsed JSON.
+async function githubRequest(url, options = {}) {
+    const response = await fetch(url, { ...options, headers: githubHeaders(options.headers) });
+
+    if (!response.ok) {
+        let message = `GitHub API returned ${response.status}`;
+        try {
+            const data = await response.json();
+            if (data.message) message = data.message;
+        } catch {}
+        throw new Error(message);
+    }
+
+    return response.json();
+}
+
+// Run mapper over items with at most `limit` in flight, preserving input order.
+// Tools that fan out several requests per PR need this to stay under GitHub's
+// secondary (concurrency) rate limit.
+async function mapWithConcurrency(items, limit, mapper) {
+    const results = new Array(items.length);
+    let nextIndex = 0;
+
+    async function worker() {
+        while (nextIndex < items.length) {
+            const index = nextIndex++;
+            results[index] = await mapper(items[index], index);
+        }
+    }
+
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+    return results;
+}
+
+// "owner/repo" from a bare slug or any github.com URL.
+function normalizeRepo(value) {
+    return String(value || '')
+        .trim()
+        .replace(/^https?:\/\/github\.com\//i, '')
+        .replace(/\.git$/i, '')
+        .replace(/\/+$/, '');
+}
+
+// -> { owner, repo, slug }, or null if it isn't a repo reference.
+function parseRepo(value) {
+    const match = normalizeRepo(value).match(/^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/);
+    if (!match) return null;
+    return { owner: match[1], repo: match[2], slug: `${match[1]}/${match[2]}` };
+}
+
+// ============================================
+// Auto Refresh
+// ============================================
+
+const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000;
+
+// The page's one background-refresh timer. Always clears the previous timer, so
+// toggling the setting repeatedly can't stack duplicates.
+const setAutoRefresh = (() => {
+    let timer = null;
+    return function setAutoRefresh(enabled, callback, intervalMs = AUTO_REFRESH_INTERVAL) {
+        if (timer) {
+            clearInterval(timer);
+            timer = null;
+        }
+        if (enabled) timer = setInterval(callback, intervalMs);
+    };
+})();
+
+// ============================================
 // Time Formatting Utilities
 // ============================================
 

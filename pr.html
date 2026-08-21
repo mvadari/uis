@@ -8,23 +8,6 @@
         <link rel="stylesheet" href="shared-styles.css" />
         <style>
             :root {
-                color-scheme: light dark;
-                --color-canvas-default: #ffffff;
-                --color-canvas-subtle: #f6f8fa;
-                --color-border-default: #d0d7de;
-                --color-border-muted: #d8dee4;
-                --color-fg-default: #1f2328;
-                --color-fg-muted: #656d76;
-                --color-accent-fg: #0969da;
-                --color-accent-subtle: #ddf4ff;
-                --color-success-fg: #1a7f37;
-                --color-success-subtle: #dafbe1;
-                --color-danger-fg: #d1242f;
-                --color-danger-subtle: #ffebe9;
-                --color-attention-fg: #9a6700;
-                --color-attention-subtle: #fff8c5;
-                --color-done-fg: #8250df;
-                --color-done-subtle: #fbefff;
                 --color-diff-add-bg: #e6ffec;
                 --color-diff-add-fg: #1a7f37;
                 --color-diff-del-bg: #ffebe9;
@@ -94,26 +77,6 @@
                 gap: 8px;
                 flex-wrap: wrap;
                 justify-content: flex-end;
-            }
-
-            .token-pill {
-                border: 1px solid var(--color-border-default);
-                background: var(--color-canvas-subtle);
-                border-radius: 999px;
-                color: var(--color-fg-muted);
-                display: inline-flex;
-                align-items: center;
-                font-size: 12px;
-                font-weight: 600;
-                min-height: 30px;
-                padding: 4px 10px;
-                white-space: nowrap;
-            }
-
-            .token-pill.set {
-                background: var(--color-success-subtle);
-                border-color: rgba(26, 127, 55, 0.35);
-                color: var(--color-success-fg);
             }
 
             .search-panel {
@@ -249,28 +212,8 @@
                 margin-top: 2px;
             }
 
-            .status-line {
-                align-items: center;
-                color: var(--color-fg-muted);
-                display: flex;
-                flex-wrap: wrap;
-                gap: 12px;
-                font-size: 13px;
-                justify-content: space-between;
-                margin-bottom: 12px;
-                min-height: 28px;
-            }
-
             .filter-box {
                 max-width: 340px;
-            }
-
-            .status-controls {
-                align-items: center;
-                display: flex;
-                flex-wrap: wrap;
-                gap: 8px;
-                justify-content: flex-end;
             }
 
             .auto-refresh-toggle {
@@ -282,12 +225,6 @@
                 white-space: nowrap;
             }
 
-            .btn.filter-active {
-                background: var(--color-accent-fg);
-                border-color: var(--color-accent-fg);
-                color: #ffffff;
-            }
-
             .error-banner {
                 background: var(--color-danger-subtle);
                 border: 1px solid rgba(209, 36, 47, 0.35);
@@ -297,23 +234,6 @@
                 font-size: 14px;
                 margin-bottom: 12px;
                 padding: 12px;
-            }
-
-            .empty-state,
-            .loading-state {
-                background: var(--color-canvas-default);
-                border: 1px solid var(--color-border-default);
-                border-radius: 6px;
-                color: var(--color-fg-muted);
-                padding: 32px;
-                text-align: center;
-            }
-
-            .loading-state {
-                align-items: center;
-                display: flex;
-                gap: 12px;
-                justify-content: center;
             }
 
             /* Sections */
@@ -1122,22 +1042,6 @@
 
             @media (prefers-color-scheme: dark) {
                 :root {
-                    --color-canvas-default: #0d1117;
-                    --color-canvas-subtle: #161b22;
-                    --color-border-default: #30363d;
-                    --color-border-muted: #21262d;
-                    --color-fg-default: #e6edf3;
-                    --color-fg-muted: #8b949e;
-                    --color-accent-fg: #58a6ff;
-                    --color-accent-subtle: #1c2a3d;
-                    --color-success-fg: #3fb950;
-                    --color-success-subtle: #1a4426;
-                    --color-danger-fg: #f85149;
-                    --color-danger-subtle: #3d1c1c;
-                    --color-attention-fg: #e3b341;
-                    --color-attention-subtle: #3d2d00;
-                    --color-done-fg: #d2a8ff;
-                    --color-done-subtle: #2d1d47;
                     --color-diff-add-bg: #12261e;
                     --color-diff-add-fg: #3fb950;
                     --color-diff-del-bg: #25171c;
@@ -1357,7 +1261,6 @@
 
         <script src="shared-utils.js"></script>
         <script>
-            const TOKEN_KEY = 'github_token';
             const LAST_PR_KEY = 'pr_comments_last';
             const SHOW_RESOLVED_KEY = 'pr_comments_show_resolved';
             const OUTDATED_FILTER_KEY = 'pr_comments_outdated_filter';
@@ -1366,7 +1269,6 @@
             const FILES_VIEWED_FILTER_KEY = 'pr_review_files_viewed_filter';
             const ACTIVE_TAB_KEY = 'pr_review_active_tab';
             const AUTO_REFRESH_KEY = 'pr_review_auto_refresh';
-            const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000;
 
             let prMeta = null;
             let threads = [];
@@ -1380,7 +1282,6 @@
             let showResolved = localStorage.getItem(SHOW_RESOLVED_KEY) === 'true';
             let outdatedFilter = localStorage.getItem(OUTDATED_FILTER_KEY) || 'all'; // 'all' | 'hide' | 'only'
             let autoRefresh = localStorage.getItem(AUTO_REFRESH_KEY) !== 'false';
-            let autoRefreshTimer = null;
             let selectedIds = new Set();
             const REST_BASE = 'https://api.github.com';
 
@@ -1434,20 +1335,6 @@
 
             // ---------- Helpers ----------
 
-            function getToken() {
-                return (localStorage.getItem(TOKEN_KEY) || '').trim();
-            }
-
-            function escape(value) {
-                return escapeHtml(value);
-            }
-
-            // escapeHtml escapes quotes too; this name is kept so attribute call sites read
-            // as intentional.
-            function escapeAttribute(value) {
-                return escapeHtml(value);
-            }
-
             function setError(message) {
                 els.errorBanner.textContent = message || '';
                 els.errorBanner.style.display = message ? 'block' : 'none';
@@ -1461,7 +1348,7 @@
             }
 
             function updateTokenStatus() {
-                const hasToken = Boolean(getToken());
+                const hasToken = Boolean(getGitHubToken());
                 els.tokenStatus.textContent = hasToken ? 'Token set' : 'Token not set';
                 els.tokenStatus.classList.toggle('set', hasToken);
             }
@@ -1489,7 +1376,7 @@
                     els.queryPreview.textContent = 'Enter a pull request URL or owner/repo#number.';
                     return;
                 }
-                els.queryPreview.innerHTML = `Pull request: <code>${escape(parsed.slug)}</code>`;
+                els.queryPreview.innerHTML = `Pull request: <code>${escapeHtml(parsed.slug)}</code>`;
             }
 
             function formatRelative(dateString) {
@@ -1500,7 +1387,7 @@
             // ---------- GraphQL ----------
 
             async function graphql(query, variables) {
-                const token = getToken();
+                const token = getGitHubToken();
                 if (!token)
                     throw new Error('A GitHub token is required. Click "Token" to add one.');
 
@@ -1784,7 +1671,7 @@
                     Accept: 'application/vnd.github.full+json',
                     'X-GitHub-Api-Version': '2022-11-28',
                 };
-                const token = getToken();
+                const token = getGitHubToken();
                 if (token) headers.Authorization = `token ${token}`;
                 return headers;
             }
@@ -1797,7 +1684,7 @@
                         const data = await response.json();
                         if (data.message) message = data.message;
                     } catch {}
-                    if (response.status === 403 && !getToken()) {
+                    if (response.status === 403 && !getGitHubToken()) {
                         message += ' — unauthenticated requests are rate-limited; add a token.';
                     }
                     throw new Error(message);
@@ -2124,14 +2011,14 @@
                 els.prHeader.innerHTML = `
                 <div class="pr-header">
                     <div class="pr-header-title">
-                        <a href="${escapeAttribute(prMeta.url)}" target="_blank" rel="noopener noreferrer">
-                            ${escape(prMeta.title)} <span class="pr-number">#${escape(prMeta.number)}</span>
+                        <a href="${escapeHtml(prMeta.url)}" target="_blank" rel="noopener noreferrer">
+                            ${escapeHtml(prMeta.title)} <span class="pr-number">#${escapeHtml(prMeta.number)}</span>
                         </a>
                     </div>
                     <div class="pr-header-meta">
                         <span class="state-pill ${st.cls}">${st.label}</span>
-                        <span>by <a href="${escapeAttribute(authorUrl)}" target="_blank" rel="noopener noreferrer">${escape(login)}</a></span>
-                        <a href="${escapeAttribute(prMeta.url)}" target="_blank" rel="noopener noreferrer">View on GitHub</a>
+                        <span>by <a href="${escapeHtml(authorUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(login)}</a></span>
+                        <a href="${escapeHtml(prMeta.url)}" target="_blank" rel="noopener noreferrer">View on GitHub</a>
                     </div>
                 </div>`;
             }
@@ -2144,7 +2031,7 @@
                     if (line.startsWith('@@')) cls = 'diff-hunk-head';
                     else if (line.startsWith('+')) cls = 'diff-add';
                     else if (line.startsWith('-')) cls = 'diff-del';
-                    return `<span class="diff-line ${cls}">${escape(line) || '&nbsp;'}</span>`;
+                    return `<span class="diff-line ${cls}">${escapeHtml(line) || '&nbsp;'}</span>`;
                 });
                 return `<pre class="diff-hunk">${rows.join('')}</pre>`;
             }
@@ -2161,9 +2048,9 @@
             // quoteId, when given, adds a quote-reply button that drops the comment into the
             // thread's reply box - only threads have one, so only they pass it.
             function commentLinkActions(url, quoteId = '') {
-                const safe = escapeAttribute(url || (prMeta && prMeta.url) || '');
+                const safe = escapeHtml(url || (prMeta && prMeta.url) || '');
                 const quoteBtn = quoteId
-                    ? `<button class="comment-link-btn quote-btn" type="button" data-quote-id="${escapeAttribute(quoteId)}" title="Quote reply" aria-label="Quote reply">${ICON_QUOTE}</button>`
+                    ? `<button class="comment-link-btn quote-btn" type="button" data-quote-id="${escapeHtml(quoteId)}" title="Quote reply" aria-label="Quote reply">${ICON_QUOTE}</button>`
                     : '';
                 return `
                 <span class="comment-links">
@@ -2179,17 +2066,17 @@
                     c.author && c.author.url ? c.author.url : `https://github.com/${login}`;
                 const avatar =
                     c.author && c.author.avatarUrl
-                        ? `<img class="avatar" src="${escapeAttribute(c.author.avatarUrl)}" alt="" loading="lazy">`
+                        ? `<img class="avatar" src="${escapeHtml(c.author.avatarUrl)}" alt="" loading="lazy">`
                         : '';
-                const body = c.bodyHTML ? c.bodyHTML : `<p>${escape(c.body || '')}</p>`;
+                const body = c.bodyHTML ? c.bodyHTML : `<p>${escapeHtml(c.body || '')}</p>`;
                 const replyTag = isReply ? '<span class="reply-tag">reply</span>' : '';
                 return `
                 <div class="comment ${isReply ? 'reply' : ''}">
                     <div class="comment-head">
                         ${avatar}
-                        <a class="comment-author" href="${escapeAttribute(authorUrl)}" target="_blank" rel="noopener noreferrer">${escape(login)}</a>
+                        <a class="comment-author" href="${escapeHtml(authorUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(login)}</a>
                         ${replyTag}
-                        <span class="comment-time">${escape(formatRelative(c.createdAt))}</span>
+                        <span class="comment-time">${escapeHtml(formatRelative(c.createdAt))}</span>
                         ${badgeHtml}
                         ${commentLinkActions(c.url, canQuote ? c.id : '')}
                     </div>
@@ -2199,7 +2086,7 @@
 
             function hiddenBadgeHtml(item) {
                 if (!item.isMinimized) return '';
-                return `<span class="tag tag-resolved">Hidden${item.minimizedReason ? `: ${escape(item.minimizedReason)}` : ''}</span>`;
+                return `<span class="tag tag-resolved">Hidden${item.minimizedReason ? `: ${escapeHtml(item.minimizedReason)}` : ''}</span>`;
             }
 
             function hideActionsHtml(item) {
@@ -2219,7 +2106,7 @@
                 return `
                 <div class="comment-actions">
                     <label class="select-check">
-                        <input type="checkbox" class="bulk-check" data-comment-id="${escapeAttribute(item.id)}" ${checked}>
+                        <input type="checkbox" class="bulk-check" data-comment-id="${escapeHtml(item.id)}" ${checked}>
                         Select
                     </label>
                     <div class="comment-actions-right">${actions}</div>
@@ -2228,7 +2115,7 @@
 
             function renderConversationComment(c) {
                 return `
-                <div class="conversation-card ${c.isMinimized ? 'minimized' : ''}" data-comment-id="${escapeAttribute(c.id)}">
+                <div class="conversation-card ${c.isMinimized ? 'minimized' : ''}" data-comment-id="${escapeHtml(c.id)}">
                     ${renderComment(c, hiddenBadgeHtml(c))}
                     ${hideActionsHtml(c)}
                 </div>`;
@@ -2285,7 +2172,7 @@
                    </div>`;
 
                 return `
-                <article class="thread ${t.isOutdated ? 'outdated' : ''}" data-thread-id="${escapeAttribute(t.id)}">
+                <article class="thread ${t.isOutdated ? 'outdated' : ''}" data-thread-id="${escapeHtml(t.id)}">
                     <div class="thread-head">
                         <span class="thread-loc">${loc || 'thread'} · ${countLabel}</span>
                         <span class="thread-badges">${badges.join('')}</span>
@@ -2300,7 +2187,7 @@
                 return `<pre class="diff-hunk">${lines
                     .map(
                         (l) =>
-                            `<span class="diff-line ${l.isAnchor ? 'diff-anchor' : 'diff-ctx'}"><span class="code-ln">${l.num}</span>${escape(l.content) || '&nbsp;'}</span>`,
+                            `<span class="diff-line ${l.isAnchor ? 'diff-anchor' : 'diff-ctx'}"><span class="code-ln">${l.num}</span>${escapeHtml(l.content) || '&nbsp;'}</span>`,
                     )
                     .join('')}</pre>`;
             }
@@ -2316,7 +2203,9 @@
                 </div>`;
                 }
                 if (cc.found) {
-                    const shaTag = prMeta.headSha ? ` · ${escape(prMeta.headSha.slice(0, 7))}` : '';
+                    const shaTag = prMeta.headSha
+                        ? ` · ${escapeHtml(prMeta.headSha.slice(0, 7))}`
+                        : '';
                     return `<div class="code-panel">
                     <div class="code-panel-head">Current version${shaTag}</div>
                     ${renderCodeLines(cc.lines)}
@@ -2332,7 +2221,7 @@
                 };
                 return `<div class="code-panel">
                 <div class="code-panel-head">Current version</div>
-                <div class="code-note">${escape(notes[cc.reason] || 'Current version unavailable.')}</div>
+                <div class="code-note">${escapeHtml(notes[cc.reason] || 'Current version unavailable.')}</div>
             </div>`;
             }
 
@@ -2349,7 +2238,7 @@
                         ([path, ts]) => `
                     <div class="file-group">
                         <div class="file-group-head">
-                            <span>${escape(path)}</span>
+                            <span>${escapeHtml(path)}</span>
                             <span class="file-group-count">${ts.length}</span>
                         </div>
                         ${ts
@@ -2377,18 +2266,18 @@
                     r.author && r.author.url ? r.author.url : `https://github.com/${login}`;
                 const avatar =
                     r.author && r.author.avatarUrl
-                        ? `<img class="avatar" src="${escapeAttribute(r.author.avatarUrl)}" alt="" loading="lazy">`
+                        ? `<img class="avatar" src="${escapeHtml(r.author.avatarUrl)}" alt="" loading="lazy">`
                         : '';
                 const st = reviewStateInfo(r.state);
-                const body = r.bodyHTML ? r.bodyHTML : `<p>${escape(r.body || '')}</p>`;
+                const body = r.bodyHTML ? r.bodyHTML : `<p>${escapeHtml(r.body || '')}</p>`;
                 return `
-                <div class="conversation-card ${r.isMinimized ? 'minimized' : ''}" data-comment-id="${escapeAttribute(r.id)}">
+                <div class="conversation-card ${r.isMinimized ? 'minimized' : ''}" data-comment-id="${escapeHtml(r.id)}">
                     <div class="comment" style="border-bottom:0;">
                         <div class="comment-head">
                             ${avatar}
-                            <a class="comment-author" href="${escapeAttribute(authorUrl)}" target="_blank" rel="noopener noreferrer">${escape(login)}</a>
-                            <span class="review-state-tag ${st.cls}">${escape(st.label)}</span>
-                            <span class="comment-time">${escape(formatRelative(r.createdAt))}</span>
+                            <a class="comment-author" href="${escapeHtml(authorUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(login)}</a>
+                            <span class="review-state-tag ${st.cls}">${escapeHtml(st.label)}</span>
+                            <span class="comment-time">${escapeHtml(formatRelative(r.createdAt))}</span>
                             ${hiddenBadgeHtml(r)}
                             ${commentLinkActions(r.url)}
                         </div>
@@ -2531,7 +2420,7 @@
                 let oldLn = 0;
                 let newLn = 0;
                 // Constant for the whole file; escaping it per diff line is pure waste.
-                const escapedPath = escapeAttribute(f.path);
+                const escapedPath = escapeHtml(f.path);
                 const rows = patch
                     .replace(/\n$/, '')
                     .split('\n')
@@ -2544,11 +2433,11 @@
                                 oldLn = parseInt(m[1], 10);
                                 newLn = parseInt(m[2], 10);
                             }
-                            return `<tr class="diff-row diff-hunk-head"><td class="diff-gutter" colspan="2"></td><td class="diff-code">${escape(line) || '&nbsp;'}</td></tr>`;
+                            return `<tr class="diff-row diff-hunk-head"><td class="diff-gutter" colspan="2"></td><td class="diff-code">${escapeHtml(line) || '&nbsp;'}</td></tr>`;
                         }
                         // "\ No newline at end of file" — informational, no line numbers.
                         if (marker === '\\') {
-                            return `<tr class="diff-row diff-ctx"><td class="diff-gutter"></td><td class="diff-gutter"></td><td class="diff-code">${escape(line)}</td></tr>`;
+                            return `<tr class="diff-row diff-ctx"><td class="diff-gutter"></td><td class="diff-gutter"></td><td class="diff-code">${escapeHtml(line)}</td></tr>`;
                         }
                         let cls = 'diff-ctx';
                         let oldNum = '';
@@ -2570,7 +2459,7 @@
                         const commentBtn = readOnly
                             ? ''
                             : `<button type="button" class="diff-comment-btn" data-path="${escapedPath}" data-line="${side === 'LEFT' ? oldNum : newNum}" data-side="${side}" title="Add a comment on this line">+</button>`;
-                        return `<tr class="diff-row ${cls}"><td class="diff-gutter">${oldNum}</td><td class="diff-gutter">${newNum}</td><td class="diff-code">${commentBtn}${escape(line) || '&nbsp;'}</td></tr>`;
+                        return `<tr class="diff-row ${cls}"><td class="diff-gutter">${oldNum}</td><td class="diff-gutter">${newNum}</td><td class="diff-code">${commentBtn}${escapeHtml(line) || '&nbsp;'}</td></tr>`;
                     });
                 return `<table class="diff-table"><tbody>${rows.join('')}</tbody></table>`;
             }
@@ -2584,7 +2473,7 @@
                     f.status === 'renamed'
                         ? 'File was renamed with no content changes.'
                         : 'No inline diff available (the file is binary or too large).';
-                return `<div class="file-diff"><div class="file-diff-note">${escape(reason)} <a href="${escapeAttribute(fileDiffUrl(f))}" target="_blank" rel="noopener noreferrer">View on GitHub ↗</a></div></div>`;
+                return `<div class="file-diff"><div class="file-diff-note">${escapeHtml(reason)} <a href="${escapeHtml(fileDiffUrl(f))}" target="_blank" rel="noopener noreferrer">View on GitHub ↗</a></div></div>`;
             }
 
             function renderFileRow(f) {
@@ -2603,19 +2492,19 @@
                         Viewed
                    </label>`;
                 const renamedFrom = f.previousPath
-                    ? `<span class="file-stat" style="color:var(--color-fg-muted);">${escape(f.previousPath)} →</span>`
+                    ? `<span class="file-stat" style="color:var(--color-fg-muted);">${escapeHtml(f.previousPath)} →</span>`
                     : '';
                 return `
-                <div class="file-row ${f.expanded ? 'open' : ''} ${isViewed ? 'viewed' : ''}" data-file-path="${escapeAttribute(f.path)}">
+                <div class="file-row ${f.expanded ? 'open' : ''} ${isViewed ? 'viewed' : ''}" data-file-path="${escapeHtml(f.path)}">
                     <div class="file-row-head">
                         <span class="file-caret">▶</span>
-                        <span class="file-status-icon ${info.cls}">${escape(info.label)}</span>
+                        <span class="file-status-icon ${info.cls}">${escapeHtml(info.label)}</span>
                         ${renamedFrom}
-                        <span class="file-path">${escape(f.path)}</span>
+                        <span class="file-path">${escapeHtml(f.path)}</span>
                         <span class="file-stat">${stat.join(' ')}</span>
                         <span class="file-actions">
                             ${viewedControl}
-                            <a href="${escapeAttribute(fileDiffUrl(f))}" target="_blank" rel="noopener noreferrer" title="Open this file's diff on GitHub">GitHub ↗</a>
+                            <a href="${escapeHtml(fileDiffUrl(f))}" target="_blank" rel="noopener noreferrer" title="Open this file's diff on GitHub">GitHub ↗</a>
                         </span>
                     </div>
                     ${renderFileDiff(f)}
@@ -2859,7 +2748,7 @@
                 formRow.className = 'diff-comment-form-row';
                 formRow.innerHTML = `
                 <td colspan="3">
-                    <div class="diff-comment-form" data-path="${escapeAttribute(button.dataset.path)}" data-line="${escapeAttribute(button.dataset.line)}" data-side="${escapeAttribute(button.dataset.side)}">
+                    <div class="diff-comment-form" data-path="${escapeHtml(button.dataset.path)}" data-line="${escapeHtml(button.dataset.line)}" data-side="${escapeHtml(button.dataset.side)}">
                         <textarea class="reply-input diff-comment-input" placeholder="Leave a comment on this line..."></textarea>
                         <div class="thread-buttons">
                             <button class="btn btn-small diff-comment-cancel-btn" type="button">Cancel</button>
@@ -3045,7 +2934,7 @@
                     return;
                 }
 
-                readOnly = !getToken();
+                readOnly = !getGitHubToken();
                 updateReadOnlyUI();
                 selectedIds.clear();
 
@@ -3114,16 +3003,14 @@
             // ---------- Token modal ----------
 
             function openTokenModal() {
-                els.tokenInput.value = getToken();
+                els.tokenInput.value = getGitHubToken();
                 els.tokenInput.type = 'password';
                 els.toggleTokenVisibility.textContent = 'Show';
                 Modal.open('tokenModal');
             }
 
             function saveToken() {
-                const token = els.tokenInput.value.trim();
-                if (token) localStorage.setItem(TOKEN_KEY, token);
-                else localStorage.removeItem(TOKEN_KEY);
+                setGitHubToken(els.tokenInput.value);
                 updateTokenStatus();
                 updateReadOnlyUI();
                 Modal.close('tokenModal');
@@ -3132,7 +3019,7 @@
             }
 
             function clearToken() {
-                localStorage.removeItem(TOKEN_KEY);
+                setGitHubToken('');
                 els.tokenInput.value = '';
                 updateTokenStatus();
                 updateReadOnlyUI();
@@ -3166,7 +3053,7 @@
                     const parsed = parsePRInput(initial);
                     els.prInput.value = parsed ? parsed.slug : initial;
                 }
-                readOnly = !getToken();
+                readOnly = !getGitHubToken();
                 updateTokenStatus();
                 updateQueryPreview();
                 updateResolvedButton();
@@ -3344,9 +3231,9 @@
                     els.toggleTokenVisibility.textContent = showing ? 'Show' : 'Hide';
                 });
                 window.addEventListener('storage', (event) => {
-                    if (event.key === TOKEN_KEY) {
+                    if (event.key === GITHUB_TOKEN_KEY) {
                         updateTokenStatus();
-                        readOnly = !getToken();
+                        readOnly = !getGitHubToken();
                         updateReadOnlyUI();
                     }
                 });
@@ -3363,12 +3250,9 @@
             }
 
             function setupAutoRefresh() {
-                if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-                if (autoRefresh) {
-                    autoRefreshTimer = setInterval(() => {
-                        if (prMeta && parsePRInput(els.prInput.value)) loadPR();
-                    }, AUTO_REFRESH_INTERVAL);
-                }
+                setAutoRefresh(autoRefresh, () => {
+                    if (prMeta && parsePRInput(els.prInput.value)) loadPR();
+                });
             }
 
             init();

@@ -610,19 +610,8 @@
             const REPO_OWNER = 'XRPLF';
             const REPO_NAME = 'rippled';
             const CACHE_KEY = 'smart_escrow_prs_cache';
-            const TOKEN_KEY = 'github_token';
-            const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000;
 
             let prs = [];
-            let autoRefreshTimer = null;
-
-            function getToken() {
-                return localStorage.getItem(TOKEN_KEY) || '';
-            }
-
-            function saveToken(token) {
-                localStorage.setItem(TOKEN_KEY, token);
-            }
 
             function showNotification(message, type = 'success') {
                 const notification = document.createElement('div');
@@ -632,17 +621,10 @@
                 setTimeout(() => notification.remove(), 3000);
             }
 
-            function getHeaders() {
-                const token = getToken();
-                const headers = { Accept: 'application/vnd.github.v3+json' };
-                if (token) headers['Authorization'] = `token ${token}`;
-                return headers;
-            }
-
             async function fetchPR(number) {
                 const response = await fetch(
                     `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${number}`,
-                    { headers: getHeaders() },
+                    { headers: githubHeaders() },
                 );
                 if (!response.ok) throw new Error(`Failed to fetch PR #${number}`);
                 return response.json();
@@ -655,11 +637,11 @@
                     const [checksResponse, statusResponse] = await Promise.all([
                         fetch(
                             `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits/${sha}/check-runs`,
-                            { headers: getHeaders() },
+                            { headers: githubHeaders() },
                         ),
                         fetch(
                             `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits/${sha}/status`,
-                            { headers: getHeaders() },
+                            { headers: githubHeaders() },
                         ),
                     ]);
                     const [checksData, statusData] = await Promise.all([
@@ -710,7 +692,7 @@
                 try {
                     const response = await fetch(
                         `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${prNumber}/reviews`,
-                        { headers: getHeaders() },
+                        { headers: githubHeaders() },
                     );
                     const reviews = await response.json();
 
@@ -748,7 +730,7 @@
                     // Compare base branch to head branch to see if head is behind
                     const response = await fetch(
                         `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/compare/${pr.head.sha}...${pr.base.ref}`,
-                        { headers: getHeaders() },
+                        { headers: githubHeaders() },
                     );
                     if (!response.ok) return { behind: false, behindBy: 0 };
                     const data = await response.json();
@@ -1004,7 +986,7 @@
                             </div>
                         </div>
                         ${
-                            status.status === 'behind' && getToken()
+                            status.status === 'behind' && getGitHubToken()
                                 ? `
                             <div class="pr-update-btn-container">
                                 <button class="update-btn" onclick="updateBranch(${pr.number})">🔄 Update</button>
@@ -1019,7 +1001,7 @@
             }
 
             async function updateBranch(prNumber, silent = false) {
-                const token = getToken();
+                const token = getGitHubToken();
                 if (!token) {
                     if (!silent) showNotification('GitHub token required for this action', 'error');
                     return false;
@@ -1028,7 +1010,7 @@
                 try {
                     const response = await fetch(
                         `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${prNumber}/update-branch`,
-                        { method: 'PUT', headers: getHeaders() },
+                        { method: 'PUT', headers: githubHeaders() },
                     );
 
                     if (response.status === 202) {
@@ -1048,7 +1030,7 @@
             }
 
             async function updateAllBranches() {
-                const token = getToken();
+                const token = getGitHubToken();
                 if (!token) {
                     showNotification('GitHub token required for this action', 'error');
                     return;
@@ -1101,12 +1083,7 @@
             }
 
             function setupAutoRefresh() {
-                const checkbox = document.getElementById('autoRefresh');
-                if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-
-                if (checkbox.checked) {
-                    autoRefreshTimer = setInterval(fetchAllPRs, AUTO_REFRESH_INTERVAL);
-                }
+                setAutoRefresh(document.getElementById('autoRefresh').checked, fetchAllPRs);
             }
 
             // Event listeners
@@ -1116,11 +1093,11 @@
             document.getElementById('toggleToken').addEventListener('click', () => {
                 const container = document.getElementById('tokenContainer');
                 container.classList.toggle('visible');
-                document.getElementById('tokenInput').value = getToken();
+                document.getElementById('tokenInput').value = getGitHubToken();
             });
 
             document.getElementById('saveToken').addEventListener('click', () => {
-                saveToken(document.getElementById('tokenInput').value);
+                setGitHubToken(document.getElementById('tokenInput').value);
                 document.getElementById('tokenContainer').classList.remove('visible');
                 showNotification('Token saved!');
                 renderPRs();

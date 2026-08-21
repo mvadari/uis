@@ -7,26 +7,6 @@
         <link rel="icon" type="image/svg+xml" href="favicon.svg" />
         <link rel="stylesheet" href="shared-styles.css" />
         <style>
-            :root {
-                color-scheme: light dark;
-                --color-canvas-default: #ffffff;
-                --color-canvas-subtle: #f6f8fa;
-                --color-border-default: #d0d7de;
-                --color-border-muted: #d8dee4;
-                --color-fg-default: #1f2328;
-                --color-fg-muted: #656d76;
-                --color-accent-fg: #0969da;
-                --color-accent-subtle: #ddf4ff;
-                --color-success-fg: #1a7f37;
-                --color-success-subtle: #dafbe1;
-                --color-danger-fg: #d1242f;
-                --color-danger-subtle: #ffebe9;
-                --color-attention-fg: #9a6700;
-                --color-attention-subtle: #fff8c5;
-                --color-done-fg: #8250df;
-                --color-done-subtle: #fbefff;
-            }
-
             body {
                 background: var(--color-canvas-subtle);
                 color: var(--color-fg-default);
@@ -92,26 +72,6 @@
                 justify-content: flex-end;
             }
 
-            .token-pill {
-                border: 1px solid var(--color-border-default);
-                background: var(--color-canvas-subtle);
-                border-radius: 999px;
-                color: var(--color-fg-muted);
-                display: inline-flex;
-                align-items: center;
-                font-size: 12px;
-                font-weight: 600;
-                min-height: 30px;
-                padding: 4px 10px;
-                white-space: nowrap;
-            }
-
-            .token-pill.set {
-                background: var(--color-success-subtle);
-                border-color: rgba(26, 127, 55, 0.35);
-                color: var(--color-success-fg);
-            }
-
             .search-panel {
                 display: grid;
                 grid-template-columns:
@@ -171,34 +131,8 @@
                 margin-top: 2px;
             }
 
-            .status-line {
-                align-items: center;
-                color: var(--color-fg-muted);
-                display: flex;
-                flex-wrap: wrap;
-                gap: 12px;
-                font-size: 13px;
-                justify-content: space-between;
-                margin-bottom: 12px;
-                min-height: 28px;
-            }
-
             .filter-box {
                 max-width: 340px;
-            }
-
-            .status-controls {
-                align-items: center;
-                display: flex;
-                flex-wrap: wrap;
-                gap: 8px;
-                justify-content: flex-end;
-            }
-
-            .btn.filter-active {
-                background: var(--color-accent-fg);
-                border-color: var(--color-accent-fg);
-                color: #ffffff;
             }
 
             .auto-refresh-toggle {
@@ -224,23 +158,6 @@
             .pr-list {
                 display: grid;
                 gap: 12px;
-            }
-
-            .empty-state,
-            .loading-state {
-                background: var(--color-canvas-default);
-                border: 1px solid var(--color-border-default);
-                border-radius: 6px;
-                color: var(--color-fg-muted);
-                padding: 32px;
-                text-align: center;
-            }
-
-            .loading-state {
-                align-items: center;
-                display: flex;
-                gap: 12px;
-                justify-content: center;
             }
 
             .pr-card {
@@ -567,27 +484,6 @@
                     padding-top: 12px;
                 }
             }
-
-            @media (prefers-color-scheme: dark) {
-                :root {
-                    --color-canvas-default: #0d1117;
-                    --color-canvas-subtle: #161b22;
-                    --color-border-default: #30363d;
-                    --color-border-muted: #21262d;
-                    --color-fg-default: #e6edf3;
-                    --color-fg-muted: #8b949e;
-                    --color-accent-fg: #58a6ff;
-                    --color-accent-subtle: #1c2a3d;
-                    --color-success-fg: #3fb950;
-                    --color-success-subtle: #1a4426;
-                    --color-danger-fg: #f85149;
-                    --color-danger-subtle: #3d1c1c;
-                    --color-attention-fg: #e3b341;
-                    --color-attention-subtle: #3d2d00;
-                    --color-done-fg: #d2a8ff;
-                    --color-done-subtle: #2d1d47;
-                }
-            }
         </style>
     </head>
     <body>
@@ -743,14 +639,12 @@
 
         <script src="shared-utils.js"></script>
         <script>
-            const TOKEN_KEY = 'github_token';
             const REPO_KEY = 'base_branch_prs_repo';
             const BRANCH_KEY = 'base_branch_prs_branch';
             const STATE_KEY = 'base_branch_prs_state';
             const CACHE_KEY = 'feature_prs_cache';
             const MY_FILTER_KEY = 'feature_prs_my_filter';
             const AUTO_REFRESH_KEY = 'feature_prs_auto_refresh';
-            const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000;
             const API_BASE = 'https://api.github.com';
 
             let pullRequests = [];
@@ -758,7 +652,6 @@
             let viewerLogin = '';
             let showOnlyMine = localStorage.getItem(MY_FILTER_KEY) === 'true';
             let autoRefresh = localStorage.getItem(AUTO_REFRESH_KEY) !== 'false';
-            let autoRefreshTimer = null;
             let lastSeenToken = '';
 
             const els = {
@@ -794,28 +687,6 @@
                 prList: document.getElementById('prList'),
             };
 
-            function getToken() {
-                return (localStorage.getItem(TOKEN_KEY) || '').trim();
-            }
-
-            function getHeaders() {
-                const headers = {
-                    Accept: 'application/vnd.github+json',
-                    'X-GitHub-Api-Version': '2022-11-28',
-                };
-                const token = getToken();
-                if (token) headers.Authorization = `token ${token}`;
-                return headers;
-            }
-
-            function escape(value) {
-                return escapeHtml(String(value ?? ''));
-            }
-
-            function escapeAttribute(value) {
-                return escape(value).replace(/"/g, '&quot;');
-            }
-
             function sleep(ms) {
                 return new Promise((resolve) => setTimeout(resolve, ms));
             }
@@ -826,20 +697,6 @@
             function isBotReviewer(user) {
                 const login = user?.login || '';
                 return user?.type === 'Bot' || /\[bot\]$/i.test(login) || BOT_LOGINS.has(login);
-            }
-
-            function normalizeRepo(value) {
-                return value
-                    .trim()
-                    .replace(/^https:\/\/github\.com\//i, '')
-                    .replace(/\/+$/g, '');
-            }
-
-            function parseRepo(value) {
-                const normalized = normalizeRepo(value);
-                const match = normalized.match(/^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/);
-                if (!match) return null;
-                return { owner: match[1], repo: match[2], slug: `${match[1]}/${match[2]}` };
             }
 
             function buildSearchQuery(repoSlug, branch, state) {
@@ -928,13 +785,13 @@
             }
 
             function updateTokenStatus() {
-                const hasToken = Boolean(getToken());
+                const hasToken = Boolean(getGitHubToken());
                 els.tokenStatus.textContent = hasToken ? 'Token set' : 'Token not set';
                 els.tokenStatus.classList.toggle('set', hasToken);
             }
 
             function syncTokenState(loadIdentity = false) {
-                const token = getToken();
+                const token = getGitHubToken();
                 const tokenChanged = token !== lastSeenToken;
                 lastSeenToken = token;
 
@@ -960,7 +817,7 @@
                     return;
                 }
                 const query = buildSearchQuery(repo.slug, branch, els.stateInput.value);
-                els.queryPreview.innerHTML = `GitHub search: <code>${escape(query)}</code>`;
+                els.queryPreview.innerHTML = `GitHub search: <code>${escapeHtml(query)}</code>`;
             }
 
             function setError(message) {
@@ -975,29 +832,8 @@
                 els.loadButton.textContent = isLoading ? 'Loading...' : 'Load PRs';
             }
 
-            async function githubRequest(url, options = {}) {
-                const response = await fetch(url, {
-                    ...options,
-                    headers: {
-                        ...getHeaders(),
-                        ...(options.headers || {}),
-                    },
-                });
-
-                if (!response.ok) {
-                    let message = `GitHub API returned ${response.status}`;
-                    try {
-                        const data = await response.json();
-                        if (data.message) message = data.message;
-                    } catch {}
-                    throw new Error(message);
-                }
-
-                return response.json();
-            }
-
             function updateMyPRsButton() {
-                const hasToken = Boolean(getToken());
+                const hasToken = Boolean(getGitHubToken());
                 els.myPrsButton.disabled = !hasToken;
                 els.myPrsButton.classList.toggle('filter-active', showOnlyMine);
                 els.myPrsButton.textContent =
@@ -1010,7 +846,7 @@
             }
 
             async function loadViewerLogin() {
-                if (!getToken()) {
+                if (!getGitHubToken()) {
                     viewerLogin = '';
                     showOnlyMine = false;
                     localStorage.setItem(MY_FILTER_KEY, 'false');
@@ -1033,7 +869,7 @@
 
             async function toggleMyPRsFilter() {
                 setError('');
-                if (!getToken()) {
+                if (!getGitHubToken()) {
                     openTokenModal();
                     return;
                 }
@@ -1307,8 +1143,8 @@
                 const label = branch?.ref || 'unknown';
                 const url = branchUrl(branch);
                 if (!url)
-                    return `<strong class="branch-link" title="${escape(label)}">${escape(label)}</strong>`;
-                return `<a class="branch-link" href="${escape(url)}" target="_blank" rel="noopener noreferrer" title="${escape(label)}">${escape(label)}</a>`;
+                    return `<strong class="branch-link" title="${escapeHtml(label)}">${escapeHtml(label)}</strong>`;
+                return `<a class="branch-link" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(label)}">${escapeHtml(label)}</a>`;
             }
 
             function renderFeatureBranch(branch) {
@@ -1322,7 +1158,7 @@
             }
 
             function renderCopyButton(value, label, className = '') {
-                return `<button class="branch-copy ${className}" type="button" data-copy-value="${escapeAttribute(value)}" title="${escapeAttribute(label)}" aria-label="${escapeAttribute(label)}">⧉</button>`;
+                return `<button class="branch-copy ${className}" type="button" data-copy-value="${escapeHtml(value)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">⧉</button>`;
             }
 
             async function copyText(text) {
@@ -1410,14 +1246,14 @@
             }
 
             function titleToHtml(title) {
-                return escape(title).replace(/`([^`]+)`/g, '<code>$1</code>');
+                return escapeHtml(title).replace(/`([^`]+)`/g, '<code>$1</code>');
             }
 
             function buildReportHtmlEntry(pr) {
                 const { author, conflictNote, reviewerText } = reportFields(pr);
-                const numberLink = `<a href="${escapeAttribute(pr.html_url)}">#${pr.number}</a>`;
+                const numberLink = `<a href="${escapeHtml(pr.html_url)}">#${pr.number}</a>`;
 
-                return `<li>${numberLink}: ${titleToHtml(pr.title)}<ul><li>Author: ${escape(author)}${escape(conflictNote)}</li><li>Reviewers: ${escape(reviewerText)}</li></ul></li>`;
+                return `<li>${numberLink}: ${titleToHtml(pr.title)}<ul><li>Author: ${escapeHtml(author)}${escapeHtml(conflictNote)}</li><li>Reviewers: ${escapeHtml(reviewerText)}</li></ul></li>`;
             }
 
             function buildReportHtml() {
@@ -1467,22 +1303,6 @@
                 pr.mergeDisplay = mergeState(pr);
                 pr.ciStatus = await fetchCIStatus(repoInfo.owner, repoInfo.repo, pr.head?.sha);
                 return pr;
-            }
-
-            async function mapWithConcurrency(items, limit, mapper) {
-                const results = new Array(items.length);
-                let nextIndex = 0;
-
-                async function worker() {
-                    while (nextIndex < items.length) {
-                        const index = nextIndex++;
-                        results[index] = await mapper(items[index], index);
-                    }
-                }
-
-                const workers = Array.from({ length: Math.min(limit, items.length) }, worker);
-                await Promise.all(workers);
-                return results;
             }
 
             async function loadPRs() {
@@ -1615,8 +1435,8 @@
                             .map(
                                 (row) => `
                             <div class="review-row">
-                                <span class="reviewer-name" title="${escape(row.user)}">${escape(row.user)}</span>
-                                <span class="review-state ${reviewStatusClass(row.state)}">${escape(reviewStatusLabel(row.state))}</span>
+                                <span class="reviewer-name" title="${escapeHtml(row.user)}">${escapeHtml(row.user)}</span>
+                                <span class="review-state ${reviewStatusClass(row.state)}">${escapeHtml(reviewStatusLabel(row.state))}</span>
                             </div>
                         `,
                             )
@@ -1651,21 +1471,21 @@
                 <article class="pr-card ${pr.draft ? 'draft-pr' : ''}">
                     <section>
                         <div class="pr-title-row">
-                            <a class="pr-link" href="${escape(pr.html_url)}" target="_blank" rel="noopener noreferrer">
-                                ${escape(pr.title)}
-                                <span class="pr-number">#${escape(pr.number)}</span>
+                            <a class="pr-link" href="${escapeHtml(pr.html_url)}" target="_blank" rel="noopener noreferrer">
+                                ${escapeHtml(pr.title)}
+                                <span class="pr-number">#${escapeHtml(pr.number)}</span>
                             </a>
                             ${renderCopyButton(pr.html_url, 'Copy PR link', 'link-copy')}
                         </div>
                         <div class="pr-meta">
-                            <span>Author <a href="${escape(authorUrl)}" target="_blank" rel="noopener noreferrer">${escape(author)}</a></span>
+                            <span>Author <a href="${escapeHtml(authorUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(author)}</a></span>
                             <span>${renderFeatureBranch(pr.head)} <span class="branch-separator">into</span> ${renderBranchLink(pr.base)}</span>
-                            <span>Updated ${escape(formatRelativeTime(pr.updated_at))}</span>
+                            <span>Updated ${escapeHtml(formatRelativeTime(pr.updated_at))}</span>
                         </div>
                         <div class="pill-row">
                             <span class="status-pill ${draftClass}">${draftText}</span>
-                            <span class="status-pill ${merge.className}">${escape(merge.label)}</span>
-                            <span class="status-pill ${ciClass}">${escape(ci.label)}</span>
+                            <span class="status-pill ${merge.className}">${escapeHtml(merge.label)}</span>
+                            <span class="status-pill ${ciClass}">${escapeHtml(ci.label)}</span>
                             ${hasApproval(pr) ? '<span class="status-pill clean">Approved</span>' : ''}
                             ${hasChangesRequested(pr) ? '<span class="status-pill conflict">Changes requested</span>' : ''}
                         </div>
@@ -1677,7 +1497,7 @@
                                 ${failedChecks
                                     .map(
                                         (check) => `
-                                    <a href="${escape(check.url || pr.html_url)}" target="_blank" rel="noopener noreferrer">${escape(check.name)}</a>
+                                    <a href="${escapeHtml(check.url || pr.html_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(check.name)}</a>
                                 `,
                                     )
                                     .join('')}
@@ -1712,22 +1532,20 @@
             }
 
             function openTokenModal() {
-                els.tokenInput.value = getToken();
+                els.tokenInput.value = getGitHubToken();
                 els.tokenInput.type = 'password';
                 els.toggleTokenVisibility.textContent = 'Show';
                 Modal.open('tokenModal');
             }
 
             function saveToken() {
-                const token = els.tokenInput.value.trim();
-                if (token) localStorage.setItem(TOKEN_KEY, token);
-                else localStorage.removeItem(TOKEN_KEY);
+                setGitHubToken(els.tokenInput.value);
                 syncTokenState(true);
                 Modal.close('tokenModal');
             }
 
             function clearToken() {
-                localStorage.removeItem(TOKEN_KEY);
+                setGitHubToken('');
                 els.tokenInput.value = '';
                 syncTokenState();
             }
@@ -1737,12 +1555,9 @@
             }
 
             function setupAutoRefresh() {
-                if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-                if (autoRefresh) {
-                    autoRefreshTimer = setInterval(() => {
-                        if (hasLoadableInputs()) loadPRs();
-                    }, AUTO_REFRESH_INTERVAL);
-                }
+                setAutoRefresh(autoRefresh, () => {
+                    if (hasLoadableInputs()) loadPRs();
+                });
             }
 
             function init() {
@@ -1789,7 +1604,7 @@
                 window.addEventListener('focus', () => syncTokenState(true));
                 window.addEventListener('pageshow', () => syncTokenState(true));
                 window.addEventListener('storage', (event) => {
-                    if (event.key === TOKEN_KEY) syncTokenState(true);
+                    if (event.key === GITHUB_TOKEN_KEY) syncTokenState(true);
                 });
 
                 if (hasLoadableInputs()) loadPRs();

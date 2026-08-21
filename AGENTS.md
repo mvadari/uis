@@ -41,23 +41,34 @@ HTML document. Files run 1000–6000 lines; `github.html` and `pr.html` are the 
 feature means editing three separate regions of the same file: the CSS block, the HTML markup, and
 the script block.
 
-**Colours go through CSS custom properties.** `github.html`, `pr.html` and `feature-prs.html` define
-a `:root` token block (`--color-canvas-default`, `--color-fg-muted`, `--color-border-default`, …) and
-a `@media (prefers-color-scheme: dark)` block that overrides _only those tokens_. A new component
-styled with `var(--color-…)` gets dark mode for free — reach for a raw hex only when no token fits,
-and then add the token rather than adding a rule to the dark block. The remaining per-selector rules
-in those dark blocks are the handful of cases with no light-mode counterpart. `release-tracker.html`
-and `stacked.html` still use raw hexes throughout.
+**Colours go through CSS custom properties.** `shared-styles.css` defines the palette in `:root`
+(`--color-canvas-default`, `--color-fg-muted`, `--color-border-default`, …) and overrides _only those
+tokens_ in its `@media (prefers-color-scheme: dark)` block. A component styled with `var(--color-…)`
+gets dark mode for free — reach for a raw hex only when no token fits, and then add a token rather
+than a dark-mode rule. `pr.html` adds four `--color-diff-*` tokens of its own; `github.html`
+deliberately keeps a larger palette inline (its `--color-canvas-default` means an elevated surface,
+not the page background), and because the inline `<style>` comes after the linked stylesheet, its
+definitions win. `release-tracker.html`, `json-table.html` and `stacked.html` still use raw hexes.
 
-**Two shared files**, included by most (not all — `index.html` and `stacked.html` skip them) tools:
+**Two shared files**, included by every tool except `index.html` (which is just the launcher).
+`stacked.html` loads `shared-utils.js` but keeps its own CSS:
 
-- `shared-styles.css` — `.btn`, `.modal`, `.toast`, `.card`, `.badge`, `.spinner`
+- `shared-styles.css` — the colour tokens, plus `.btn`, `.modal`, `.toast`, `.card`, `.badge`,
+  `.spinner`, `.token-pill`, `.status-line`, `.status-controls`, `.empty-state`/`.loading-state`
 - `shared-utils.js` — `showToast`, `escapeHtml`, `timeAgo`/`timeAgoShort`, `formatDate`, `debounce`,
-  `getQueryParam`/`setQueryParam`, `copyToClipboard`, and the `Storage`, `Modal` objects
+  `getQueryParam`/`setQueryParam`, `copyToClipboard`, the `Storage` and `Modal` objects, and the
+  GitHub layer: `getGitHubToken`/`setGitHubToken`/`GITHUB_TOKEN_KEY`, `githubHeaders`,
+  `githubRequest`, `mapWithConcurrency`, `normalizeRepo`/`parseRepo`, and
+  `setAutoRefresh`/`AUTO_REFRESH_INTERVAL`
 
-`escapeHtml` escapes quotes as well as tags, so it's safe in attribute values too; the local
-`escapeAttribute` helpers in `github.html` and `pr.html` are just aliases that document intent at
-the call site.
+`escapeHtml` escapes quotes as well as tags, so it's safe in attribute values too — there is no
+separate `escapeAttribute`.
+
+**Watch for redeclarations.** These are classic scripts sharing one global lexical scope, so a
+top-level `const`/`let` in `shared-utils.js` whose name a tool also declares is a _fatal_
+`SyntaxError` that breaks the whole tool — not a shadowing warning. Before adding a top-level
+`const` to `shared-utils.js`, grep the tools for the name. (Top-level `function` declarations are
+fine; the tool's copy just wins.)
 
 Some tools define their own local equivalent instead of using the shared one — sometimes
 deliberately (`github.html`'s `showNotification`, `ui.html`'s `showToast`, which renders into its

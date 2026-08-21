@@ -923,6 +923,7 @@
             </main>
         </div>
 
+        <script src="shared-utils.js"></script>
         <script>
             // ============================================================
             // CONFIGURATION
@@ -946,13 +947,12 @@
             let REPOS = loadRepos();
             const CACHE_KEY = 'stacked_prs_cache';
             const CACHE_TIMESTAMP_KEY = 'stacked_prs_cache_timestamp';
-            const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
             // ============================================================
             // STATE
             // ============================================================
             let state = {
-                token: localStorage.getItem('github_token') || '',
+                token: getGitHubToken(),
                 currentUser: null,
                 prs: [],
                 stacks: [],
@@ -964,8 +964,6 @@
                 lastUpdateTime: null,
                 isRefreshing: false,
             };
-
-            let autoRefreshTimer = null;
 
             function toggleBranchCollapse(branchName) {
                 if (state.collapsedBranches.has(branchName)) {
@@ -1103,19 +1101,16 @@
                 }
             }
 
+            let lastUpdatedTimer = null;
+
             function setupAutoRefresh() {
-                // Clear existing timer
-                if (autoRefreshTimer) {
-                    clearInterval(autoRefreshTimer);
+                setAutoRefresh(true, () => fetchPRs(false));
+
+                // Keep the "Updated X minutes ago" text fresh. init() can run more than
+                // once (saving a token re-runs it), so only ever register this timer once.
+                if (!lastUpdatedTimer) {
+                    lastUpdatedTimer = setInterval(updateLastUpdatedTime, 60000);
                 }
-
-                // Refresh every 5 minutes
-                autoRefreshTimer = setInterval(() => {
-                    fetchPRs(false);
-                }, AUTO_REFRESH_INTERVAL);
-
-                // Update the "Updated X minutes ago" text every minute
-                setInterval(updateLastUpdatedTime, 60000);
             }
 
             // ============================================================
@@ -1205,7 +1200,7 @@
                 const token = document.getElementById('tokenInput').value.trim();
                 if (token) {
                     state.token = token;
-                    localStorage.setItem('github_token', token);
+                    setGitHubToken(token);
                     updateTokenStatus();
                     hideAuthModal();
                     init();
@@ -1214,7 +1209,7 @@
 
             function clearToken() {
                 state.token = '';
-                localStorage.removeItem('github_token');
+                setGitHubToken('');
                 localStorage.removeItem(CACHE_KEY);
                 localStorage.removeItem(CACHE_TIMESTAMP_KEY);
                 updateTokenStatus();
@@ -1896,18 +1891,6 @@
             // ============================================================
             // UTILITIES
             // ============================================================
-            // This tool doesn't load shared-utils.js, so it keeps its own copy.
-            const HTML_ESCAPES = {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#39;',
-            };
-
-            function escapeHtml(text) {
-                return String(text ?? '').replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
-            }
         </script>
     </body>
 </html>
