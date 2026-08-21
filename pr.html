@@ -1309,6 +1309,7 @@
             let showResolved = localStorage.getItem(SHOW_RESOLVED_KEY) === 'true';
             let outdatedFilter = localStorage.getItem(OUTDATED_FILTER_KEY) || 'all'; // 'all' | 'hide' | 'only'
             let autoRefresh = localStorage.getItem(AUTO_REFRESH_KEY) !== 'false';
+            let lastSignature = null;
             let selectedIds = new Set();
             const REST_BASE = 'https://api.github.com';
 
@@ -3143,7 +3144,77 @@
 
             // ---------- Load ----------
 
-            async function loadPR() {
+            // A cheap fingerprint of "is there anything new to show" — deliberately excludes
+            // local-only UI state (expanded/viewed/currentCode) so those don't force a re-render.
+            function computeSignature(meta, threadList, conv, revs, fileList) {
+                return JSON.stringify({
+                    updatedAt: meta.updatedAt,
+                    reviewDecision: meta.reviewDecision,
+                    threads: threadList.map((t) => ({
+                        id: t.id,
+                        isResolved: t.isResolved,
+                        comments: (t.comments || []).map((c) => c.id),
+                    })),
+                    conversation: conv.map((c) => c.id),
+                    reviews: revs.map((r) => r.id),
+                    files: fileList.map((f) => ({
+                        path: f.path,
+                        additions: f.additions,
+                        deletions: f.deletions,
+                        status: f.status,
+                    })),
+                });
+            }
+
+            // A background refresh re-renders threads/files from scratch, which would blow away
+            // any reply/inline-comment text the user is mid-typing. Snapshot it before rendering
+            // and put it back after.
+            function captureDrafts() {
+                const threadDrafts = new Map();
+                els.content.querySelectorAll('.thread').forEach((article) => {
+                    const textarea = article.querySelector('.reply-input');
+                    if (textarea && textarea.value.trim()) {
+                        threadDrafts.set(article.dataset.threadId, textarea.value);
+                    }
+                });
+                const diffDrafts = [];
+                els.filesContent.querySelectorAll('.diff-comment-form').forEach((form) => {
+                    const textarea = form.querySelector('.diff-comment-input');
+                    if (textarea && textarea.value.trim()) {
+                        diffDrafts.push({
+                            path: form.dataset.path,
+                            line: form.dataset.line,
+                            side: form.dataset.side,
+                            value: textarea.value,
+                        });
+                    }
+                });
+                return { threadDrafts, diffDrafts };
+            }
+
+            function restoreDrafts({ threadDrafts, diffDrafts }) {
+                threadDrafts.forEach((value, threadId) => {
+                    const article = els.content.querySelector(
+                        `.thread[data-thread-id="${CSS.escape(threadId)}"]`,
+                    );
+                    const textarea = article && article.querySelector('.reply-input');
+                    if (textarea) textarea.value = value;
+                });
+                diffDrafts.forEach(({ path, line, side, value }) => {
+                    const btn = els.filesContent.querySelector(
+                        `.diff-comment-btn[data-path="${CSS.escape(path)}"][data-line="${CSS.escape(line)}"][data-side="${CSS.escape(side)}"]`,
+                    );
+                    if (!btn) return; // file collapsed, or the line no longer exists
+                    openInlineCommentForm(btn);
+                    const textarea = btn
+                        .closest('tr')
+                        .nextElementSibling?.querySelector('.diff-comment-input');
+                    if (textarea) textarea.value = value;
+                });
+            }
+
+            async function loadPR(opts = {}) {
+                const background = Boolean(opts.background);
                 if (loading) return;
                 const parsed = parsePRInput(els.prInput.value);
                 setError('');
@@ -3156,28 +3227,26 @@
 
                 readOnly = !getGitHubToken();
                 updateReadOnlyUI();
-                selectedIds.clear();
+                if (!background) selectedIds.clear();
 
                 localStorage.setItem(LAST_PR_KEY, parsed.param);
                 setQueryParam('pr', parsed.param);
 
                 setLoading(true);
-                els.content.innerHTML = `
-                <div class="loading-state">
-                    <span class="spinner"></span>
-                    <span>Loading pull request conversation${readOnly ? ' (read-only)' : ''}...</span>
-                </div>`;
+                if (!background) {
+                    els.content.innerHTML = `
+                    <div class="loading-state">
+                        <span class="spinner"></span>
+                        <span>Loading pull request conversation${readOnly ? ' (read-only)' : ''}...</span>
+                    </div>`;
+                }
 
                 try {
                     const result = readOnly
                         ? await fetchPRRest(parsed.owner, parsed.repo, parsed.number)
                         : await fetchPR(parsed.owner, parsed.repo, parsed.number);
-                    prMeta = result.meta;
-                    prMeta.owner = parsed.owner;
-                    prMeta.repo = parsed.repo;
-                    threads = result.threads;
-                    conversation = result.comments;
-                    reviews = result.reviews;
+                    result.meta.owner = parsed.owner;
+                    result.meta.repo = parsed.repo;
 
                     // Files: REST supplies patch/status, GraphQL supplies per-viewer viewed state.
                     const restFiles = await fetchFilesRest(
@@ -3186,11 +3255,42 @@
                         parsed.number,
                     );
                     const viewedByPath = result.viewedByPath || new Map();
-                    files = restFiles.map((f) => ({
+                    const newFiles = restFiles.map((f) => ({
                         ...f,
                         viewed: viewedByPath.has(f.path) ? viewedByPath.get(f.path) : null,
                     }));
-                    await assignFileAnchors(files);
+                    await assignFileAnchors(newFiles);
+
+                    const signature = computeSignature(
+                        result.meta,
+                        result.threads,
+                        result.comments,
+                        result.reviews,
+                        newFiles,
+                    );
+                    // A quiet background poll that found nothing new shouldn't touch the DOM at
+                    // all — that's what would otherwise wipe out an in-progress reply/comment.
+                    if (background && prMeta && signature === lastSignature) {
+                        return;
+                    }
+                    lastSignature = signature;
+
+                    // Full re-render wipes reply/inline-comment textareas and collapses every
+                    // expanded file (files are rebuilt from scratch); snapshot both and restore
+                    // them once the new DOM is in place.
+                    const expandedPaths = new Set(
+                        files.filter((f) => f.expanded).map((f) => f.path),
+                    );
+                    const drafts = captureDrafts();
+
+                    prMeta = result.meta;
+                    threads = result.threads;
+                    conversation = result.comments;
+                    reviews = result.reviews;
+                    files = newFiles;
+                    files.forEach((f) => {
+                        if (expandedPaths.has(f.path)) f.expanded = true;
+                    });
 
                     els.summaryGrid.style.display = '';
                     els.statusLine.style.display = '';
@@ -3198,9 +3298,13 @@
                     els.lastUpdated.textContent = `Last updated: ${new Date().toLocaleTimeString()}${readOnly ? ' (read-only)' : ''}`;
                     setActiveTab(activeTab);
                     renderAll();
+                    restoreDrafts(drafts);
                 } catch (error) {
                     console.error('Failed to load PR:', error);
                     setError(error.message);
+                    // A failed background poll shouldn't tear down the PR the user is already
+                    // looking at — just leave it be and let the next poll try again.
+                    if (background) return;
                     prMeta = null;
                     threads = [];
                     conversation = [];
@@ -3471,7 +3575,7 @@
 
             function setupAutoRefresh() {
                 setAutoRefresh(autoRefresh, () => {
-                    if (prMeta && parsePRInput(els.prInput.value)) loadPR();
+                    if (prMeta && parsePRInput(els.prInput.value)) loadPR({ background: true });
                 });
             }
 
