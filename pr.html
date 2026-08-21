@@ -1425,7 +1425,6 @@
                 filesViewedFilterSelect: document.getElementById('filesViewedFilterSelect'),
                 filesFilterInput: document.getElementById('filesFilterInput'),
                 filesContent: document.getElementById('filesContent'),
-                tokenModal: document.getElementById('tokenModal'),
                 closeTokenModal: document.getElementById('closeTokenModal'),
                 tokenInput: document.getElementById('tokenInput'),
                 toggleTokenVisibility: document.getElementById('toggleTokenVisibility'),
@@ -2913,8 +2912,11 @@
                 }
             }
 
+            const HIDE_REASON_LABELS = new Map(HIDE_REASONS);
+
             function formatMinimizedReason(classifier) {
-                return classifier.toLowerCase().replace(/_/g, ' ');
+                // Fall back to the raw API string for classifiers we don't list.
+                return HIDE_REASON_LABELS.get(classifier) || classifier;
             }
 
             // Conversation comments and review summaries are both Minimizable; look up in either list.
@@ -2926,39 +2928,27 @@
                 );
             }
 
-            async function hideItem(id, classifier, button) {
-                setError('');
-                if (button) button.disabled = true;
-                try {
-                    await graphql(MINIMIZE_MUTATION, { id, classifier });
-                    const item = findMinimizable(id);
-                    if (item) {
-                        item.isMinimized = true;
-                        item.minimizedReason = formatMinimizedReason(classifier);
-                    }
-                    showToast('Comment hidden', 'success');
-                    renderAll();
-                } catch (error) {
-                    console.error('Failed to hide comment:', error);
-                    setError(error.message);
-                    if (button) button.disabled = false;
-                }
+            // Apply the local effect of a (un)hide that the API has already accepted.
+            function applyHidden(item, hide, classifier) {
+                if (!item) return;
+                item.isMinimized = hide;
+                item.minimizedReason = hide ? formatMinimizedReason(classifier) : null;
             }
 
-            async function unhideItem(id, button) {
+            async function setHidden(id, hide, classifier, button) {
                 setError('');
                 if (button) button.disabled = true;
                 try {
-                    await graphql(UNMINIMIZE_MUTATION, { id });
-                    const item = findMinimizable(id);
-                    if (item) {
-                        item.isMinimized = false;
-                        item.minimizedReason = null;
-                    }
-                    showToast('Comment shown', 'success');
+                    if (hide) await graphql(MINIMIZE_MUTATION, { id, classifier });
+                    else await graphql(UNMINIMIZE_MUTATION, { id });
+                    applyHidden(findMinimizable(id), hide, classifier);
+                    showToast(hide ? 'Comment hidden' : 'Comment shown', 'success');
                     renderAll();
                 } catch (error) {
-                    console.error('Failed to show comment:', error);
+                    console.error(
+                        hide ? 'Failed to hide comment:' : 'Failed to show comment:',
+                        error,
+                    );
                     setError(error.message);
                     if (button) button.disabled = false;
                 }
@@ -2994,74 +2984,49 @@
                 renderContent();
             }
 
-            async function bulkHide() {
+            async function bulkSetHidden(hide) {
                 const classifier = els.bulkReason.value;
+                const button = hide ? els.bulkHide : els.bulkUnhide;
                 const targets = [...selectedIds]
                     .map(findMinimizable)
-                    .filter((item) => item && !item.isMinimized);
+                    .filter((item) => item && item.isMinimized !== hide);
                 if (targets.length === 0) {
-                    showToast('No un-hidden comments selected', 'info');
+                    showToast(
+                        hide ? 'No un-hidden comments selected' : 'No hidden comments selected',
+                        'info',
+                    );
                     return;
                 }
                 setError('');
                 setBulkBusy(true);
-                const label = els.bulkHide.textContent;
-                els.bulkHide.textContent = 'Hiding...';
+                const label = button.textContent;
+                button.textContent = hide ? 'Hiding...' : 'Unhiding...';
                 const results = await Promise.allSettled(
-                    targets.map((item) => graphql(MINIMIZE_MUTATION, { id: item.id, classifier })),
+                    targets.map((item) =>
+                        hide
+                            ? graphql(MINIMIZE_MUTATION, { id: item.id, classifier })
+                            : graphql(UNMINIMIZE_MUTATION, { id: item.id }),
+                    ),
                 );
                 let done = 0;
                 results.forEach((result, i) => {
                     const item = targets[i];
                     if (result.status === 'fulfilled') {
-                        item.isMinimized = true;
-                        item.minimizedReason = formatMinimizedReason(classifier);
+                        applyHidden(item, hide, classifier);
                         done++;
                     } else {
-                        console.error('Bulk hide failed for', item.id, result.reason);
+                        console.error(
+                            hide ? 'Bulk hide failed for' : 'Bulk unhide failed for',
+                            item.id,
+                            result.reason,
+                        );
                         setError(result.reason.message);
                     }
                 });
                 selectedIds.clear();
-                els.bulkHide.textContent = label;
+                button.textContent = label;
                 showToast(
-                    `Hid ${done} comment${done === 1 ? '' : 's'}`,
-                    done ? 'success' : 'error',
-                );
-                renderAll();
-            }
-
-            async function bulkUnhide() {
-                const targets = [...selectedIds]
-                    .map(findMinimizable)
-                    .filter((item) => item && item.isMinimized);
-                if (targets.length === 0) {
-                    showToast('No hidden comments selected', 'info');
-                    return;
-                }
-                setError('');
-                setBulkBusy(true);
-                const label = els.bulkUnhide.textContent;
-                els.bulkUnhide.textContent = 'Unhiding...';
-                const results = await Promise.allSettled(
-                    targets.map((item) => graphql(UNMINIMIZE_MUTATION, { id: item.id })),
-                );
-                let done = 0;
-                results.forEach((result, i) => {
-                    const item = targets[i];
-                    if (result.status === 'fulfilled') {
-                        item.isMinimized = false;
-                        item.minimizedReason = null;
-                        done++;
-                    } else {
-                        console.error('Bulk unhide failed for', item.id, result.reason);
-                        setError(result.reason.message);
-                    }
-                });
-                selectedIds.clear();
-                els.bulkUnhide.textContent = label;
-                showToast(
-                    `Unhid ${done} comment${done === 1 ? '' : 's'}`,
+                    `${hide ? 'Hid' : 'Unhid'} ${done} comment${done === 1 ? '' : 's'}`,
                     done ? 'success' : 'error',
                 );
                 renderAll();
@@ -3315,13 +3280,18 @@
                     const reasonBtn = event.target.closest('.hide-reason');
                     if (reasonBtn) {
                         const card = reasonBtn.closest('.conversation-card');
-                        hideItem(card.dataset.commentId, reasonBtn.dataset.classifier, reasonBtn);
+                        setHidden(
+                            card.dataset.commentId,
+                            true,
+                            reasonBtn.dataset.classifier,
+                            reasonBtn,
+                        );
                         return;
                     }
                     const unhideBtn = event.target.closest('.unhide-btn');
                     if (unhideBtn) {
                         const card = unhideBtn.closest('.conversation-card');
-                        unhideItem(card.dataset.commentId, unhideBtn);
+                        setHidden(card.dataset.commentId, false, null, unhideBtn);
                         return;
                     }
 
@@ -3361,8 +3331,8 @@
                 });
                 els.bulkSelectAll.addEventListener('click', selectAllShown);
                 els.bulkClear.addEventListener('click', clearSelection);
-                els.bulkHide.addEventListener('click', bulkHide);
-                els.bulkUnhide.addEventListener('click', bulkUnhide);
+                els.bulkHide.addEventListener('click', () => bulkSetHidden(true));
+                els.bulkUnhide.addEventListener('click', () => bulkSetHidden(false));
 
                 els.tokenButton.addEventListener('click', openTokenModal);
                 els.closeTokenModal.addEventListener('click', () => Modal.close('tokenModal'));
