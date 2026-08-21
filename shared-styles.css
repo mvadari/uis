@@ -2,6 +2,30 @@
    SHARED STYLES - Common CSS for all UI tools
    ============================================ */
 
+/* Colour tokens. Style new components with var(--color-…) and they get dark mode
+   for free -- the dark block at the bottom overrides only these. A tool needing a
+   colour that isn't here should add a token rather than a dark-mode rule.
+   github.html deliberately keeps its own, larger palette inline. */
+:root {
+    color-scheme: light dark;
+    --color-accent-fg: #0969da;
+    --color-accent-subtle: #ddf4ff;
+    --color-attention-fg: #9a6700;
+    --color-attention-subtle: #fff8c5;
+    --color-border-default: #d0d7de;
+    --color-border-muted: #d8dee4;
+    --color-canvas-default: #ffffff;
+    --color-canvas-subtle: #f6f8fa;
+    --color-danger-fg: #d1242f;
+    --color-danger-subtle: #ffebe9;
+    --color-done-fg: #8250df;
+    --color-done-subtle: #fbefff;
+    --color-fg-default: #1f2328;
+    --color-fg-muted: #656d76;
+    --color-success-fg: #1a7f37;
+    --color-success-subtle: #dafbe1;
+}
+
 /* CSS Reset */
 * {
     margin: 0;
@@ -316,10 +340,90 @@ textarea:focus {
     }
 }
 
+/* Token pill + status line, shared by the PR tools */
+.token-pill {
+    border: 1px solid var(--color-border-default);
+    background: var(--color-canvas-subtle);
+    border-radius: 999px;
+    color: var(--color-fg-muted);
+    display: inline-flex;
+    align-items: center;
+    font-size: 12px;
+    font-weight: 600;
+    min-height: 30px;
+    padding: 4px 10px;
+    white-space: nowrap;
+}
+
+.token-pill.set {
+    border-color: var(--color-success-fg);
+    color: var(--color-success-fg);
+}
+
+.status-line {
+    align-items: center;
+    color: var(--color-fg-muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 13px;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    min-height: 28px;
+}
+
+.status-controls {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.empty-state,
+.loading-state {
+    border: 1px dashed var(--color-border-default);
+    border-radius: 6px;
+    color: var(--color-fg-muted);
+    padding: 32px;
+    text-align: center;
+}
+
+.loading-state {
+    align-items: center;
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.btn.filter-active {
+    border-color: var(--color-accent-fg);
+    box-shadow: inset 0 0 0 1px var(--color-accent-fg);
+    color: var(--color-accent-fg);
+}
+
 /* ============================================
    DARK MODE - system preference
    ============================================ */
 @media (prefers-color-scheme: dark) {
+    :root {
+        --color-accent-fg: #58a6ff;
+        --color-accent-subtle: #1c2a3d;
+        --color-attention-fg: #e3b341;
+        --color-attention-subtle: #3d2d00;
+        --color-border-default: #30363d;
+        --color-border-muted: #21262d;
+        --color-canvas-default: #0d1117;
+        --color-canvas-subtle: #161b22;
+        --color-danger-fg: #f85149;
+        --color-danger-subtle: #3d1c1c;
+        --color-done-fg: #d2a8ff;
+        --color-done-subtle: #2d1d47;
+        --color-fg-default: #e6edf3;
+        --color-fg-muted: #8b949e;
+        --color-success-fg: #3fb950;
+        --color-success-subtle: #1a4426;
+    }
+
     .btn {
         background-color: #21262d;
         color: #e6edf3;
