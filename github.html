@@ -1036,6 +1036,22 @@
                 outline: none;
             }
 
+            .label-hide-empty {
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                flex-shrink: 0;
+                font-size: 12px;
+                color: #57606a;
+                cursor: pointer;
+                white-space: nowrap;
+            }
+
+            .label-hide-empty input {
+                margin: 0;
+                cursor: pointer;
+            }
+
             .label-name-input:focus {
                 border-color: #0969da;
                 box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.1);
@@ -2105,6 +2121,9 @@
                 }
                 .label-name {
                     color: #e6edf3;
+                }
+                .label-hide-empty {
+                    color: #8b949e;
                 }
                 .label-name-input {
                     color: #e6edf3;
@@ -5299,10 +5318,17 @@
                         <span class="label-drag-handle">☰</span>
                         <input type="text"
                                class="label-name-input"
-                               value="${label.name}"
+                               value="${escapeAttribute(label.name)}"
                                data-index="${index}"
                                ${isLocked ? 'readonly' : ''}
                                placeholder="Label name">
+                        <label class="label-hide-empty" title="Hide this column from the board when it has no pull requests">
+                            <input type="checkbox"
+                                   class="label-hide-empty-input"
+                                   data-index="${index}"
+                                   ${label.hideWhenEmpty ? 'checked' : ''}>
+                            Hide when empty
+                        </label>
                         ${!isLocked ? '<button class="label-delete" data-index="' + index + '">Delete</button>' : ''}
                     </div>
                     <div class="drop-indicator" data-position="${index + 1}"></div>
@@ -5341,6 +5367,15 @@
                     input.addEventListener('input', (e) => {
                         const index = parseInt(e.target.dataset.index);
                         tempLabels[index].name = e.target.value;
+                    });
+                });
+
+                // Add hide-when-empty listeners
+                const hideEmptyInputs = labelList.querySelectorAll('.label-hide-empty-input');
+                hideEmptyInputs.forEach((input) => {
+                    input.addEventListener('change', (e) => {
+                        const index = parseInt(e.target.dataset.index);
+                        tempLabels[index].hideWhenEmpty = e.target.checked;
                     });
                 });
             }
