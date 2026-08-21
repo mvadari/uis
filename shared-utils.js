@@ -135,16 +135,18 @@ function formatDate(date, includeTime = false) {
 // HTML Utilities
 // ============================================
 
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+const HTML_ESCAPES = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+};
 
-function stripHtml(html) {
-    const div = document.createElement('div');
-    div.innerHTML = html;
-    return div.textContent || div.innerText || '';
+// Escapes quotes as well as tags, so the result is safe in an attribute value too.
+// A plain string replace rather than a throwaway element: this runs per diff line.
+function escapeHtml(text) {
+    return String(text ?? '').replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
 }
 
 // ============================================
@@ -287,23 +289,4 @@ function setQueryParam(param, value) {
     const url = new URL(window.location);
     url.searchParams.set(param, value);
     window.history.pushState({}, '', url);
-}
-
-// ============================================
-// Number Formatting
-// ============================================
-
-function formatNumber(num) {
-    return new Intl.NumberFormat('en-US').format(num);
-}
-
-function formatBytes(bytes, decimals = 2) {
-    if (bytes === 0) return '0 Bytes';
-
-    const k = 1024;
-    const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
