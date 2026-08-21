@@ -604,6 +604,8 @@
 
         <script src="shared-utils.js"></script>
         <script>
+            // Membership only -- the stack order is derived from the PRs' own base/head
+            // branches by orderByStack, not from the order here.
             const PR_NUMBERS = [5999, 6075, 7441, 5810, 6329, 5811];
             const REPO_OWNER = 'XRPLF';
             const REPO_NAME = 'rippled';
@@ -784,7 +786,7 @@
                         return pr;
                     });
 
-                    prs = await Promise.all(enrichPromises);
+                    prs = orderByStack(await Promise.all(enrichPromises));
                     localStorage.setItem(CACHE_KEY, JSON.stringify(prs));
                     document.getElementById('lastUpdated').textContent =
                         new Date().toLocaleTimeString();
@@ -797,7 +799,7 @@
                     // Try to load from cache
                     const cached = localStorage.getItem(CACHE_KEY);
                     if (cached) {
-                        prs = JSON.parse(cached);
+                        prs = orderByStack(JSON.parse(cached));
                         renderPRs();
                     } else {
                         document.getElementById('prStack').innerHTML =
@@ -874,12 +876,52 @@
                 return '<span class="approvals none"><span class="approval-icon">⚪</span> No approvals</span>';
             }
 
-            function renderMergeTarget(pr, index) {
-                const isFirst = index === 0;
+            // The PR this one stacks on: the one whose head branch is our base branch.
+            // Null for the bottom of the stack, whose base is a real branch.
+            function stackParent(pr) {
+                return prs.find((other) => other.head.ref === pr.base.ref) || null;
+            }
+
+            // Order the stack from its root by following base -> head links, so array
+            // position stops being load-bearing for the arrows and for Update All.
+            function orderByStack(list) {
+                const byHead = new Map(list.map((pr) => [pr.head.ref, pr]));
+                const children = new Map();
+                const roots = [];
+
+                list.forEach((pr) => {
+                    const parent = byHead.get(pr.base.ref);
+                    if (!parent) {
+                        roots.push(pr);
+                        return;
+                    }
+                    if (!children.has(parent.number)) children.set(parent.number, []);
+                    children.get(parent.number).push(pr);
+                });
+
+                const ordered = [];
+                const seen = new Set();
+
+                function visit(pr) {
+                    if (seen.has(pr.number)) return;
+                    seen.add(pr.number);
+                    ordered.push(pr);
+                    (children.get(pr.number) || []).forEach(visit);
+                }
+
+                roots.forEach(visit);
+                // Anything left is in a cycle or otherwise unreachable -- keep it rather
+                // than silently dropping a PR off the board.
+                list.forEach(visit);
+                return ordered;
+            }
+
+            function renderMergeTarget(pr) {
+                const parent = stackParent(pr);
                 const baseBranch = pr.base.ref;
                 const headBranch = pr.head.ref;
 
-                if (isFirst) {
+                if (!parent) {
                     return `<div class="merge-arrow">
                     <code>${headBranch}</code>
                     <span class="arrow-icon">→</span>
@@ -887,12 +929,11 @@
                     <span style="color: #1a7f37; margin-left: 8px;">📦 Base branch</span>
                 </div>`;
                 } else {
-                    const prevPr = prs[index - 1];
                     return `<div class="merge-arrow">
                     <code>${headBranch}</code>
                     <span class="arrow-icon">→</span>
                     <code>${baseBranch}</code>
-                    <span style="color: #0969da; margin-left: 8px;">⬆️ Merges into PR #${prevPr.number}</span>
+                    <span style="color: #0969da; margin-left: 8px;">⬆️ Merges into PR #${parent.number}</span>
                 </div>`;
                 }
             }
@@ -934,7 +975,7 @@
                                 </span>
                                 <span class="pr-meta-item">by ${pr.user.login}</span>
                             </div>
-                            ${renderMergeTarget(pr, index)}
+                            ${renderMergeTarget(pr)}
                             <div class="pr-badges">
                                 <span class="badge ${status.class}">${status.label}</span>
                                 ${renderCIStatus(pr)}
@@ -1090,7 +1131,8 @@
             // Initial load
             const cached = localStorage.getItem(CACHE_KEY);
             if (cached) {
-                prs = JSON.parse(cached);
+                // Re-order in case the cache predates orderByStack.
+                prs = orderByStack(JSON.parse(cached));
                 renderPRs();
             }
             fetchAllPRs();
