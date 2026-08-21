@@ -272,15 +272,6 @@
                 color: white;
             }
 
-            .section-title {
-                font-size: 14px;
-                font-weight: 600;
-                color: var(--color-fg-muted);
-                text-transform: uppercase;
-                letter-spacing: 1px;
-                margin-bottom: 20px;
-            }
-
             .cards-grid {
                 display: grid;
                 grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
@@ -631,13 +622,6 @@
                 text-align: center;
                 padding: 80px 20px;
                 color: var(--color-fg-muted);
-            }
-
-            .empty-state-icon {
-                width: 64px;
-                height: 64px;
-                margin-bottom: 20px;
-                fill: var(--color-fg-subtle);
             }
 
             .loading-spinner {
@@ -1163,12 +1147,6 @@
                     </div>
                 </div>
             `;
-            }
-
-            function escapeHtml(text) {
-                const div = document.createElement('div');
-                div.textContent = text;
-                return div.innerHTML;
             }
 
             async function fetchPRs(state = 'open', page = 1, append = false) {
