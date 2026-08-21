@@ -1455,7 +1455,7 @@
                   createdAt updatedAt reviewDecision
                   ${AUTHOR_FRAGMENT}
                   reviewRequests(first:25) {
-                    nodes { requestedReviewer { ... on User { login } ... on Team { slug } } }
+                    nodes { requestedReviewer { ... on User { login } } }
                   }
                   approvedReviews: reviews(states:[APPROVED]) { totalCount }
                   changesRequestedReviews: reviews(states:[CHANGES_REQUESTED]) { totalCount }
@@ -1633,37 +1633,43 @@
 
                 const vars = { owner, repo, number };
                 // Each connection paginates independently, so fetch all four concurrently
-                // instead of waiting for one to finish before starting the next.
-                const [threadNodes, commentNodes, reviewNodes, fileNodes] = await Promise.all([
-                    paginateAll(
-                        p.reviewThreads.nodes,
-                        p.reviewThreads.pageInfo,
-                        THREADS_PAGE_QUERY,
-                        vars,
-                        (d) => d.repository.pullRequest.reviewThreads,
-                    ),
-                    paginateAll(
-                        p.comments.nodes,
-                        p.comments.pageInfo,
-                        COMMENTS_PAGE_QUERY,
-                        vars,
-                        (d) => d.repository.pullRequest.comments,
-                    ),
-                    paginateAll(
-                        p.reviews.nodes,
-                        p.reviews.pageInfo,
-                        REVIEWS_PAGE_QUERY,
-                        vars,
-                        (d) => d.repository.pullRequest.reviews,
-                    ),
-                    paginateAll(
-                        p.files ? p.files.nodes : [],
-                        p.files && p.files.pageInfo,
-                        FILES_PAGE_QUERY,
-                        vars,
-                        (d) => d.repository.pullRequest.files,
-                    ),
-                ]);
+                // instead of waiting for one to finish before starting the next. Requested-reviewer
+                // teams come from REST, not GraphQL: the GraphQL Team type requires read:org/
+                // read:discussion scope for any field, which a repo-scoped token won't have.
+                const [threadNodes, commentNodes, reviewNodes, fileNodes, requestedTeams] =
+                    await Promise.all([
+                        paginateAll(
+                            p.reviewThreads.nodes,
+                            p.reviewThreads.pageInfo,
+                            THREADS_PAGE_QUERY,
+                            vars,
+                            (d) => d.repository.pullRequest.reviewThreads,
+                        ),
+                        paginateAll(
+                            p.comments.nodes,
+                            p.comments.pageInfo,
+                            COMMENTS_PAGE_QUERY,
+                            vars,
+                            (d) => d.repository.pullRequest.comments,
+                        ),
+                        paginateAll(
+                            p.reviews.nodes,
+                            p.reviews.pageInfo,
+                            REVIEWS_PAGE_QUERY,
+                            vars,
+                            (d) => d.repository.pullRequest.reviews,
+                        ),
+                        paginateAll(
+                            p.files ? p.files.nodes : [],
+                            p.files && p.files.pageInfo,
+                            FILES_PAGE_QUERY,
+                            vars,
+                            (d) => d.repository.pullRequest.files,
+                        ),
+                        restGet(
+                            `${REST_BASE}/repos/${owner}/${repo}/pulls/${number}/requested_reviewers`,
+                        ),
+                    ]);
 
                 return {
                     meta: {
@@ -1684,10 +1690,13 @@
                         changesRequestedCount: p.changesRequestedReviews
                             ? p.changesRequestedReviews.totalCount
                             : 0,
-                        reviewRequests: (p.reviewRequests ? p.reviewRequests.nodes : [])
-                            .map((n) => n.requestedReviewer)
-                            .filter(Boolean)
-                            .map((r) => r.login || r.slug),
+                        reviewRequests: [
+                            ...(p.reviewRequests ? p.reviewRequests.nodes : [])
+                                .map((n) => n.requestedReviewer)
+                                .filter(Boolean)
+                                .map((r) => r.login),
+                            ...(requestedTeams.teams || []).map((t) => t.name),
+                        ],
                         ciState:
                             p.commits && p.commits.nodes[0] && p.commits.nodes[0].commit
                                 ? p.commits.nodes[0].commit.statusCheckRollup &&
