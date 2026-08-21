@@ -1455,7 +1455,7 @@
                   createdAt updatedAt reviewDecision
                   ${AUTHOR_FRAGMENT}
                   reviewRequests(first:25) {
-                    nodes { requestedReviewer { ... on User { login } ... on Team { name } } }
+                    nodes { requestedReviewer { ... on User { login } ... on Team { slug } } }
                   }
                   approvedReviews: reviews(states:[APPROVED]) { totalCount }
                   changesRequestedReviews: reviews(states:[CHANGES_REQUESTED]) { totalCount }
@@ -1687,7 +1687,7 @@
                         reviewRequests: (p.reviewRequests ? p.reviewRequests.nodes : [])
                             .map((n) => n.requestedReviewer)
                             .filter(Boolean)
-                            .map((r) => r.login || r.name),
+                            .map((r) => r.login || r.slug),
                         ciState:
                             p.commits && p.commits.nodes[0] && p.commits.nodes[0].commit
                                 ? p.commits.nodes[0].commit.statusCheckRollup &&
