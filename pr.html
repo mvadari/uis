@@ -1440,11 +1440,13 @@
             }
 
             function escape(value) {
-                return escapeHtml(String(value ?? ''));
+                return escapeHtml(value);
             }
 
+            // escapeHtml escapes quotes too; this name is kept so attribute call sites read
+            // as intentional.
             function escapeAttribute(value) {
-                return escape(value).replace(/"/g, '&quot;');
+                return escapeHtml(value);
             }
 
             function setError(message) {
@@ -2397,22 +2399,28 @@
                 </div>`;
             }
 
-            function filteredThreads() {
-                const filter = els.filterInput.value.trim().toLowerCase();
-                let list = threads.filter((t) => showResolved || !t.isResolved);
-                if (outdatedFilter === 'hide') list = list.filter((t) => !t.isOutdated);
-                else if (outdatedFilter === 'only') list = list.filter((t) => t.isOutdated);
-                if (!filter) return list;
-                return list.filter((t) => {
-                    const searchable = [
+            // Cache the filter haystack on the thread. Recomputing it per keystroke means
+            // re-joining and lowercasing every comment body on the PR for every character.
+            function threadSearchText(t) {
+                if (t._searchText === undefined) {
+                    t._searchText = [
                         t.path,
                         ...t.comments.map((c) => (c.author && c.author.login) || ''),
                         ...t.comments.map((c) => c.body || ''),
                     ]
                         .join(' ')
                         .toLowerCase();
-                    return searchable.includes(filter);
-                });
+                }
+                return t._searchText;
+            }
+
+            function filteredThreads() {
+                const filter = els.filterInput.value.trim().toLowerCase();
+                let list = threads.filter((t) => showResolved || !t.isResolved);
+                if (outdatedFilter === 'hide') list = list.filter((t) => !t.isOutdated);
+                else if (outdatedFilter === 'only') list = list.filter((t) => t.isOutdated);
+                if (!filter) return list;
+                return list.filter((t) => threadSearchText(t).includes(filter));
             }
 
             function updateSummary() {
@@ -2523,6 +2531,8 @@
                 if (!patch) return '';
                 let oldLn = 0;
                 let newLn = 0;
+                // Constant for the whole file; escaping it per diff line is pure waste.
+                const escapedPath = escapeAttribute(f.path);
                 const rows = patch
                     .replace(/\n$/, '')
                     .split('\n')
@@ -2560,7 +2570,7 @@
                         // the old-file line number (side:LEFT); everything else against the new one.
                         const commentBtn = readOnly
                             ? ''
-                            : `<button type="button" class="diff-comment-btn" data-path="${escapeAttribute(f.path)}" data-line="${side === 'LEFT' ? oldNum : newNum}" data-side="${side}" title="Add a comment on this line">+</button>`;
+                            : `<button type="button" class="diff-comment-btn" data-path="${escapedPath}" data-line="${side === 'LEFT' ? oldNum : newNum}" data-side="${side}" title="Add a comment on this line">+</button>`;
                         return `<tr class="diff-row ${cls}"><td class="diff-gutter">${oldNum}</td><td class="diff-gutter">${newNum}</td><td class="diff-code">${commentBtn}${escape(line) || '&nbsp;'}</td></tr>`;
                     });
                 return `<table class="diff-table"><tbody>${rows.join('')}</tbody></table>`;
@@ -2772,7 +2782,10 @@
                     const data = await graphql(REPLY_MUTATION, { threadId, body });
                     const comment = data.addPullRequestReviewThreadReply.comment;
                     const thread = threads.find((t) => t.id === threadId);
-                    if (thread) thread.comments.push(comment);
+                    if (thread) {
+                        thread.comments.push(comment);
+                        thread._searchText = undefined;
+                    }
                     showToast('Reply posted', 'success');
                     renderAll();
                 } catch (error) {
@@ -3222,7 +3235,7 @@
                     updateQueryPreview();
                     loadPR();
                 });
-                els.filterInput.addEventListener('input', renderContent);
+                els.filterInput.addEventListener('input', debounce(renderContent, 150));
                 els.toggleResolvedButton.addEventListener('click', () => {
                     showResolved = !showResolved;
                     localStorage.setItem(SHOW_RESOLVED_KEY, String(showResolved));
@@ -3239,7 +3252,7 @@
                     const btn = event.target.closest('.tab-btn');
                     if (btn) setActiveTab(btn.dataset.tab);
                 });
-                els.filesFilterInput.addEventListener('input', renderFilesContent);
+                els.filesFilterInput.addEventListener('input', debounce(renderFilesContent, 150));
                 els.filesViewedFilterSelect.addEventListener('change', () => {
                     filesViewedFilter = els.filesViewedFilterSelect.value;
                     localStorage.setItem(FILES_VIEWED_FILTER_KEY, filesViewedFilter);
