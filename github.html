@@ -3610,6 +3610,21 @@
                 return false;
             }
 
+            // Paint the cached board so it's usable before any network round-trip.
+            // Returns false if there was nothing cached to show.
+            function renderFromCache() {
+                const cached = loadPRsFromCache();
+                if (!cached || cached.prs.length === 0) return false;
+
+                allPRs = cached.prs;
+                updateLastUpdatedTime();
+                populateRepoFilter();
+                populateQueryFilter();
+                populateMilestoneFilter();
+                renderPRs();
+                return true;
+            }
+
             // Fetch PRs from GitHub
             async function fetchPRs(isAutoRefresh = false) {
                 const token = getStoredToken();
@@ -3625,26 +3640,16 @@
                     return;
                 }
 
-                const headers = {
-                    Accept: 'application/vnd.github.v3+json',
-                    Authorization: `token ${token}`,
-                };
+                const headers = ghHeaders();
 
                 try {
-                    // Load and display cached data immediately if not auto-refresh
+                    // Display cached data immediately if not auto-refresh. init() may have
+                    // already painted it, in which case there's nothing left to render.
                     if (!isAutoRefresh) {
-                        const cached = loadPRsFromCache();
-                        if (cached && cached.prs.length > 0) {
-                            allPRs = cached.prs;
-                            lastUpdateTime = cached.timestamp;
-                            updateLastUpdatedTime();
-                            populateRepoFilter();
-                            populateQueryFilter();
-                            populateMilestoneFilter();
-                            renderPRs();
+                        if (allPRs.length > 0 || renderFromCache()) {
                             // Show loading indicator in header instead
                             document.getElementById('error').innerHTML =
-                                '<div style="color: #0969da; font-size: 12px; margin-top: 4px;">Refreshing...</div>';
+                                '<div class="refreshing-note">Refreshing...</div>';
                         } else {
                             document.getElementById('error').innerHTML = '';
                             document.getElementById('prList').innerHTML =
@@ -4336,27 +4341,27 @@
                 setupScrollIndicator();
             }
 
-            // Setup scroll indicator
+            // Show the "more columns this way" affordance unless we're scrolled to the end.
+            // Looks the view up each time; renderPRs replaces the element wholesale.
+            function checkKanbanScroll() {
+                const kanbanView = document.getElementById('kanbanView');
+                if (!kanbanView) return;
+
+                const hasScroll = kanbanView.scrollWidth > kanbanView.clientWidth;
+                const isScrolledToEnd =
+                    kanbanView.scrollLeft + kanbanView.clientWidth >= kanbanView.scrollWidth - 10;
+
+                kanbanView.classList.toggle('has-scroll', hasScroll && !isScrolledToEnd);
+            }
+
+            // Setup scroll indicator. The scroll listener has to be re-attached after every
+            // render; the resize listener is registered once in init() so it can't pile up.
             function setupScrollIndicator() {
                 const kanbanView = document.getElementById('kanbanView');
                 if (!kanbanView) return;
 
-                function checkScroll() {
-                    const hasScroll = kanbanView.scrollWidth > kanbanView.clientWidth;
-                    const isScrolledToEnd =
-                        kanbanView.scrollLeft + kanbanView.clientWidth >=
-                        kanbanView.scrollWidth - 10;
-
-                    if (hasScroll && !isScrolledToEnd) {
-                        kanbanView.classList.add('has-scroll');
-                    } else {
-                        kanbanView.classList.remove('has-scroll');
-                    }
-                }
-
-                checkScroll();
-                kanbanView.addEventListener('scroll', checkScroll);
-                window.addEventListener('resize', checkScroll);
+                checkKanbanScroll();
+                kanbanView.addEventListener('scroll', checkKanbanScroll);
             }
 
             // Setup column collapse/expand toggle
@@ -5660,9 +5665,15 @@
                 minimizedColumns = getMinimizedColumns();
                 manuallyToggledColumns = getManuallyToggledColumns();
 
+                window.addEventListener('resize', checkKanbanScroll);
+
                 const savedToken = getStoredToken();
 
                 if (savedToken) {
+                    // Paint the cache before validating the token — the board is already on
+                    // disk and shouldn't wait on a round-trip to api.github.com/user.
+                    renderFromCache();
+
                     // Validate the saved token
                     const result = await validateToken(savedToken);
                     updateTokenStatus(result.valid, result.valid ? '' : 'invalid');
