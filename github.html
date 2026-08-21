@@ -2848,6 +2848,10 @@
                         }
                         // Update nextLabelId to be higher than any existing custom label IDs
                         parsed.forEach((label) => {
+                            // Backfill for lists saved before hideWhenEmpty existed
+                            if (label.hideWhenEmpty === undefined) {
+                                label.hideWhenEmpty = label.id === 'unlabeled';
+                            }
                             if (label.id && label.id.startsWith('custom-')) {
                                 const idNum = parseInt(label.id.replace('custom-', ''), 10);
                                 if (!isNaN(idNum) && idNum >= nextLabelId) {
@@ -2880,6 +2884,7 @@
                             id: newId,
                             name: labelName,
                             locked: labelName === 'Unlabeled',
+                            hideWhenEmpty: false,
                         });
                         nameToIdMap[labelName] = newId;
                     }
@@ -5534,6 +5539,7 @@
                         id: `custom-${nextLabelId++}`,
                         name: trimmedName,
                         locked: false,
+                        hideWhenEmpty: false,
                     });
                     renderLabelEditor();
                 }
