@@ -1445,7 +1445,7 @@
                 return payload.data;
             }
 
-            const AUTHOR_FRAGMENT = 'author { login url avatarUrl }';
+            const AUTHOR_FRAGMENT = 'author { login url avatarUrl __typename }';
 
             const PR_QUERY = `
             query($owner:String!, $repo:String!, $number:Int!) {
@@ -1457,11 +1457,7 @@
                   reviewRequests(first:25) {
                     nodes { requestedReviewer { ... on User { login } } }
                   }
-                  approvedReviews: reviews(states:[APPROVED]) { totalCount }
                   changesRequestedReviews: reviews(states:[CHANGES_REQUESTED]) { totalCount }
-                  commits(last:1) {
-                    nodes { commit { statusCheckRollup { state } } }
-                  }
                   reviewThreads(first:50) {
                     pageInfo { hasNextPage endCursor }
                     nodes {
@@ -1632,44 +1628,69 @@
                     throw new Error('Pull request not found. Check the owner, repo, and number.');
 
                 const vars = { owner, repo, number };
+                const base = `${REST_BASE}/repos/${owner}/${repo}`;
                 // Each connection paginates independently, so fetch all four concurrently
                 // instead of waiting for one to finish before starting the next. Requested-reviewer
-                // teams come from REST, not GraphQL: the GraphQL Team type requires read:org/
-                // read:discussion scope for any field, which a repo-scoped token won't have.
-                const [threadNodes, commentNodes, reviewNodes, fileNodes, requestedTeams] =
-                    await Promise.all([
-                        paginateAll(
-                            p.reviewThreads.nodes,
-                            p.reviewThreads.pageInfo,
-                            THREADS_PAGE_QUERY,
-                            vars,
-                            (d) => d.repository.pullRequest.reviewThreads,
-                        ),
-                        paginateAll(
-                            p.comments.nodes,
-                            p.comments.pageInfo,
-                            COMMENTS_PAGE_QUERY,
-                            vars,
-                            (d) => d.repository.pullRequest.comments,
-                        ),
-                        paginateAll(
-                            p.reviews.nodes,
-                            p.reviews.pageInfo,
-                            REVIEWS_PAGE_QUERY,
-                            vars,
-                            (d) => d.repository.pullRequest.reviews,
-                        ),
-                        paginateAll(
-                            p.files ? p.files.nodes : [],
-                            p.files && p.files.pageInfo,
-                            FILES_PAGE_QUERY,
-                            vars,
-                            (d) => d.repository.pullRequest.files,
-                        ),
-                        restGet(
-                            `${REST_BASE}/repos/${owner}/${repo}/pulls/${number}/requested_reviewers`,
-                        ),
-                    ]);
+                // teams and CI check details come from REST, not GraphQL: the GraphQL Team type
+                // requires read:org/read:discussion scope for any field (which a repo-scoped token
+                // won't have), and statusCheckRollup doesn't expose individual check names.
+                const [
+                    threadNodes,
+                    commentNodes,
+                    reviewNodes,
+                    fileNodes,
+                    requestedTeams,
+                    combinedStatus,
+                    checkRuns,
+                ] = await Promise.all([
+                    paginateAll(
+                        p.reviewThreads.nodes,
+                        p.reviewThreads.pageInfo,
+                        THREADS_PAGE_QUERY,
+                        vars,
+                        (d) => d.repository.pullRequest.reviewThreads,
+                    ),
+                    paginateAll(
+                        p.comments.nodes,
+                        p.comments.pageInfo,
+                        COMMENTS_PAGE_QUERY,
+                        vars,
+                        (d) => d.repository.pullRequest.comments,
+                    ),
+                    paginateAll(
+                        p.reviews.nodes,
+                        p.reviews.pageInfo,
+                        REVIEWS_PAGE_QUERY,
+                        vars,
+                        (d) => d.repository.pullRequest.reviews,
+                    ),
+                    paginateAll(
+                        p.files ? p.files.nodes : [],
+                        p.files && p.files.pageInfo,
+                        FILES_PAGE_QUERY,
+                        vars,
+                        (d) => d.repository.pullRequest.files,
+                    ),
+                    restGet(`${base}/pulls/${number}/requested_reviewers`),
+                    p.headRefOid
+                        ? restGet(`${base}/commits/${p.headRefOid}/status`).catch(() => null)
+                        : null,
+                    p.headRefOid
+                        ? restGet(`${base}/commits/${p.headRefOid}/check-runs`).catch(() => null)
+                        : null,
+                ]);
+
+                const latestReviews = latestReviewsByAuthor(
+                    reviewNodes.map((r) => ({
+                        login: r.author && r.author.login,
+                        state: r.state,
+                        isBot: !!r.author && r.author.__typename === 'Bot',
+                        createdAt: r.createdAt,
+                    })),
+                );
+                const approvedBy = latestReviews
+                    .filter((r) => r.state === 'APPROVED' && !r.isBot)
+                    .map((r) => r.login);
 
                 return {
                     meta: {
@@ -1686,7 +1707,8 @@
                         createdAt: p.createdAt,
                         updatedAt: p.updatedAt,
                         reviewDecision: p.reviewDecision,
-                        approvedCount: p.approvedReviews ? p.approvedReviews.totalCount : 0,
+                        approvedCount: approvedBy.length,
+                        approvedBy,
                         changesRequestedCount: p.changesRequestedReviews
                             ? p.changesRequestedReviews.totalCount
                             : 0,
@@ -1697,11 +1719,8 @@
                                 .map((r) => r.login),
                             ...(requestedTeams.teams || []).map((t) => t.name),
                         ],
-                        ciState:
-                            p.commits && p.commits.nodes[0] && p.commits.nodes[0].commit
-                                ? p.commits.nodes[0].commit.statusCheckRollup &&
-                                  p.commits.nodes[0].commit.statusCheckRollup.state
-                                : null,
+                        ciState: computeCiState(combinedStatus, checkRuns),
+                        ciChecks: ciChecksList(combinedStatus, checkRuns),
                     },
                     threads: threadNodes.map((t) => ({
                         id: t.id,
@@ -1828,22 +1847,48 @@
             }
 
             // Reduces a flat review list to one decision per reviewer (their most recent
-            // submission), so re-review after "changes requested" doesn't double count.
-            function latestReviewStatesByUser(reviewList) {
+            // submission), so re-review after "changes requested" doesn't double count. Expects
+            // normalized entries: { login, state, isBot, createdAt }.
+            function latestReviewsByAuthor(entries) {
                 const latest = new Map();
-                reviewList
-                    .filter((r) => r.state !== 'COMMENTED' && r.state !== 'PENDING')
+                entries
+                    .filter((r) => r.login && r.state !== 'COMMENTED' && r.state !== 'PENDING')
                     .slice()
-                    .sort(byCreatedAtRest)
-                    .forEach((r) => {
-                        const login = r.user && r.user.login;
-                        if (login) latest.set(login, r.state);
-                    });
+                    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+                    .forEach((r) => latest.set(r.login, r));
                 return [...latest.values()];
             }
 
             function byCreatedAtRest(a, b) {
                 return new Date(a.submitted_at) - new Date(b.submitted_at);
+            }
+
+            // Normalizes commit statuses + check-runs into one list for the CI stat pill's tooltip.
+            function ciChecksList(combinedStatus, checkRuns) {
+                const statuses = (combinedStatus && combinedStatus.statuses) || [];
+                const runs = (checkRuns && checkRuns.check_runs) || [];
+                return [
+                    ...statuses.map((s) => ({
+                        name: s.context,
+                        cls:
+                            s.state === 'success'
+                                ? 'success'
+                                : s.state === 'pending'
+                                  ? 'pending'
+                                  : 'failure',
+                    })),
+                    ...runs.map((r) => ({
+                        name: r.name,
+                        cls:
+                            r.status !== 'completed'
+                                ? 'pending'
+                                : ['failure', 'timed_out', 'cancelled', 'action_required'].includes(
+                                        r.conclusion,
+                                    )
+                                  ? 'failure'
+                                  : 'success',
+                    })),
+                ];
             }
 
             async function fetchPRRest(owner, repo, number) {
@@ -1863,7 +1908,17 @@
                           restGet(`${base}/commits/${headSha}/check-runs`).catch(() => null),
                       ])
                     : [null, null];
-                const reviewStates = latestReviewStatesByUser(reviewList);
+                const latestReviews = latestReviewsByAuthor(
+                    reviewList.map((r) => ({
+                        login: r.user && r.user.login,
+                        state: r.state,
+                        isBot: !!r.user && r.user.type === 'Bot',
+                        createdAt: r.submitted_at,
+                    })),
+                );
+                const approvedBy = latestReviews
+                    .filter((r) => r.state === 'APPROVED' && !r.isBot)
+                    .map((r) => r.login);
 
                 // Rebuild review threads from flat comments using in_reply_to_id chains.
                 const byId = new Map();
@@ -1915,9 +1970,11 @@
                         deletions: pr.deletions,
                         createdAt: pr.created_at,
                         updatedAt: pr.updated_at,
-                        approvedCount: reviewStates.filter((s) => s === 'APPROVED').length,
-                        changesRequestedCount: reviewStates.filter((s) => s === 'CHANGES_REQUESTED')
-                            .length,
+                        approvedCount: approvedBy.length,
+                        approvedBy,
+                        changesRequestedCount: latestReviews.filter(
+                            (r) => r.state === 'CHANGES_REQUESTED',
+                        ).length,
                         reviewRequests: requestedReviewers
                             ? [
                                   ...(requestedReviewers.users || []).map((u) => u.login),
@@ -1925,6 +1982,7 @@
                               ]
                             : [],
                         ciState: computeCiState(combinedStatus, checkRuns),
+                        ciChecks: ciChecksList(combinedStatus, checkRuns),
                     },
                     threads,
                     comments: issueComments.map(mapRestIssueComment).sort(byCreatedAt),
@@ -2138,13 +2196,23 @@
                         ? prMeta.author.url
                         : `https://github.com/${login}`;
 
+                const CI_CHECK_ICON = { success: '✓', failure: '✗', pending: '●' };
                 const stats = [];
                 const ci = prMeta.ciState && CI_STATE_INFO[prMeta.ciState];
-                if (ci) stats.push(`<span class="stat-pill ${ci.cls}">${ci.label}</span>`);
-                if (prMeta.approvedCount)
+                if (ci) {
+                    const ciTitle = (prMeta.ciChecks || [])
+                        .map((c) => `${CI_CHECK_ICON[c.cls] || '●'} ${c.name}`)
+                        .join('\n');
                     stats.push(
-                        `<span class="stat-pill success">✓ ${prMeta.approvedCount} approved</span>`,
+                        `<span class="stat-pill ${ci.cls}"${ciTitle ? ` title="${escapeHtml(ciTitle)}"` : ''}>${ci.label}</span>`,
                     );
+                }
+                if (prMeta.approvedCount) {
+                    const approvedTitle = (prMeta.approvedBy || []).join('\n');
+                    stats.push(
+                        `<span class="stat-pill success"${approvedTitle ? ` title="${escapeHtml(approvedTitle)}"` : ''}>✓ ${prMeta.approvedCount} approved</span>`,
+                    );
+                }
                 if (prMeta.changesRequestedCount)
                     stats.push(
                         `<span class="stat-pill failure">✗ ${prMeta.changesRequestedCount} changes requested</span>`,
