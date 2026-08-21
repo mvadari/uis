@@ -2850,6 +2850,17 @@
             const QUERY_SETTINGS_KEY = 'github_pr_query_settings';
             const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
 
+            // Per-PR state carried by export/import, as { settings file property: [key, empty value] }.
+            // Drives both directions so the two lists can't drift apart.
+            const EXPORTED_KEYS = {
+                prLabels: [STORAGE_KEY, {}],
+                prNotes: [NOTES_KEY, {}],
+                prFlags: [FLAGGED_KEY, {}],
+                columnSortModes: [SORT_KEY, {}],
+                customOrders: [CUSTOM_ORDER_KEY, {}],
+                manuallyToggledColumns: [MANUALLY_TOGGLED_KEY, []],
+            };
+
             const ICON_COPY_LINK = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7.775 3.275a.75.75 0 001.06 1.06l1.25-1.25a2 2 0 112.83 2.83l-2.5 2.5a2 2 0 01-2.83 0 .75.75 0 00-1.06 1.06 3.5 3.5 0 004.95 0l2.5-2.5a3.5 3.5 0 00-4.95-4.95l-1.25 1.25zm-4.69 9.64a2 2 0 010-2.83l2.5-2.5a2 2 0 012.83 0 .75.75 0 001.06-1.06 3.5 3.5 0 00-4.95 0l-2.5 2.5a3.5 3.5 0 004.95 4.95l1.25-1.25a.75.75 0 00-1.06-1.06l-1.25 1.25a2 2 0 01-2.83 0z"></path></svg>`;
 
             // Default query settings - array of query objects
@@ -5043,15 +5054,11 @@
                     queries: getQuerySettings(),
                     labels: LABELS,
                     autoRefreshEnabled: localStorage.getItem('autoRefreshEnabled') !== 'false',
-                    prLabels: JSON.parse(localStorage.getItem('pr_labels') || '{}'),
-                    prNotes: JSON.parse(localStorage.getItem('pr_notes') || '{}'),
-                    prFlags: JSON.parse(localStorage.getItem('pr_flags') || '{}'),
-                    columnSortModes: JSON.parse(localStorage.getItem('column_sort_modes') || '{}'),
-                    customOrders: JSON.parse(localStorage.getItem('custom_orders') || '{}'),
-                    manuallyToggledColumns: JSON.parse(
-                        localStorage.getItem(MANUALLY_TOGGLED_KEY) || '[]',
-                    ),
                 };
+
+                for (const [prop, [key, empty]] of Object.entries(EXPORTED_KEYS)) {
+                    settings[prop] = Storage.get(key, empty);
+                }
 
                 const dataStr = JSON.stringify(settings, null, 2);
                 const dataBlob = new Blob([dataStr], { type: 'application/json' });
@@ -5110,32 +5117,8 @@
                         if (settings.autoRefreshEnabled !== undefined) {
                             localStorage.setItem('autoRefreshEnabled', settings.autoRefreshEnabled);
                         }
-                        if (settings.prLabels) {
-                            localStorage.setItem('pr_labels', JSON.stringify(settings.prLabels));
-                        }
-                        if (settings.prNotes) {
-                            localStorage.setItem('pr_notes', JSON.stringify(settings.prNotes));
-                        }
-                        if (settings.prFlags) {
-                            localStorage.setItem('pr_flags', JSON.stringify(settings.prFlags));
-                        }
-                        if (settings.columnSortModes) {
-                            localStorage.setItem(
-                                'column_sort_modes',
-                                JSON.stringify(settings.columnSortModes),
-                            );
-                        }
-                        if (settings.customOrders) {
-                            localStorage.setItem(
-                                'custom_orders',
-                                JSON.stringify(settings.customOrders),
-                            );
-                        }
-                        if (settings.manuallyToggledColumns) {
-                            localStorage.setItem(
-                                MANUALLY_TOGGLED_KEY,
-                                JSON.stringify(settings.manuallyToggledColumns),
-                            );
+                        for (const [prop, [key]] of Object.entries(EXPORTED_KEYS)) {
+                            if (settings[prop]) Storage.set(key, settings[prop]);
                         }
 
                         showNotification(
