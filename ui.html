@@ -880,6 +880,15 @@
                     .join('');
             }
 
+            // Pristine markup for the two panels, captured before anything mutates them so
+            // the disconnected placeholder can be undone without a second copy of the HTML.
+            const PANEL_HTML = {};
+
+            function capturePanelHtml() {
+                PANEL_HTML.request = document.getElementById('requestContent').innerHTML;
+                PANEL_HTML.transaction = document.getElementById('transactionContent').innerHTML;
+            }
+
             function updateTabsVisibility() {
                 const requestContent = document.getElementById('requestContent');
                 const transactionContent = document.getElementById('transactionContent');
@@ -900,71 +909,40 @@
                         txEditor = null;
                     }
                 } else {
-                    // Restore original content if it was replaced
+                    // Restore the original markup if the placeholder replaced it
                     if (requestContent.innerHTML.includes('Connect to a network')) {
-                        requestContent.innerHTML = `
-                <div class="form-group">
-                    <label>Request Template</label>
-                    <select id="requestTemplate" onchange="loadTemplate()" aria-label="Select request template">
-                        <option value="">-- Select Template --</option>
-                        <option value="account_info">Account Info</option>
-                        <option value="account_objects">Account Objects</option>
-                        <option value="ledger">Ledger</option>
-                        <option value="ledger_data">Ledger Data</option>
-                        <option value="ledger_entry">Ledger Entry</option>
-                        <option value="tx">Transaction</option>
-                        <option value="amm_info">AMM Info</option>
-                        <option value="fee">Fee</option>
-                        <option value="server_info">Server Info</option>
-                        <option value="server_definitions">Server Definitions</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>WebSocket Request</label>
-                    <div id="requestBody"></div>
-                </div>
-                <div style="display: flex; gap: 12px;">
-                    <button onclick="sendRequest()" aria-label="Send WebSocket request">Send Request</button>
-                    <button onclick="copyLastOutput('requestOutput')" aria-label="Copy last request output">Copy Last</button>
-                    <button onclick="copyOutput('requestOutput')" aria-label="Copy request log">Copy All</button>
-                    <button onclick="document.getElementById('requestOutput').textContent = ''" aria-label="Clear request log">Clear Log</button>
-                </div>
-                <div class="output" id="requestOutput" role="log" aria-live="polite"></div>
-                `;
+                        requestContent.innerHTML = PANEL_HTML.request;
                         // Reinitialize request editor
                         initializeEditors();
                     }
                     if (transactionContent.innerHTML.includes('Connect to a network')) {
-                        transactionContent.innerHTML = `
-                <div class="form-group">
-                    <label>Account Secret</label>
-                    <input type="text" id="txSecret" placeholder="sXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" aria-label="Account secret key">
-                </div>
-                <div class="form-group">
-                    <label>Transaction Template</label>
-                    <select id="txTemplate" onchange="loadTxTemplate()" aria-label="Select transaction template">
-                        <option value="">-- Select Template --</option>
-                        <option value="payment">Payment</option>
-                        <option value="accountset">AccountSet</option>
-                        <option value="trustset">TrustSet</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Transaction JSON</label>
-                    <div id="txBody"></div>
-                </div>
-                <div style="display: flex; gap: 12px;">
-                    <button onclick="sendTransaction()" aria-label="Submit and sign transaction">Send Transaction</button>
-                    <button onclick="simulateTransaction()" aria-label="Simulate transaction without submitting">Simulate</button>
-                    <button onclick="copyLastOutput('txOutput')" aria-label="Copy last transaction output">Copy Last</button>
-                    <button onclick="copyOutput('txOutput')" aria-label="Copy transaction log">Copy All</button>
-                    <button onclick="document.getElementById('txOutput').textContent = ''" aria-label="Clear transaction log">Clear Log</button>
-                </div>
-                <div class="output" id="txOutput" role="log" aria-live="polite"></div>
-                `;
+                        transactionContent.innerHTML = PANEL_HTML.transaction;
                         // Reinitialize transaction editor
                         initializeEditors();
                     }
+                }
+            }
+
+            const LOG_SEPARATOR = '='.repeat(80);
+
+            // Prepend a timestamped entry to one of the output logs and return the element.
+            // `isError` toggles the error styling; leave it null to keep the current state.
+            function appendLog(outputId, body, isError = null) {
+                const outputEl = document.getElementById(outputId);
+                const timestamp = new Date().toLocaleTimeString();
+                outputEl.textContent = `[${timestamp}] ${body}\n\n` + outputEl.textContent;
+                if (isError !== null) outputEl.classList.toggle('error', isError);
+                return outputEl;
+            }
+
+            // Parse editor JSON, logging and toasting on failure. Returns null if invalid.
+            function parseJsonOrLog(outputId, text) {
+                try {
+                    return JSON.parse(text);
+                } catch (error) {
+                    appendLog(outputId, `Invalid JSON: ${error.message}`, true);
+                    showToast('Invalid JSON: ' + error.message, 'error');
+                    return null;
                 }
             }
 
@@ -1328,34 +1306,20 @@
 
                 const requestBody = requestEditor ? requestEditor.getValue() : '';
 
-                // Validate JSON syntax
-                try {
-                    JSON.parse(requestBody);
-                } catch (error) {
-                    const outputEl = document.getElementById('requestOutput');
-                    const timestamp = new Date().toLocaleTimeString();
-                    const logEntry = `[${timestamp}] Invalid JSON: ${error.message}\n\n`;
-                    outputEl.textContent = logEntry + outputEl.textContent;
-                    outputEl.classList.add('error');
-                    showToast('Invalid JSON: ' + error.message, 'error');
-                    return;
-                }
+                const request = parseJsonOrLog('requestOutput', requestBody);
+                if (!request) return;
 
                 try {
-                    const request = JSON.parse(requestBody);
                     const response = await client.request(request);
 
-                    const outputEl = document.getElementById('requestOutput');
-                    const timestamp = new Date().toLocaleTimeString();
-                    const logEntry = `[${timestamp}] Request:\n${JSON.stringify(request, null, 2)}\n\nResponse:\n${JSON.stringify(response, null, 2)}\n\n${'='.repeat(80)}\n\n`;
-                    outputEl.textContent = logEntry + outputEl.textContent;
-                    outputEl.classList.remove('error');
+                    appendLog(
+                        'requestOutput',
+                        `Request:\n${JSON.stringify(request, null, 2)}\n\nResponse:\n${JSON.stringify(response, null, 2)}\n\n${LOG_SEPARATOR}`,
+                        false,
+                    );
                     showToast('Request successful', 'success');
                 } catch (error) {
-                    const outputEl = document.getElementById('requestOutput');
-                    const timestamp = new Date().toLocaleTimeString();
-                    const logEntry = `[${timestamp}] Error: ${error.message}\n\n${'='.repeat(80)}\n\n`;
-                    outputEl.textContent = logEntry + outputEl.textContent;
+                    appendLog('requestOutput', `Error: ${error.message}\n\n${LOG_SEPARATOR}`);
                     showToast('Request failed: ' + error.message, 'error');
                 }
             }
@@ -1374,22 +1338,10 @@
                     return;
                 }
 
-                // Validate JSON syntax
-                try {
-                    JSON.parse(txBody);
-                } catch (error) {
-                    const outputEl = document.getElementById('txOutput');
-                    const timestamp = new Date().toLocaleTimeString();
-                    const logEntry = `[${timestamp}] Invalid JSON: ${error.message}\n\n`;
-                    outputEl.textContent = logEntry + outputEl.textContent;
-                    outputEl.classList.add('error');
-                    showToast('Invalid JSON: ' + error.message, 'error');
-                    return;
-                }
+                const tx = parseJsonOrLog('txOutput', txBody);
+                if (!tx) return;
 
                 try {
-                    const tx = JSON.parse(txBody);
-
                     let response;
                     // For standalone, submit and manually advance ledger
                     if (currentNetworkUrl && isStandalone(currentNetworkUrl)) {
@@ -1405,10 +1357,10 @@
                         response = await client.submitAndWait(tx, { wallet });
                     }
 
-                    const outputEl = document.getElementById('txOutput');
-                    const timestamp = new Date().toLocaleTimeString();
-                    const logEntry = `[${timestamp}] Transaction:\n${JSON.stringify(tx, null, 2)}\n\nResponse:\n${JSON.stringify(response, null, 2)}\n\n${'='.repeat(80)}\n\n`;
-                    outputEl.textContent = logEntry + outputEl.textContent;
+                    const outputEl = appendLog(
+                        'txOutput',
+                        `Transaction:\n${JSON.stringify(tx, null, 2)}\n\nResponse:\n${JSON.stringify(response, null, 2)}\n\n${LOG_SEPARATOR}`,
+                    );
 
                     // Check the transaction result code
                     const engineResult =
@@ -1430,10 +1382,7 @@
                         showToast('Transaction submitted', 'info');
                     }
                 } catch (error) {
-                    const outputEl = document.getElementById('txOutput');
-                    const timestamp = new Date().toLocaleTimeString();
-                    const logEntry = `[${timestamp}] Error: ${error.message}\n\n${'='.repeat(80)}\n\n`;
-                    outputEl.textContent = logEntry + outputEl.textContent;
+                    appendLog('txOutput', `Error: ${error.message}\n\n${LOG_SEPARATOR}`);
                     showToast('Transaction failed: ' + error.message, 'error');
                 }
             }
@@ -1448,30 +1397,19 @@
 
                 const txBody = txEditor ? txEditor.getValue() : '';
 
-                // Validate JSON syntax
-                try {
-                    JSON.parse(txBody);
-                } catch (error) {
-                    const outputEl = document.getElementById('txOutput');
-                    const timestamp = new Date().toLocaleTimeString();
-                    const logEntry = `[${timestamp}] Invalid JSON: ${error.message}\n\n`;
-                    outputEl.textContent = logEntry + outputEl.textContent;
-                    outputEl.classList.add('error');
-                    showToast('Invalid JSON: ' + error.message, 'error');
-                    return;
-                }
+                const tx = parseJsonOrLog('txOutput', txBody);
+                if (!tx) return;
 
                 try {
-                    const tx = JSON.parse(txBody);
                     const response = await client.request({
                         command: 'simulate',
                         tx_json: tx,
                     });
 
-                    const outputEl = document.getElementById('txOutput');
-                    const timestamp = new Date().toLocaleTimeString();
-                    const logEntry = `[${timestamp}] Simulate:\n${JSON.stringify(tx, null, 2)}\n\nResponse:\n${JSON.stringify(response, null, 2)}\n\n${'='.repeat(80)}\n\n`;
-                    outputEl.textContent = logEntry + outputEl.textContent;
+                    const outputEl = appendLog(
+                        'txOutput',
+                        `Simulate:\n${JSON.stringify(tx, null, 2)}\n\nResponse:\n${JSON.stringify(response, null, 2)}\n\n${LOG_SEPARATOR}`,
+                    );
 
                     const engineResult =
                         response.result?.engine_result || response.result?.meta?.TransactionResult;
@@ -1486,10 +1424,7 @@
                         showToast('Simulation complete', 'info');
                     }
                 } catch (error) {
-                    const outputEl = document.getElementById('txOutput');
-                    const timestamp = new Date().toLocaleTimeString();
-                    const logEntry = `[${timestamp}] Error: ${error.message}\n\n${'='.repeat(80)}\n\n`;
-                    outputEl.textContent = logEntry + outputEl.textContent;
+                    appendLog('txOutput', `Error: ${error.message}\n\n${LOG_SEPARATOR}`);
                     showToast('Simulation failed: ' + error.message, 'error');
                 }
             }
@@ -1548,6 +1483,7 @@
 
             // Initialize on page load
             window.addEventListener('DOMContentLoaded', () => {
+                capturePanelHtml();
                 renderAccountList();
                 updateTabsVisibility();
                 initializeEditors();
