@@ -51,6 +51,21 @@ Kanban-style dashboard for managing GitHub pull requests.
 - Auto-refresh every 5 minutes
 - Update PR branches directly
 
+**Review Queue view** — the same cards, notes, flags and sort modes, bucketed by what is blocked
+on you instead of by label:
+
+- **Waiting on your review**: review requested from you (directly or through a team), plus PRs you
+  already reviewed where the author has pushed since
+- **Waiting on your reply**: your own PRs with a review or an unresolved thread newer than your
+  last push
+- Bot reviews only count when they left inline comments, so the summary-only review AI reviewers
+  post after every push doesn't fill the queue
+- A thread whose newest comment is yours doesn't count — you already replied
+- Each card shows why it's queued and how long it has been waiting
+- A "Waiting" sort mode (longest wait first) alongside Updated / Created / Custom
+- Needs the `review-requested:@me` query enabled; saved settings using
+  `user-review-requested:@me` are upgraded in place, since that form skips team requests
+
 [**Launch GitHub PR Dashboard →**](https://mvadari.github.io/uis/github.html)
 
 ---

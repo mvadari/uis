@@ -182,6 +182,54 @@
                 border-color: var(--color-border-emphasis);
             }
 
+            /* Board / Review Queue switch - one segmented control, so button.active applies */
+            .view-switch {
+                display: flex;
+            }
+
+            .header-controls .view-switch button {
+                border-radius: 0;
+                padding: 5px 12px;
+            }
+
+            .header-controls .view-switch button:first-child {
+                border-radius: 6px 0 0 6px;
+            }
+
+            .header-controls .view-switch button:last-child {
+                border-radius: 0 6px 6px 0;
+                margin-left: -1px;
+            }
+
+            /* Needed explicitly: .header-controls button sets a background at the same
+               specificity as button.active and comes later, so it would win. */
+            .header-controls .view-switch button.active {
+                background-color: var(--color-accent-emphasis);
+                border-color: var(--color-accent-emphasis);
+                color: var(--color-fg-on-emphasis);
+                z-index: 1;
+            }
+
+            /* Why a card is in a queue column, and how long it has been sitting there */
+            .queue-note {
+                display: flex;
+                align-items: baseline;
+                gap: 6px;
+                margin-top: 4px;
+                font-size: 11px;
+                color: var(--color-fg-muted);
+            }
+
+            .queue-wait {
+                flex-shrink: 0;
+                font-weight: 600;
+                color: var(--color-attention-fg);
+            }
+
+            .queue-reason {
+                min-width: 0;
+            }
+
             .kanban-view {
                 display: flex;
                 gap: 12px;
@@ -2050,6 +2098,12 @@
                     </div>
 
                     <div class="header-controls">
+                        <div class="view-switch" role="group" aria-label="View">
+                            <button id="boardViewBtn" type="button" data-view="board">Board</button>
+                            <button id="queueViewBtn" type="button" data-view="queue">
+                                Review Queue
+                            </button>
+                        </div>
                         <span id="tokenStatus" class="token-status missing">⚠️ No Token</span>
                         <button id="loadBtn">Reload PRs</button>
                         <button id="settingsBtn">⚙️ Settings</button>
@@ -2204,8 +2258,9 @@
                                 <li><code>author:@me</code> - PRs you authored</li>
                                 <li><code>assignee:@me</code> - PRs assigned to you</li>
                                 <li>
-                                    <code>user-review-requested:@me</code> - PRs requesting your
-                                    review
+                                    <code>review-requested:@me</code> - PRs requesting your review,
+                                    directly or through a team (the Review Queue view needs this
+                                    one; <code>user-review-requested:@me</code> skips team requests)
                                 </li>
                                 <li><code>reviewed-by:@me</code> - PRs you've reviewed</li>
                                 <li><code>milestone:"v1.0"</code> - PRs in a specific milestone</li>
@@ -2462,6 +2517,14 @@
             const NOTES_KEY = 'github_pr_notes';
             const FLAGGED_KEY = 'github_pr_flagged';
             const QUERY_SETTINGS_KEY = 'github_pr_query_settings';
+            const VIEW_KEY = 'github_pr_view';
+            const GRAPHQL_URL = 'https://api.github.com/graphql';
+
+            // The two derived columns of the Review Queue view. Deliberately not label IDs:
+            // membership is computed from pr._review, so a card is never assigned to one and
+            // these can't collide with anything in LABELS.
+            const QUEUE_REVIEW = '__queue-review';
+            const QUEUE_REPLY = '__queue-reply';
 
             // Per-PR state carried by export/import, as { settings file property: [key, empty value] }.
             // Drives both directions so the two lists can't drift apart.
@@ -2502,7 +2565,9 @@
                 {
                     id: 'q3',
                     name: 'Review requested',
-                    query: 'user-review-requested:@me',
+                    // review-requested (not user-review-requested) so requests that reach you
+                    // through a team show up too - the Review Queue view depends on it.
+                    query: 'review-requested:@me',
                     enabled: true,
                 },
                 { id: 'q4', name: 'Reviewed by me', query: 'reviewed-by:@me', enabled: true },
@@ -2604,6 +2669,8 @@
             let currentQueryFilters = new Set(); // Track currently selected query filters (empty = all queries)
             let currentMilestoneFilter = ''; // Track current milestone filter
             let currentUser = null; // Cache current user login
+            let currentView = localStorage.getItem(VIEW_KEY) || 'board'; // 'board' | 'queue'
+            let reviewMetadataError = ''; // Last enrichReviewMetadata failure, shown in queue view
             let tempLabels = []; // Temporary labels for editing
             let tempQueries = []; // Temporary queries for editing
             let draggedQueryIndex = null; // Index of query row being dragged in the editor
@@ -2880,6 +2947,21 @@
                             parsed.splice(titleBasedReleaseQueryIndex, 1);
                         }
 
+                        // user-review-requested only matches direct requests, so PRs where a
+                        // team is the reviewer never got fetched. Upgrade saved settings in
+                        // place, otherwise the Review Queue silently misses them.
+                        let upgraded = false;
+                        parsed.forEach((query) => {
+                            if (query.query && query.query.includes('user-review-requested:')) {
+                                query.query = query.query.replace(
+                                    /user-review-requested:/g,
+                                    'review-requested:',
+                                );
+                                upgraded = true;
+                            }
+                        });
+                        if (upgraded) saveQuerySettings(parsed);
+
                         DEFAULT_QUERY_SETTINGS.forEach((defaultQuery) => {
                             if (!parsed.some((query) => query.id === defaultQuery.id)) {
                                 parsed.push({ ...defaultQuery });
@@ -2941,7 +3023,14 @@
             function sortPRs(prs, mode, label) {
                 const sorted = [...prs];
 
-                if (mode === 'updated') {
+                if (mode === 'waiting') {
+                    // Longest wait first. PRs with no waiting timestamp sort last.
+                    const waitOf = (pr) =>
+                        pr._review && pr._review.waitingSince
+                            ? new Date(pr._review.waitingSince).getTime()
+                            : Infinity;
+                    sorted.sort((a, b) => waitOf(a) - waitOf(b));
+                } else if (mode === 'updated') {
                     sorted.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
                 } else if (mode === 'created') {
                     sorted.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -3104,6 +3193,249 @@
                         baseRef: null,
                     };
                 }
+            }
+
+            // ---------- Review Queue metadata ----------
+            //
+            // REST search tells us which PRs are on the board but not what's blocked on whom:
+            // there is no REST field for "review requested at", and stale-review detection needs
+            // the last commit date next to my last review. One GraphQL pass over the PRs already
+            // fetched fills that in. Results land on pr._review, which is cached with the PR, so
+            // the queue renders from cache with no token round-trip.
+
+            async function graphqlRequest(query, variables) {
+                const response = await fetch(GRAPHQL_URL, {
+                    method: 'POST',
+                    headers: githubHeaders({ 'Content-Type': 'application/json' }),
+                    body: JSON.stringify({ query, variables }),
+                });
+
+                let payload;
+                try {
+                    payload = await response.json();
+                } catch {
+                    throw new Error(`GitHub GraphQL returned ${response.status}`);
+                }
+                if (!response.ok) {
+                    throw new Error(
+                        payload.message || `GitHub GraphQL returned ${response.status}`,
+                    );
+                }
+                if (payload.errors && payload.errors.length) {
+                    throw new Error(payload.errors.map((e) => e.message).join('; '));
+                }
+                return payload.data;
+            }
+
+            const REVIEW_METADATA_QUERY = `
+                query($ids: [ID!]!) {
+                    nodes(ids: $ids) {
+                        ... on PullRequest {
+                            id
+                            commits(last: 1) { nodes { commit { committedDate } } }
+                            reviewRequests(first: 25) {
+                                nodes { requestedReviewer { __typename ... on User { login } } }
+                            }
+                            reviews(last: 50) {
+                                nodes {
+                                    state
+                                    submittedAt
+                                    author { login __typename }
+                                    comments { totalCount }
+                                }
+                            }
+                            reviewThreads(first: 50) {
+                                nodes {
+                                    isResolved
+                                    comments(last: 1) { nodes { createdAt author { login } } }
+                                }
+                            }
+                            timelineItems(last: 30, itemTypes: [REVIEW_REQUESTED_EVENT]) {
+                                nodes {
+                                    ... on ReviewRequestedEvent {
+                                        createdAt
+                                        requestedReviewer { __typename ... on User { login } }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            `;
+
+            // 20 PRs x 50 reviews x 50 threads keeps each request well under GitHub's GraphQL
+            // node limit. Raise only alongside a smaller reviews/reviewThreads page size.
+            const REVIEW_METADATA_CHUNK = 20;
+
+            function isBotAuthor(author) {
+                if (!author) return true;
+                return author.__typename === 'Bot' || /\[bot\]$/i.test(author.login || '');
+            }
+
+            function reviewsNeedingResponse(node, pushedAt, me) {
+                return (node.reviews?.nodes || []).filter((review) => {
+                    if (!review.submittedAt) return false;
+                    if (review.state === 'PENDING' || review.state === 'DISMISSED') return false;
+                    if (review.author?.login === me) return false;
+                    if (new Date(review.submittedAt) <= pushedAt) return false;
+                    // A bot review only counts when it left inline comments. The summary-only
+                    // review the AI reviewers post after every push isn't something to answer.
+                    return !isBotAuthor(review.author) || (review.comments?.totalCount || 0) > 0;
+                });
+            }
+
+            function myLastReviewOf(node, me) {
+                const mine = (node.reviews?.nodes || []).filter(
+                    (review) =>
+                        review.author?.login === me &&
+                        review.submittedAt &&
+                        review.state !== 'PENDING' &&
+                        review.state !== 'DISMISSED',
+                );
+                if (!mine.length) return null;
+                return mine.reduce((latest, review) =>
+                    new Date(review.submittedAt) > new Date(latest.submittedAt) ? review : latest,
+                );
+            }
+
+            // GitHub exposes no "requested at" on reviewRequests, so read it off the timeline.
+            function requestedAtFor(node, me, fallback) {
+                const events = (node.timelineItems?.nodes || []).filter(
+                    (event) => event?.createdAt,
+                );
+                const forMe = events.filter((event) => event.requestedReviewer?.login === me);
+                const relevant = forMe.length ? forMe : events;
+                if (!relevant.length) return fallback;
+                return relevant.reduce((latest, event) =>
+                    new Date(event.createdAt) > new Date(latest.createdAt) ? event : latest,
+                ).createdAt;
+            }
+
+            function buildReviewMetadata(pr, node, me, requestedByQuery) {
+                const pushedAtISO =
+                    node.commits?.nodes?.[0]?.commit?.committedDate || pr.created_at;
+                const pushedAt = new Date(pushedAtISO);
+                const isMine = pr.user?.login === me;
+
+                // Direct requests come straight off the PR. A request that reaches me through a
+                // team names the team, not me, so the search that returned the PR is the only
+                // reliable signal for those - hence requestedByQuery.
+                const requestedDirectly = (node.reviewRequests?.nodes || []).some(
+                    (request) => request.requestedReviewer?.login === me,
+                );
+                const requestedFromMe = !isMine && (requestedDirectly || requestedByQuery);
+
+                const myReview = myLastReviewOf(node, me);
+                const staleAfterPush = Boolean(
+                    !isMine && myReview && pushedAt > new Date(myReview.submittedAt),
+                );
+
+                const replyReviews = isMine ? reviewsNeedingResponse(node, pushedAt, me) : [];
+                const openThreads = isMine
+                    ? (node.reviewThreads?.nodes || [])
+                          .filter((thread) => !thread.isResolved)
+                          .map((thread) => thread.comments?.nodes?.[0])
+                          // A thread whose newest comment is mine is already answered.
+                          .filter((last) => last && last.author?.login !== me)
+                    : [];
+                const freshThreads = openThreads.filter(
+                    (last) => new Date(last.createdAt) > pushedAt,
+                );
+
+                const meta = {
+                    isMine,
+                    pushedAt: pushedAtISO,
+                    requestedFromMe,
+                    staleAfterPush,
+                    myReviewState: myReview ? myReview.state : null,
+                    myReviewAt: myReview ? myReview.submittedAt : null,
+                    replyReviewers: [
+                        ...new Set(replyReviews.map((review) => review.author?.login)),
+                    ].filter(Boolean),
+                    replyChangesRequested: replyReviews.some(
+                        (review) => review.state === 'CHANGES_REQUESTED',
+                    ),
+                    freshThreadCount: freshThreads.length,
+                    olderThreadCount: openThreads.length - freshThreads.length,
+                };
+
+                // waitingSince is what the Waiting sort orders on: how long this card has been
+                // sitting on you. Oldest wait first.
+                if (meta.isMine) {
+                    const stamps = [
+                        ...replyReviews.map((review) => review.submittedAt),
+                        ...freshThreads.map((last) => last.createdAt),
+                    ].map((value) => new Date(value).getTime());
+                    meta.waitingSince = stamps.length
+                        ? new Date(Math.min(...stamps)).toISOString()
+                        : null;
+                } else if (requestedFromMe) {
+                    meta.waitingSince = requestedAtFor(node, me, pushedAtISO);
+                } else if (staleAfterPush) {
+                    meta.waitingSince = pushedAtISO;
+                } else {
+                    meta.waitingSince = null;
+                }
+
+                return meta;
+            }
+
+            // Attaches pr._review to every PR in place. A failure here is not fatal: the board
+            // works without it, so the queue just reports that it has no data yet.
+            async function enrichReviewMetadata(prs) {
+                if (prs.length === 0) return;
+                if (!currentUser) {
+                    const result = await validateToken(getGitHubToken());
+                    if (!result.valid) throw new Error(result.error);
+                }
+                const me = currentUser;
+
+                // Which query IDs are review-request searches, so a team-routed request still
+                // registers as "requested from me".
+                const requestQueryIds = new Set(
+                    getQuerySettings()
+                        .filter((query) => /review-requested:@me/i.test(query.query || ''))
+                        .map((query) => query.id),
+                );
+
+                const byNodeId = new Map(
+                    prs.filter((pr) => pr.node_id).map((pr) => [pr.node_id, pr]),
+                );
+                const chunks = [];
+                const ids = [...byNodeId.keys()];
+                for (let i = 0; i < ids.length; i += REVIEW_METADATA_CHUNK) {
+                    chunks.push(ids.slice(i, i + REVIEW_METADATA_CHUNK));
+                }
+
+                const results = await mapWithConcurrency(chunks, 3, (chunk) =>
+                    graphqlRequest(REVIEW_METADATA_QUERY, { ids: chunk }),
+                );
+
+                results.forEach((data) => {
+                    (data.nodes || []).forEach((node) => {
+                        if (!node || !node.id) return;
+                        const pr = byNodeId.get(node.id);
+                        if (!pr) return;
+                        const requestedByQuery = (pr._sourceQueries || []).some((queryId) =>
+                            requestQueryIds.has(queryId),
+                        );
+                        pr._review = buildReviewMetadata(pr, node, me, requestedByQuery);
+                    });
+                });
+            }
+
+            function inReviewQueue(pr) {
+                const meta = pr._review;
+                return Boolean(
+                    meta && !meta.isMine && (meta.requestedFromMe || meta.staleAfterPush),
+                );
+            }
+
+            function inReplyQueue(pr) {
+                const meta = pr._review;
+                return Boolean(
+                    meta && meta.isMine && (meta.replyReviewers.length || meta.freshThreadCount),
+                );
             }
 
             // Helper function to fetch all pages of search results
@@ -3370,6 +3702,16 @@
                     // Fetch detailed info for each PR (CI status, conflicts) in parallel
                     newPRs = await Promise.all(newPRs.map((pr) => fetchPRDetails(pr, headers)));
 
+                    // Review Queue metadata. Non-fatal: the board is fine without it, so a
+                    // failure only costs the queue view its data.
+                    try {
+                        await enrichReviewMetadata(newPRs);
+                        reviewMetadataError = '';
+                    } catch (error) {
+                        reviewMetadataError = error.message;
+                        console.warn('Review metadata unavailable:', error);
+                    }
+
                     // Detect changes if this is an auto-refresh
                     if (isAutoRefresh && allPRs.length > 0) {
                         const oldPRIds = new Set(allPRs.map((pr) => pr.id));
@@ -3445,7 +3787,7 @@
             }
 
             // Generate PR HTML
-            function generatePRHTML(pr, labels) {
+            function generatePRHTML(pr, labels, annotation = '') {
                 const repoName = repoNameFromUrl(pr.repository_url);
                 const createdDate = formatShortDate(pr.created_at);
 
@@ -3561,6 +3903,7 @@
                                 <a href="pr.html?pr=${repoName}/${pr.number}" target="_blank" class="pr-comments-link" title="View unresolved comments in PR Comments">💬</a>
                             </div>
                         </div>
+                        ${annotation}
                     </div>
                 </div>
             `;
@@ -3780,6 +4123,140 @@
             }
 
             // Render PRs in Kanban view
+            const BOARD_SORTS = [
+                ['updated', 'Updated'],
+                ['created', 'Created'],
+                ['custom', 'Custom'],
+            ];
+            const QUEUE_SORTS = [['waiting', 'Waiting'], ...BOARD_SORTS];
+
+            // The Kanban board: one column per label, PRs bucketed by their stored label.
+            function buildBoardColumns(filteredPRs, prLabels) {
+                const columns = {};
+                LABELS.forEach((label) => {
+                    columns[label.id] = [];
+                });
+
+                // Reconcile PRs whose stored label no longer exists in LABELS (e.g. its column
+                // was deleted) by clearing the stale reference, as a separate step from bucketing
+                // below so the persistence side effect isn't buried inside the grouping loop.
+                pruneInvalidPRLabels(filteredPRs, prLabels);
+
+                // Group PRs by label ID; anything left without a valid label falls to Unlabeled
+                filteredPRs.forEach((pr) => {
+                    const labelId = prLabels[pr.id];
+                    if (labelId && columns[labelId]) {
+                        columns[labelId].push(pr);
+                    } else {
+                        columns['unlabeled'].push(pr);
+                    }
+                });
+
+                return LABELS.map((label) => ({
+                    id: label.id,
+                    name: label.name,
+                    prs: columns[label.id],
+                    hideWhenEmpty: label.hideWhenEmpty,
+                    defaultSort: 'updated',
+                    sorts: BOARD_SORTS,
+                }));
+            }
+
+            const MY_REVIEW_STATE_TEXT = {
+                APPROVED: 'you approved',
+                CHANGES_REQUESTED: 'you requested changes',
+                COMMENTED: 'you commented',
+            };
+
+            // The extra line each queue card carries: why it's here and how long it's been here.
+            function queueAnnotation(pr, reasons) {
+                const meta = pr._review;
+                if (!meta) return '';
+                const waited = meta.waitingSince
+                    ? `<span class="queue-wait" title="Waiting since ${escapeHtml(formatShortDate(meta.waitingSince))}">${escapeHtml(timeAgoShort(meta.waitingSince))}</span>`
+                    : '';
+                return `
+                    <div class="queue-note">
+                        ${waited}
+                        <span class="queue-reason">${reasons.map((text) => escapeHtml(text)).join(' · ')}</span>
+                    </div>
+                `;
+            }
+
+            function reviewQueueReasons(pr) {
+                const meta = pr._review;
+                const reasons = [];
+                if (meta.requestedFromMe) {
+                    reasons.push(
+                        meta.myReviewAt
+                            ? `re-requested after ${MY_REVIEW_STATE_TEXT[meta.myReviewState] || 'your review'}`
+                            : 'review requested',
+                    );
+                } else if (meta.staleAfterPush) {
+                    reasons.push(
+                        `pushed since ${MY_REVIEW_STATE_TEXT[meta.myReviewState] || 'your review'}`,
+                    );
+                }
+                return reasons;
+            }
+
+            function replyQueueReasons(pr) {
+                const meta = pr._review;
+                const reasons = [];
+                if (meta.replyChangesRequested) reasons.push('changes requested');
+                if (meta.freshThreadCount) {
+                    reasons.push(
+                        `${meta.freshThreadCount} unresolved thread${meta.freshThreadCount === 1 ? '' : 's'}`,
+                    );
+                }
+                if (!reasons.length && meta.replyReviewers.length) reasons.push('new review');
+                if (meta.replyReviewers.length) {
+                    reasons.push(`from ${meta.replyReviewers.join(', ')}`);
+                }
+                if (meta.olderThreadCount) {
+                    reasons.push(`+${meta.olderThreadCount} older unresolved`);
+                }
+                return reasons;
+            }
+
+            // The Review Queue: two derived columns, membership computed from pr._review.
+            function buildQueueColumns(filteredPRs) {
+                return [
+                    {
+                        id: QUEUE_REVIEW,
+                        name: 'Waiting on your review',
+                        hint: 'Review requested from you, or you reviewed and the author pushed since',
+                        prs: filteredPRs.filter(inReviewQueue),
+                        hideWhenEmpty: false,
+                        defaultSort: 'waiting',
+                        sorts: QUEUE_SORTS,
+                        autoCollapse: false,
+                        annotate: (pr) => queueAnnotation(pr, reviewQueueReasons(pr)),
+                        emptyIcon: '✅',
+                        emptyText: 'Nothing waiting on you',
+                        emptyHint: reviewMetadataError
+                            ? `Review data unavailable: ${reviewMetadataError}`
+                            : 'Reload PRs to check again',
+                    },
+                    {
+                        id: QUEUE_REPLY,
+                        name: 'Waiting on your reply',
+                        hint: 'Your PRs with a review or unresolved thread newer than your last push',
+                        prs: filteredPRs.filter(inReplyQueue),
+                        hideWhenEmpty: false,
+                        defaultSort: 'waiting',
+                        sorts: QUEUE_SORTS,
+                        autoCollapse: false,
+                        annotate: (pr) => queueAnnotation(pr, replyQueueReasons(pr)),
+                        emptyIcon: '✅',
+                        emptyText: 'Nothing to respond to',
+                        emptyHint: reviewMetadataError
+                            ? `Review data unavailable: ${reviewMetadataError}`
+                            : 'Reload PRs to check again',
+                    },
+                ];
+            }
+
             function renderPRs() {
                 const prLabels = getLabels();
 
@@ -3851,80 +4328,68 @@
                         ? allPRs.length
                         : `${filteredPRs.length}/${allPRs.length}`;
 
-                // Kanban view - always show all columns
-                const columns = {};
+                // Both views render the same columns of the same cards; they differ only in how
+                // PRs are bucketed and which sort modes make sense.
+                const columnDefs =
+                    currentView === 'queue'
+                        ? buildQueueColumns(filteredPRs)
+                        : buildBoardColumns(filteredPRs, prLabels);
 
-                // Initialize all columns with label IDs as keys
-                LABELS.forEach((label) => {
-                    columns[label.id] = [];
-                });
-
-                // Reconcile PRs whose stored label no longer exists in LABELS (e.g. its column
-                // was deleted) by clearing the stale reference, as a separate step from bucketing
-                // below so the persistence side effect isn't buried inside the grouping loop.
-                pruneInvalidPRLabels(filteredPRs, prLabels);
-
-                // Group PRs by label ID; anything left without a valid label falls to Unlabeled
-                filteredPRs.forEach((pr) => {
-                    const labelId = prLabels[pr.id];
-                    if (labelId && columns[labelId]) {
-                        columns[labelId].push(pr);
-                    } else {
-                        columns['unlabeled'].push(pr);
-                    }
-                });
-
-                // Sort PRs in each column
-                LABELS.forEach((label) => {
-                    const mode = sortModes[label.id] || 'updated';
-                    columns[label.id] = sortPRs(columns[label.id], mode, label.id);
+                // Sort each column, defaulting to whatever that column's view prefers
+                columnDefs.forEach((column) => {
+                    const mode = sortModes[column.id] || column.defaultSort;
+                    column.sortMode = mode;
+                    column.prs = sortPRs(column.prs, mode, column.id);
                 });
 
                 // Auto-collapse columns that just became empty, auto-expand columns that just
                 // received their first item - always, regardless of manual toggle history.
-                LABELS.forEach((label) => {
-                    applyAutoCollapseState(label.id, columns[label.id].length);
+                // The queue has only two columns and its empty state is the useful signal, so
+                // don't auto-collapse them out of sight.
+                columnDefs.forEach((column) => {
+                    if (column.autoCollapse !== false) {
+                        applyAutoCollapseState(column.id, column.prs.length);
+                    }
                 });
                 saveMinimizedColumns();
                 saveManuallyToggledColumns();
 
                 // Generate Kanban HTML
-                const kanbanHTML = LABELS.map((label) => {
-                    const prs = columns[label.id];
-                    const count = prs.length;
+                const kanbanHTML = columnDefs
+                    .map((column) => {
+                        const count = column.prs.length;
 
-                    // Hide empty columns that are marked hideWhenEmpty (e.g. Unlabeled);
-                    // loadLabelsList backfills the field for older saved lists.
-                    if (label.hideWhenEmpty && count === 0) {
-                        return '';
-                    }
+                        // Hide empty columns that are marked hideWhenEmpty (e.g. Unlabeled);
+                        // loadLabelsList backfills the field for older saved lists.
+                        if (column.hideWhenEmpty && count === 0) {
+                            return '';
+                        }
 
-                    const sortMode = sortModes[label.id] || 'updated';
-                    const isMinimized = minimizedColumns.has(label.id);
+                        const isMinimized = minimizedColumns.has(column.id);
+                        const sortButton = (mode, text) =>
+                            `<button class="sort-btn ${column.sortMode === mode ? 'active' : ''}" data-label="${column.id}" data-mode="${mode}">${text}</button>`;
 
-                    return `
-                    <div class="kanban-column ${isMinimized ? 'minimized' : ''}" data-label="${label.id}">
+                        return `
+                    <div class="kanban-column ${isMinimized ? 'minimized' : ''}" data-label="${column.id}">
                         <div class="kanban-header">
                             <div class="kanban-header-top">
-                                <span>${label.name} (${count})</span>
+                                <span${column.hint ? ` title="${escapeHtml(column.hint)}"` : ''}>${escapeHtml(column.name)} (${count})</span>
                                 <span class="collapse-icon">◀</span>
                             </div>
                             <div class="kanban-sort">
-                                <button class="sort-btn ${sortMode === 'updated' ? 'active' : ''}" data-label="${label.id}" data-mode="updated">Updated</button>
-                                <button class="sort-btn ${sortMode === 'created' ? 'active' : ''}" data-label="${label.id}" data-mode="created">Created</button>
-                                <button class="sort-btn ${sortMode === 'custom' ? 'active' : ''}" data-label="${label.id}" data-mode="custom">Custom</button>
-                                <button class="copy-urls-btn" data-label="${label.id}" type="button" title="Copy the URLs of every PR in this column (hold Shift for Markdown links)" aria-label="Copy PR URLs in this column">${ICON_COPY_LINK}</button>
+                                ${column.sorts.map(([mode, text]) => sortButton(mode, text)).join('')}
+                                <button class="copy-urls-btn" data-label="${column.id}" type="button" title="Copy the URLs of every PR in this column (hold Shift for Markdown links)" aria-label="Copy PR URLs in this column">${ICON_COPY_LINK}</button>
                             </div>
                         </div>
-                        <div class="kanban-content" data-label="${label.id}">
-                            ${prs.map((pr) => generatePRHTML(pr, prLabels)).join('')}
+                        <div class="kanban-content" data-label="${column.id}">
+                            ${column.prs.map((pr) => generatePRHTML(pr, prLabels, column.annotate ? column.annotate(pr) : '')).join('')}
                             ${
                                 count === 0
                                     ? `
                                 <div class="empty-state">
-                                    <div class="empty-state-icon">📭</div>
-                                    <div class="empty-state-text">No PRs here</div>
-                                    <div class="empty-state-hint">Drag PRs here to organize them</div>
+                                    <div class="empty-state-icon">${column.emptyIcon || '📭'}</div>
+                                    <div class="empty-state-text">${escapeHtml(column.emptyText || 'No PRs here')}</div>
+                                    <div class="empty-state-hint">${escapeHtml(column.emptyHint || 'Drag PRs here to organize them')}</div>
                                 </div>
                             `
                                     : ''
@@ -3932,7 +4397,8 @@
                         </div>
                     </div>
                 `;
-                }).join('');
+                    })
+                    .join('');
 
                 document.getElementById('prList').innerHTML =
                     `<div class="kanban-view" id="kanbanView">${kanbanHTML}</div>`;
@@ -4168,16 +4634,21 @@
                         const draggingItem = document.querySelector('.dragging');
                         if (draggingItem && element.classList.contains('kanban-content')) {
                             const label = element.dataset.label;
-                            const sortMode = getSortModes()[label] || 'updated';
+                            const sortMode =
+                                getSortModes()[label] ||
+                                (currentView === 'queue' ? 'waiting' : 'updated');
 
                             if (sortMode === 'custom') {
                                 const afterElement = getDragAfterElement(element, e.clientY);
                                 const currentParent = draggingItem.parentElement;
 
-                                // Only move if we're in the same column or moving to a different column
+                                // Same column: reorder. Different column: move it there - except
+                                // in the queue view, where membership is derived and a card can
+                                // only be reordered inside its own section.
                                 if (
                                     currentParent === element ||
-                                    currentParent.dataset.label !== label
+                                    (currentView !== 'queue' &&
+                                        currentParent.dataset.label !== label)
                                 ) {
                                     if (afterElement == null) {
                                         element.appendChild(draggingItem);
@@ -4215,7 +4686,9 @@
                             if (draggingItem) {
                                 const prId = draggingItem.dataset.prId;
                                 const newLabel = column.dataset.label;
-                                const sortMode = getSortModes()[newLabel] || 'updated';
+                                const sortMode =
+                                    getSortModes()[newLabel] ||
+                                    (currentView === 'queue' ? 'waiting' : 'updated');
 
                                 // Get the content element
                                 const contentElement = element.classList.contains('kanban-content')
@@ -4232,6 +4705,13 @@
                                         const prIds = prItems.map((item) => item.dataset.prId);
                                         saveCustomOrder(newLabel, prIds);
                                     }, 0);
+                                }
+
+                                // Queue columns are derived, so a card can't be assigned to one:
+                                // reorder within a section, never move between them.
+                                if (currentView === 'queue') {
+                                    if (!contentElement || sortMode !== 'custom') renderPRs();
+                                    return;
                                 }
 
                                 // Save the new label if it changed, and re-render
@@ -5148,8 +5628,22 @@
                 }
             }
 
+            // Board / Review Queue switch. Both views read the same allPRs, so switching is a
+            // re-render - no refetch.
+            function setView(view) {
+                currentView = view;
+                localStorage.setItem(VIEW_KEY, view);
+                document.querySelectorAll('.view-switch button').forEach((btn) => {
+                    btn.classList.toggle('active', btn.dataset.view === view);
+                });
+                if (allPRs.length > 0) renderPRs();
+            }
+
             // Event listeners
             document.getElementById('loadBtn').addEventListener('click', () => fetchPRs(false));
+            document.querySelectorAll('.view-switch button').forEach((btn) => {
+                btn.addEventListener('click', () => setView(btn.dataset.view));
+            });
 
             // Welcome modal event listeners
             document.getElementById('welcomeSetupBtn').addEventListener('click', () => {
@@ -5282,6 +5776,9 @@
 
             // Initialize token status on page load
             async function initializeApp() {
+                // Reflect the saved view in the switch before anything renders
+                setView(currentView);
+
                 // Initialize auto-refresh checkbox from localStorage
                 const autoRefreshEnabled = localStorage.getItem('autoRefreshEnabled');
                 const autoRefreshCheckbox = document.getElementById('autoRefreshSetting');
