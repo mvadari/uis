@@ -1399,6 +1399,22 @@
                 color: var(--color-accent-fg);
             }
 
+            .pr-tooltip-labels {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 4px;
+                margin-top: 4px;
+            }
+
+            .pr-tooltip-label-badge {
+                display: inline-block;
+                padding: 2px 6px;
+                border-radius: 10px;
+                font-size: 10px;
+                font-weight: 500;
+                border: 1px solid transparent;
+            }
+
             /* Context Menu Styles */
             .context-menu {
                 display: none;
@@ -5338,6 +5354,14 @@
                 });
             }
 
+            function contrastTextColor(hexColor) {
+                const r = parseInt(hexColor.substring(0, 2), 16);
+                const g = parseInt(hexColor.substring(2, 4), 16);
+                const b = parseInt(hexColor.substring(4, 6), 16);
+                const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+                return luminance > 0.6 ? '#000000' : '#ffffff';
+            }
+
             // PR tooltip handling
             function setupPRTooltips() {
                 const tooltip = document.getElementById('globalPRTooltip');
@@ -5413,6 +5437,36 @@
                     ? '<span style="color: #57606a; font-size: 11px;"> (Draft)</span>'
                     : '';
 
+                const assigneesHtml =
+                    Array.isArray(pr.assignees) && pr.assignees.length > 0
+                        ? `
+                    <div class="pr-tooltip-row">
+                        <span class="pr-tooltip-icon">🙋</span>
+                        <span class="pr-tooltip-label">Assignees:</span>
+                        <span class="pr-tooltip-value">${pr.assignees.map((a) => escapeHtml(a.login)).join(', ')}</span>
+                    </div>
+                `
+                        : '';
+
+                const labelsHtml =
+                    Array.isArray(pr.labels) && pr.labels.length > 0
+                        ? `
+                    <div class="pr-tooltip-row">
+                        <span class="pr-tooltip-icon">🏷️</span>
+                        <span class="pr-tooltip-label">Labels:</span>
+                        <span class="pr-tooltip-labels">
+                            ${pr.labels
+                                .map((label) => {
+                                    const bg = `#${label.color}`;
+                                    const fg = contrastTextColor(label.color);
+                                    return `<span class="pr-tooltip-label-badge" style="background-color: ${bg}; color: ${fg};">${escapeHtml(label.name)}</span>`;
+                                })
+                                .join('')}
+                        </span>
+                    </div>
+                `
+                        : '';
+
                 // Get matched query names
                 const querySettings = getQuerySettings();
                 const matchedQueries = (pr._sourceQueries || [])
@@ -5441,6 +5495,7 @@
                     <span class="pr-tooltip-label">Author:</span>
                     <span class="pr-tooltip-value">${pr.user.login}</span>
                 </div>
+                ${assigneesHtml}
                 <div class="pr-tooltip-row">
                     <span class="pr-tooltip-icon">📅</span>
                     <span class="pr-tooltip-label">Created:</span>
@@ -5456,6 +5511,7 @@
                     <span class="pr-tooltip-label">Branch:</span>
                     <span class="pr-tooltip-value">${branchInfo}</span>
                 </div>
+                ${labelsHtml}
                 ${diffStatsHtml}
                 ${queriesHtml}
             `;
