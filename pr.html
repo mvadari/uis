@@ -6,6 +6,8 @@
         <title>PR Review</title>
         <link rel="icon" type="image/svg+xml" href="favicon.svg" />
         <link rel="stylesheet" href="shared-styles.css" />
+        <script src="https://cdn.jsdelivr.net/npm/marked@18.0.12/lib/marked.umd.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.7/dist/purify.min.js"></script>
         <style>
             :root {
                 --color-diff-add-bg: #e6ffec;
@@ -1047,6 +1049,233 @@
                 padding: 12px;
             }
 
+            /* Markdown rich view */
+            .md-mode-toggle {
+                display: inline-flex;
+                border: 1px solid var(--color-border-default);
+                border-radius: 6px;
+                overflow: hidden;
+            }
+
+            .md-mode-btn {
+                background: var(--color-canvas-default);
+                border: 0;
+                color: var(--color-fg-muted);
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: 600;
+                padding: 2px 8px;
+            }
+
+            .md-mode-btn + .md-mode-btn {
+                border-left: 1px solid var(--color-border-default);
+            }
+
+            .md-mode-btn:hover {
+                background: var(--color-canvas-subtle);
+            }
+
+            .md-mode-btn.active {
+                background: var(--color-accent-subtle);
+                color: var(--color-accent-fg);
+            }
+
+            .md-view {
+                border-top: 1px solid var(--color-border-muted);
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            }
+
+            .md-pane {
+                max-height: 78vh;
+                min-width: 0;
+                overflow: auto;
+            }
+
+            .md-pane + .md-pane {
+                border-left: 1px solid var(--color-border-muted);
+            }
+
+            .md-pane-head {
+                background: var(--color-canvas-subtle);
+                border-bottom: 1px solid var(--color-border-muted);
+                color: var(--color-fg-muted);
+                font-size: 11px;
+                font-weight: 600;
+                letter-spacing: 0.03em;
+                padding: 4px 12px;
+                position: sticky;
+                text-transform: uppercase;
+                top: 0;
+                z-index: 1;
+            }
+
+            .md-src {
+                padding: 6px 0;
+            }
+
+            .md-src-line {
+                display: flex;
+                font-family:
+                    ui-monospace, SFMono-Regular, 'SF Mono', Consolas, 'Liberation Mono', Menlo,
+                    monospace;
+                font-size: 12px;
+                line-height: 1.6;
+                position: relative;
+            }
+
+            .md-src-num {
+                color: var(--color-fg-muted);
+                flex: 0 0 auto;
+                min-width: 52px;
+                padding: 0 10px 0 24px;
+                text-align: right;
+                user-select: none;
+            }
+
+            .md-src-text {
+                flex: 1 1 auto;
+                min-width: 0;
+                overflow-wrap: anywhere;
+                padding-right: 10px;
+                white-space: pre-wrap;
+            }
+
+            .md-src-line.md-add {
+                background: var(--color-diff-add-bg);
+            }
+
+            .md-src-line.md-add .md-src-num {
+                color: var(--color-diff-add-fg);
+            }
+
+            .md-src-line.md-hl,
+            .md-block.md-hl {
+                background: var(--color-attention-subtle);
+            }
+
+            .md-block {
+                border-left: 3px solid transparent;
+                padding: 1px 12px 1px 25px;
+                position: relative;
+            }
+
+            .md-block.md-changed {
+                border-left-color: var(--color-diff-add-fg);
+            }
+
+            .md-src-line:hover .diff-comment-btn,
+            .md-block:hover .diff-comment-btn {
+                display: block;
+            }
+
+            .md-block .diff-comment-btn {
+                left: 4px;
+                top: 4px;
+            }
+
+            .md-rendered {
+                font-size: 14px;
+                line-height: 1.6;
+                padding: 10px 0 16px;
+            }
+
+            .md-rendered h1,
+            .md-rendered h2,
+            .md-rendered h3,
+            .md-rendered h4,
+            .md-rendered h5,
+            .md-rendered h6 {
+                font-weight: 600;
+                line-height: 1.25;
+                margin: 16px 0 8px;
+            }
+            .md-rendered h1 {
+                border-bottom: 1px solid var(--color-border-muted);
+                font-size: 26px;
+                padding-bottom: 6px;
+            }
+            .md-rendered h2 {
+                border-bottom: 1px solid var(--color-border-muted);
+                font-size: 20px;
+                padding-bottom: 5px;
+            }
+            .md-rendered h3 {
+                font-size: 17px;
+            }
+            .md-rendered h4 {
+                font-size: 15px;
+            }
+            .md-rendered p,
+            .md-rendered ul,
+            .md-rendered ol,
+            .md-rendered table,
+            .md-rendered blockquote,
+            .md-rendered pre {
+                margin: 0 0 12px;
+            }
+            .md-rendered ul,
+            .md-rendered ol {
+                padding-left: 24px;
+            }
+            .md-rendered li + li {
+                margin-top: 3px;
+            }
+            .md-rendered a {
+                color: var(--color-accent-fg);
+            }
+            .md-rendered img {
+                max-width: 100%;
+            }
+            .md-rendered code {
+                background: var(--color-canvas-subtle);
+                border-radius: 4px;
+                font-family:
+                    ui-monospace, SFMono-Regular, 'SF Mono', Consolas, 'Liberation Mono', Menlo,
+                    monospace;
+                font-size: 85%;
+                padding: 1px 5px;
+            }
+            .md-rendered pre {
+                background: var(--color-canvas-subtle);
+                border-radius: 6px;
+                overflow-x: auto;
+                padding: 10px 12px;
+            }
+            .md-rendered pre code {
+                background: none;
+                padding: 0;
+            }
+            .md-rendered blockquote {
+                border-left: 3px solid var(--color-border-default);
+                color: var(--color-fg-muted);
+                padding-left: 12px;
+            }
+            .md-rendered table {
+                border-collapse: collapse;
+            }
+            .md-rendered th,
+            .md-rendered td {
+                border: 1px solid var(--color-border-default);
+                padding: 5px 10px;
+            }
+            .md-rendered th {
+                background: var(--color-canvas-subtle);
+            }
+            .md-rendered hr {
+                background: var(--color-border-default);
+                border: 0;
+                height: 1px;
+                margin: 16px 0;
+            }
+
+            .diff-comment-host > .diff-comment-form {
+                background: var(--color-canvas-subtle);
+                border-top: 1px solid var(--color-border-muted);
+                border-bottom: 1px solid var(--color-border-muted);
+                padding: 12px;
+            }
+
             @media (max-width: 860px) {
                 .container {
                     padding: 12px;
@@ -1064,6 +1293,13 @@
                 }
                 .summary-grid {
                     grid-template-columns: repeat(3, minmax(0, 1fr));
+                }
+                .md-view {
+                    grid-template-columns: minmax(0, 1fr);
+                }
+                .md-pane + .md-pane {
+                    border-left: 0;
+                    border-top: 1px solid var(--color-border-muted);
                 }
             }
 
@@ -1296,6 +1532,7 @@
             const FILES_VIEWED_FILTER_KEY = 'pr_review_files_viewed_filter';
             const ACTIVE_TAB_KEY = 'pr_review_active_tab';
             const AUTO_REFRESH_KEY = 'pr_review_auto_refresh';
+            const MARKDOWN_MODE_KEY = 'pr_review_markdown_mode';
 
             let prMeta = null;
             let threads = [];
@@ -1309,6 +1546,8 @@
             let showResolved = localStorage.getItem(SHOW_RESOLVED_KEY) === 'true';
             let outdatedFilter = localStorage.getItem(OUTDATED_FILTER_KEY) || 'all'; // 'all' | 'hide' | 'only'
             let autoRefresh = localStorage.getItem(AUTO_REFRESH_KEY) !== 'false';
+            // Default view for markdown files; a per-file toggle overrides it for that file.
+            let markdownMode = localStorage.getItem(MARKDOWN_MODE_KEY) || 'rich';
             let lastSignature = null;
             let selectedIds = new Set();
             const REST_BASE = 'https://api.github.com';
@@ -2056,6 +2295,254 @@
                 return f.anchor ? `${base}#diff-${f.anchor}` : base;
             }
 
+            // ---------- Markdown rich view ----------
+
+            const MARKDOWN_EXTENSIONS = ['.md', '.markdown', '.mdown', '.mkdn', '.mdx'];
+
+            // Links in the rendered markdown would otherwise navigate the review page away.
+            DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+                if (node.tagName === 'A' && node.getAttribute('href')) {
+                    node.setAttribute('target', '_blank');
+                    node.setAttribute('rel', 'noopener noreferrer');
+                }
+            });
+
+            function isMarkdownPath(path) {
+                const lower = (path || '').toLowerCase();
+                return MARKDOWN_EXTENSIONS.some((ext) => lower.endsWith(ext));
+            }
+
+            // A markdown file can be reviewed side by side (source + rendered) as long as it
+            // still exists at head; a deleted file has nothing to render.
+            function supportsRichView(f) {
+                return isMarkdownPath(f.path) && f.status !== 'removed';
+            }
+
+            function fileMode(f) {
+                if (!supportsRichView(f)) return 'diff';
+                return f.mode || markdownMode;
+            }
+
+            // GitHub only accepts review comments on lines that appear in the diff, so walk the
+            // patch once for (a) the new-file lines that are addressable and (b) which of those
+            // were added, for highlighting.
+            function patchLineInfo(f) {
+                if (f._lineInfo) return f._lineInfo;
+                const commentable = new Set();
+                const added = new Set();
+                let newLn = 0;
+                (f.patch || '')
+                    .replace(/\n$/, '')
+                    .split('\n')
+                    .forEach((line) => {
+                        if (line.startsWith('@@')) {
+                            const m = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+                            if (m) newLn = parseInt(m[1], 10);
+                            return;
+                        }
+                        const marker = line[0];
+                        if (marker === '\\' || marker === '-') return; // old side only
+                        if (marker === '+') added.add(newLn);
+                        commentable.add(newLn);
+                        newLn++;
+                    });
+                f._lineInfo = { commentable, added };
+                return f._lineInfo;
+            }
+
+            // Splits the document into top-level markdown blocks, each rendered on its own and
+            // tagged with the source line range it came from, so a comment on a rendered heading
+            // or paragraph can anchor to a real line number.
+            function buildMarkdownBlocks(text) {
+                const tokens = marked.lexer(text);
+                const blocks = [];
+                let line = 1;
+                tokens.forEach((token) => {
+                    const raw = token.raw || '';
+                    const newlines = (raw.match(/\n/g) || []).length;
+                    const start = line;
+                    // A trailing newline ends this block's last line rather than starting a new one.
+                    const end = raw.endsWith('\n')
+                        ? Math.max(start, start + newlines - 1)
+                        : start + newlines;
+                    line += newlines;
+                    if (token.type === 'space') return;
+                    const single = [token];
+                    single.links = tokens.links; // reference-style links live on the token list
+                    blocks.push({
+                        start,
+                        end,
+                        html: DOMPurify.sanitize(marked.parser(single)),
+                    });
+                });
+                return blocks;
+            }
+
+            // Re-rendering the files panel rebuilds its DOM, so carry any in-progress comment
+            // text across it the same way a background refresh does.
+            function renderFilesKeepingDrafts() {
+                const drafts = captureDrafts();
+                renderFilesContent();
+                restoreDrafts(drafts);
+            }
+
+            async function ensureRichLoaded(f) {
+                if (!supportsRichView(f) || f.rich) return;
+                f.rich = { status: 'loading' };
+                renderFilesKeepingDrafts();
+                try {
+                    const text = await fetchFileText(
+                        prMeta.owner,
+                        prMeta.repo,
+                        f.path,
+                        prMeta.headSha,
+                    );
+                    if (text === null) {
+                        f.rich = {
+                            status: 'error',
+                            message: 'The file no longer exists at the head of this PR.',
+                        };
+                    } else {
+                        f.rich = {
+                            status: 'ready',
+                            lines: text.split('\n'),
+                            blocks: buildMarkdownBlocks(text),
+                        };
+                    }
+                } catch (error) {
+                    console.error('Failed to load markdown source:', error);
+                    f.rich = { status: 'error', message: error.message };
+                }
+                renderFilesKeepingDrafts();
+            }
+
+            function commentButtonHtml(path, line, title) {
+                if (readOnly || !line) return '';
+                return `<button type="button" class="diff-comment-btn" data-path="${escapeHtml(path)}" data-line="${line}" data-side="RIGHT" title="${escapeHtml(title)}">+</button>`;
+            }
+
+            function renderMarkdownSource(f) {
+                const { commentable, added } = patchLineInfo(f);
+                return f.rich.lines
+                    .map((content, i) => {
+                        const num = i + 1;
+                        const btn = commentable.has(num)
+                            ? commentButtonHtml(f.path, num, `Comment on line ${num}`)
+                            : '';
+                        return `<div class="md-src-line ${added.has(num) ? 'md-add' : ''}" data-line="${num}">
+                        <span class="md-src-num">${btn}${num}</span><span class="md-src-text">${escapeHtml(content) || '&nbsp;'}</span>
+                    </div>`;
+                    })
+                    .join('');
+            }
+
+            function renderMarkdownBlocks(f) {
+                const { commentable, added } = patchLineInfo(f);
+                return f.rich.blocks
+                    .map((b) => {
+                        // Anchor the block's comment to the first line of it that GitHub will
+                        // accept — a block outside every diff hunk gets no button.
+                        let anchor = 0;
+                        for (let n = b.start; n <= b.end; n++) {
+                            if (commentable.has(n)) {
+                                anchor = n;
+                                break;
+                            }
+                        }
+                        let changed = false;
+                        for (let n = b.start; n <= b.end && !changed; n++) {
+                            if (added.has(n)) changed = true;
+                        }
+                        const btn = commentButtonHtml(
+                            f.path,
+                            anchor,
+                            `Comment on line ${anchor} (lines ${b.start}–${b.end})`,
+                        );
+                        return `<div class="md-block ${changed ? 'md-changed' : ''}" data-start="${b.start}" data-end="${b.end}">${btn}${b.html}</div>`;
+                    })
+                    .join('');
+            }
+
+            function renderRichView(f) {
+                const rich = f.rich;
+                if (!rich || rich.status === 'loading') {
+                    return `<div class="file-diff"><div class="code-note"><span class="spinner"></span> Loading ${escapeHtml(f.path)}…</div></div>`;
+                }
+                if (rich.status === 'error') {
+                    return `<div class="file-diff"><div class="file-diff-note">${escapeHtml(rich.message)} <a href="${escapeHtml(fileDiffUrl(f))}" target="_blank" rel="noopener noreferrer">View on GitHub ↗</a></div></div>`;
+                }
+                const shaTag = prMeta.headSha ? ` · ${escapeHtml(prMeta.headSha.slice(0, 7))}` : '';
+                return `
+                <div class="md-view">
+                    <div class="md-pane">
+                        <div class="md-pane-head">Source${shaTag}</div>
+                        <div class="md-src">${renderMarkdownSource(f)}</div>
+                    </div>
+                    <div class="md-pane">
+                        <div class="md-pane-head">Rendered</div>
+                        <div class="md-rendered">${renderMarkdownBlocks(f)}</div>
+                    </div>
+                </div>`;
+            }
+
+            // Hovering either pane highlights the counterpart lines/block, so it stays obvious
+            // which source lines a rendered paragraph came from.
+            let mdHighlighted = [];
+            let mdHoverAnchor = null;
+
+            function syncMarkdownHover(target) {
+                const view = target && target.closest('.md-view');
+                const block = view && target.closest('.md-block');
+                const srcLine = view && target.closest('.md-src-line');
+                // Moving within the same block/line is the common case; don't redo the work.
+                const anchor = block || srcLine || null;
+                if (anchor === mdHoverAnchor) return;
+                mdHoverAnchor = anchor;
+                mdHighlighted.forEach((el) => el.classList.remove('md-hl'));
+                mdHighlighted = [];
+                if (!anchor) return;
+                let start;
+                let end;
+                if (block) {
+                    start = Number(block.dataset.start);
+                    end = Number(block.dataset.end);
+                    mdHighlighted.push(block);
+                } else {
+                    const n = Number(srcLine.dataset.line);
+                    const owner = [...view.querySelectorAll('.md-block')].find(
+                        (b) => Number(b.dataset.start) <= n && n <= Number(b.dataset.end),
+                    );
+                    if (owner) mdHighlighted.push(owner);
+                    start = n;
+                    end = n;
+                }
+                view.querySelectorAll('.md-src-line').forEach((el) => {
+                    const n = Number(el.dataset.line);
+                    if (n >= start && n <= end) mdHighlighted.push(el);
+                });
+                mdHighlighted.forEach((el) => el.classList.add('md-hl'));
+            }
+
+            // The two panes scroll independently, so clicking in one brings the other alongside.
+            function scrollMarkdownCounterpart(target) {
+                const view = target.closest('.md-view');
+                if (!view || window.getSelection().toString()) return;
+                const block = target.closest('.md-block');
+                const srcLine = target.closest('.md-src-line');
+                let counterpart = null;
+                if (block) {
+                    counterpart = view.querySelector(
+                        `.md-src-line[data-line="${block.dataset.start}"]`,
+                    );
+                } else if (srcLine) {
+                    const n = Number(srcLine.dataset.line);
+                    counterpart = [...view.querySelectorAll('.md-block')].find(
+                        (b) => Number(b.dataset.start) <= n && n <= Number(b.dataset.end),
+                    );
+                }
+                if (counterpart) counterpart.scrollIntoView({ block: 'center' });
+            }
+
             // ---------- Current code for outdated threads ----------
 
             function decodeBase64Utf8(b64) {
@@ -2687,6 +3174,7 @@
 
             function renderFileDiff(f) {
                 if (!f.expanded) return '';
+                if (fileMode(f) === 'rich') return renderRichView(f);
                 if (f.patch) {
                     return `<div class="file-diff">${renderPatch(f)}</div>`;
                 }
@@ -2715,6 +3203,13 @@
                 const renamedFrom = f.previousPath
                     ? `<span class="file-stat" style="color:var(--color-fg-muted);">${escapeHtml(f.previousPath)} →</span>`
                     : '';
+                const mode = fileMode(f);
+                const modeToggle = supportsRichView(f)
+                    ? `<span class="md-mode-toggle" title="Rich: rendered Markdown beside its source, with inline comments">
+                        <button type="button" class="md-mode-btn ${mode === 'rich' ? 'active' : ''}" data-mode="rich">Rich</button>
+                        <button type="button" class="md-mode-btn ${mode === 'rich' ? '' : 'active'}" data-mode="diff">Diff</button>
+                   </span>`
+                    : '';
                 return `
                 <div class="file-row ${f.expanded ? 'open' : ''} ${isViewed ? 'viewed' : ''}" data-file-path="${escapeHtml(f.path)}">
                     <div class="file-row-head">
@@ -2724,6 +3219,7 @@
                         <span class="file-path">${escapeHtml(f.path)}</span>
                         <span class="file-stat">${stat.join(' ')}</span>
                         <span class="file-actions">
+                            ${modeToggle}
                             ${viewedControl}
                             <a href="${escapeHtml(fileDiffUrl(f))}" target="_blank" rel="noopener noreferrer" title="Open this file's diff on GitHub">GitHub ↗</a>
                         </span>
@@ -2930,6 +3426,20 @@
                 if (!f) return;
                 f.expanded = !f.expanded;
                 renderFilesContent();
+                if (f.expanded && fileMode(f) === 'rich') ensureRichLoaded(f);
+            }
+
+            // The toggle also becomes the default for the other markdown files in the PR — a
+            // reviewer who wants the rendered view for one almost always wants it for the rest.
+            function setFileMode(path, mode) {
+                const f = files.find((x) => x.path === path);
+                if (!f) return;
+                f.mode = mode;
+                markdownMode = mode;
+                localStorage.setItem(MARKDOWN_MODE_KEY, mode);
+                f.expanded = true;
+                renderFilesContent();
+                if (mode === 'rich') ensureRichLoaded(f);
             }
 
             async function toggleViewed(path, checkbox) {
@@ -2954,31 +3464,45 @@
                 }
             }
 
-            function openInlineCommentForm(button) {
-                const row = button.closest('tr');
-                const existing = row.nextElementSibling;
-                if (existing && existing.classList.contains('diff-comment-form-row')) {
-                    existing.remove();
-                    return;
-                }
-                row.closest('table')
-                    .querySelectorAll('.diff-comment-form-row')
-                    .forEach((el) => el.remove());
-
-                const formRow = document.createElement('tr');
-                formRow.className = 'diff-comment-form-row';
-                formRow.innerHTML = `
-                <td colspan="3">
-                    <div class="diff-comment-form" data-path="${escapeHtml(button.dataset.path)}" data-line="${escapeHtml(button.dataset.line)}" data-side="${escapeHtml(button.dataset.side)}">
-                        <textarea class="reply-input diff-comment-input" placeholder="Leave a comment on this line..."></textarea>
-                        <div class="thread-buttons">
-                            <button class="btn btn-small diff-comment-cancel-btn" type="button">Cancel</button>
-                            <button class="btn btn-small btn-primary diff-comment-post-btn" type="button">Comment</button>
-                        </div>
+            function commentFormMarkup(path, line, side) {
+                return `
+                <div class="diff-comment-form" data-path="${escapeHtml(path)}" data-line="${escapeHtml(line)}" data-side="${escapeHtml(side)}">
+                    <textarea class="reply-input diff-comment-input" placeholder="Leave a comment on line ${escapeHtml(line)}..."></textarea>
+                    <div class="thread-buttons">
+                        <button class="btn btn-small diff-comment-cancel-btn" type="button">Cancel</button>
+                        <button class="btn btn-small btn-primary diff-comment-post-btn" type="button">Comment</button>
                     </div>
-                </td>`;
-                row.after(formRow);
-                formRow.querySelector('textarea').focus();
+                </div>`;
+            }
+
+            // Opens (or toggles shut) a comment box directly below whatever the button sits on:
+            // a diff row, a source line, or a rendered markdown block. Returns the textarea so
+            // callers restoring a draft can refill it.
+            function openInlineCommentForm(button) {
+                const host = button.closest('tr, .md-src-line, .md-block');
+                if (!host) return null;
+                const existing = host.nextElementSibling;
+                if (existing && existing.classList.contains('diff-comment-host')) {
+                    existing.remove();
+                    return null;
+                }
+                const scope = button.closest('.file-row') || document;
+                scope.querySelectorAll('.diff-comment-host').forEach((el) => el.remove());
+
+                const { path, line, side } = button.dataset;
+                const node = document.createElement(host.tagName === 'TR' ? 'tr' : 'div');
+                node.className =
+                    host.tagName === 'TR'
+                        ? 'diff-comment-host diff-comment-form-row'
+                        : 'diff-comment-host';
+                node.innerHTML =
+                    host.tagName === 'TR'
+                        ? `<td colspan="3">${commentFormMarkup(path, line, side)}</td>`
+                        : commentFormMarkup(path, line, side);
+                host.after(node);
+                const textarea = node.querySelector('textarea');
+                textarea.focus();
+                return textarea;
             }
 
             async function submitInlineComment(button) {
@@ -3004,16 +3528,8 @@
                     });
                     showToast('Comment posted', 'success');
                     // Refetching is the only way to get the new thread's id/isResolved/etc, so
-                    // reload wholesale — but the reload rebuilds `files` from scratch, so restore
-                    // whichever files were expanded rather than collapsing the view on the user.
-                    const expandedPaths = new Set(
-                        files.filter((f) => f.expanded).map((f) => f.path),
-                    );
+                    // reload wholesale; loadPR restores the per-file view state it rebuilds.
                     await loadPR();
-                    files.forEach((f) => {
-                        if (expandedPaths.has(f.path)) f.expanded = true;
-                    });
-                    renderFilesContent();
                 } catch (error) {
                     console.error('Failed to post inline comment:', error);
                     setError(error.message);
@@ -3166,6 +3682,27 @@
                 });
             }
 
+            // Per-file view state (expanded, diff/rich mode, the fetched markdown source) is local
+            // to the session — a reload rebuilds `files` from the API and would otherwise reset it.
+            function captureFileState() {
+                const byPath = new Map();
+                files.forEach((f) =>
+                    byPath.set(f.path, { expanded: f.expanded, mode: f.mode, rich: f.rich }),
+                );
+                return { headSha: prMeta ? prMeta.headSha : null, byPath };
+            }
+
+            function applyFileState({ headSha, byPath }) {
+                files.forEach((f) => {
+                    const prev = byPath.get(f.path);
+                    if (!prev) return;
+                    f.expanded = prev.expanded;
+                    f.mode = prev.mode;
+                    // The rendered source is pinned to a commit; a new head has to be refetched.
+                    if (headSha && headSha === prMeta.headSha) f.rich = prev.rich;
+                });
+            }
+
             // A background refresh re-renders threads/files from scratch, which would blow away
             // any reply/inline-comment text the user is mid-typing. Snapshot it before rendering
             // and put it back after.
@@ -3205,10 +3742,7 @@
                         `.diff-comment-btn[data-path="${CSS.escape(path)}"][data-line="${CSS.escape(line)}"][data-side="${CSS.escape(side)}"]`,
                     );
                     if (!btn) return; // file collapsed, or the line no longer exists
-                    openInlineCommentForm(btn);
-                    const textarea = btn
-                        .closest('tr')
-                        .nextElementSibling?.querySelector('.diff-comment-input');
+                    const textarea = openInlineCommentForm(btn);
                     if (textarea) textarea.value = value;
                 });
             }
@@ -3275,12 +3809,10 @@
                     }
                     lastSignature = signature;
 
-                    // Full re-render wipes reply/inline-comment textareas and collapses every
-                    // expanded file (files are rebuilt from scratch); snapshot both and restore
+                    // Full re-render wipes reply/inline-comment textareas and resets every file's
+                    // view state (files are rebuilt from scratch); snapshot both and restore
                     // them once the new DOM is in place.
-                    const expandedPaths = new Set(
-                        files.filter((f) => f.expanded).map((f) => f.path),
-                    );
+                    const fileState = captureFileState();
                     const drafts = captureDrafts();
 
                     prMeta = result.meta;
@@ -3288,9 +3820,7 @@
                     conversation = result.comments;
                     reviews = result.reviews;
                     files = newFiles;
-                    files.forEach((f) => {
-                        if (expandedPaths.has(f.path)) f.expanded = true;
-                    });
+                    applyFileState(fileState);
 
                     els.summaryGrid.style.display = '';
                     els.statusLine.style.display = '';
@@ -3299,6 +3829,10 @@
                     setActiveTab(activeTab);
                     renderAll();
                     restoreDrafts(drafts);
+                    // Rich files whose cached source was dropped (new head commit) need refetching.
+                    files.forEach((f) => {
+                        if (f.expanded && fileMode(f) === 'rich') ensureRichLoaded(f);
+                    });
                 } catch (error) {
                     console.error('Failed to load PR:', error);
                     setError(error.message);
@@ -3435,6 +3969,14 @@
                     renderFilesContent();
                 });
                 els.filesContent.addEventListener('click', (event) => {
+                    const modeBtn = event.target.closest('.md-mode-btn');
+                    if (modeBtn) {
+                        setFileMode(
+                            modeBtn.closest('.file-row').dataset.filePath,
+                            modeBtn.dataset.mode,
+                        );
+                        return;
+                    }
                     // Clicks on the GitHub link or the viewed checkbox act on their own; don't expand.
                     if (event.target.closest('.file-actions')) return;
 
@@ -3445,7 +3987,7 @@
                     }
                     const cancelBtn = event.target.closest('.diff-comment-cancel-btn');
                     if (cancelBtn) {
-                        cancelBtn.closest('.diff-comment-form-row').remove();
+                        cancelBtn.closest('.diff-comment-host').remove();
                         return;
                     }
                     const postBtn = event.target.closest('.diff-comment-post-btn');
@@ -3454,11 +3996,19 @@
                         return;
                     }
                     // Clicking inside the open comment form (e.g. the textarea) shouldn't collapse the file.
-                    if (event.target.closest('.diff-comment-form-row')) return;
+                    if (event.target.closest('.diff-comment-host')) return;
+                    // Nor should reading, selecting, or following a link in the rich view.
+                    if (event.target.closest('.md-view')) {
+                        scrollMarkdownCounterpart(event.target);
+                        return;
+                    }
 
                     const row = event.target.closest('.file-row');
                     if (row) toggleFileExpanded(row.dataset.filePath);
                 });
+                els.filesContent.addEventListener('mouseover', (event) =>
+                    syncMarkdownHover(event.target),
+                );
                 els.filesContent.addEventListener('change', (event) => {
                     const check = event.target.closest('.viewed-check-input');
                     if (!check) return;
