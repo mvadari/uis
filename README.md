@@ -82,7 +82,7 @@ A clean, focused view of a single pull request's unresolved conversation.
 - Groups each thread's sub-comments (root + replies) in chronological order
 - Reply to threads and mark them resolved/unresolved directly from the view
 - Add a new inline comment on any diff line from the Files tab (posts immediately, like GitHub's "Add single comment")
-- Rich view for Markdown files: the source beside its rendered output, with inline comments from either side — hover to link a rendered block to its source lines, click to scroll the other pane
+- Rich view for Markdown files: the source beside its rendered output, with inline comments from either side — the panes scroll in sync (toggleable) and hovering either one highlights the matching lines
 - Quote reply: drop any thread comment into that thread's reply box as a Markdown blockquote
 - Hide comments and review summaries with a reason (spam, off topic, resolved, etc.)
 - Bulk-select comments/reviews with checkboxes to hide or unhide many at once

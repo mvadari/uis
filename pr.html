@@ -27,6 +27,11 @@
                 padding: 24px;
             }
 
+            /* Two panes of prose need more than the reading width the rest of the page uses. */
+            body.md-wide .container {
+                max-width: 1600px;
+            }
+
             .header {
                 background: var(--color-canvas-default);
                 border: 1px solid var(--color-border-default);
@@ -1097,17 +1102,36 @@
             }
 
             .md-pane-head {
+                align-items: center;
                 background: var(--color-canvas-subtle);
                 border-bottom: 1px solid var(--color-border-muted);
                 color: var(--color-fg-muted);
+                display: flex;
                 font-size: 11px;
                 font-weight: 600;
+                gap: 8px;
+                justify-content: space-between;
                 letter-spacing: 0.03em;
                 padding: 4px 12px;
                 position: sticky;
                 text-transform: uppercase;
                 top: 0;
                 z-index: 1;
+            }
+
+            .md-sync-toggle {
+                align-items: center;
+                cursor: pointer;
+                display: inline-flex;
+                gap: 4px;
+                letter-spacing: 0;
+                text-transform: none;
+                user-select: none;
+            }
+
+            .md-sync-toggle input {
+                cursor: pointer;
+                margin: 0;
             }
 
             .md-src {
@@ -1177,6 +1201,8 @@
             .md-rendered {
                 font-size: 14px;
                 line-height: 1.6;
+                min-width: 0;
+                overflow-wrap: break-word;
                 padding: 10px 0 16px;
             }
 
@@ -1234,6 +1260,7 @@
                     ui-monospace, SFMono-Regular, 'SF Mono', Consolas, 'Liberation Mono', Menlo,
                     monospace;
                 font-size: 85%;
+                overflow-wrap: anywhere;
                 padding: 1px 5px;
             }
             .md-rendered pre {
@@ -1251,8 +1278,13 @@
                 color: var(--color-fg-muted);
                 padding-left: 12px;
             }
+            /* A wide table scrolls on its own rather than widening the whole pane. */
             .md-rendered table {
                 border-collapse: collapse;
+                display: block;
+                max-width: 100%;
+                overflow-x: auto;
+                width: max-content;
             }
             .md-rendered th,
             .md-rendered td {
@@ -1533,6 +1565,7 @@
             const ACTIVE_TAB_KEY = 'pr_review_active_tab';
             const AUTO_REFRESH_KEY = 'pr_review_auto_refresh';
             const MARKDOWN_MODE_KEY = 'pr_review_markdown_mode';
+            const SCROLL_SYNC_KEY = 'pr_review_markdown_scroll_sync';
 
             let prMeta = null;
             let threads = [];
@@ -1548,6 +1581,7 @@
             let autoRefresh = localStorage.getItem(AUTO_REFRESH_KEY) !== 'false';
             // Default view for markdown files; a per-file toggle overrides it for that file.
             let markdownMode = localStorage.getItem(MARKDOWN_MODE_KEY) || 'rich';
+            let scrollSync = localStorage.getItem(SCROLL_SYNC_KEY) !== 'false';
             let lastSignature = null;
             let selectedIds = new Set();
             const REST_BASE = 'https://api.github.com';
@@ -2475,11 +2509,16 @@
                 return `
                 <div class="md-view">
                     <div class="md-pane">
-                        <div class="md-pane-head">Source${shaTag}</div>
+                        <div class="md-pane-head"><span>Source${shaTag}</span></div>
                         <div class="md-src">${renderMarkdownSource(f)}</div>
                     </div>
                     <div class="md-pane">
-                        <div class="md-pane-head">Rendered</div>
+                        <div class="md-pane-head">
+                            <span>Rendered</span>
+                            <label class="md-sync-toggle" title="Keep both panes on the same part of the document">
+                                <input type="checkbox" class="md-sync-input" ${scrollSync ? 'checked' : ''}> Sync scroll
+                            </label>
+                        </div>
                         <div class="md-rendered">${renderMarkdownBlocks(f)}</div>
                     </div>
                 </div>`;
@@ -2489,6 +2528,42 @@
             // which source lines a rendered paragraph came from.
             let mdHighlighted = [];
             let mdHoverAnchor = null;
+
+            // Both panes of a rich view get walked on every hover and every scroll frame, and a
+            // long spec runs to thousands of elements — collect them once per rendered view. A
+            // re-render builds a new .md-view element, which gets its own entry.
+            const mdIndexes = new WeakMap();
+
+            function markdownIndex(view) {
+                let index = mdIndexes.get(view);
+                if (!index) {
+                    index = {
+                        // Source lines are numbered 1..n in order, so line n is lines[n - 1].
+                        lines: [...view.querySelectorAll('.md-src-line')],
+                        blocks: [...view.querySelectorAll('.md-block')],
+                    };
+                    mdIndexes.set(view, index);
+                }
+                return index;
+            }
+
+            // The last block starting at or before the given line: the block containing it, or —
+            // for a blank line between blocks — the one just above.
+            function blockForLine(index, line) {
+                let lo = 0;
+                let hi = index.blocks.length - 1;
+                let best = null;
+                while (lo <= hi) {
+                    const mid = (lo + hi) >> 1;
+                    if (Number(index.blocks[mid].dataset.start) <= line) {
+                        best = index.blocks[mid];
+                        lo = mid + 1;
+                    } else {
+                        hi = mid - 1;
+                    }
+                }
+                return best;
+            }
 
             function syncMarkdownHover(target) {
                 const view = target && target.closest('.md-view');
@@ -2501,6 +2576,7 @@
                 mdHighlighted.forEach((el) => el.classList.remove('md-hl'));
                 mdHighlighted = [];
                 if (!anchor) return;
+                const index = markdownIndex(view);
                 let start;
                 let end;
                 if (block) {
@@ -2508,37 +2584,111 @@
                     end = Number(block.dataset.end);
                     mdHighlighted.push(block);
                 } else {
-                    const n = Number(srcLine.dataset.line);
-                    const owner = [...view.querySelectorAll('.md-block')].find(
-                        (b) => Number(b.dataset.start) <= n && n <= Number(b.dataset.end),
-                    );
-                    if (owner) mdHighlighted.push(owner);
-                    start = n;
-                    end = n;
+                    start = Number(srcLine.dataset.line);
+                    end = start;
+                    const owner = blockForLine(index, start);
+                    if (owner && Number(owner.dataset.end) >= start) mdHighlighted.push(owner);
                 }
-                view.querySelectorAll('.md-src-line').forEach((el) => {
-                    const n = Number(el.dataset.line);
-                    if (n >= start && n <= end) mdHighlighted.push(el);
-                });
+                for (let n = start; n <= end; n++) {
+                    if (index.lines[n - 1]) mdHighlighted.push(index.lines[n - 1]);
+                }
                 mdHighlighted.forEach((el) => el.classList.add('md-hl'));
             }
 
-            // The two panes scroll independently, so clicking in one brings the other alongside.
+            // ---------- Markdown scroll sync ----------
+
+            let syncingPanes = false;
+
+            function paneOffsetTop(pane, el) {
+                return (
+                    el.getBoundingClientRect().top -
+                    pane.getBoundingClientRect().top +
+                    pane.scrollTop
+                );
+            }
+
+            // Index of the last element at or above y within the pane. The elements are in
+            // document order, so this is a binary search rather than a walk of all of them.
+            function lastAtOrAbove(pane, list, y) {
+                let lo = 0;
+                let hi = list.length - 1;
+                let best = 0;
+                while (lo <= hi) {
+                    const mid = (lo + hi) >> 1;
+                    if (paneOffsetTop(pane, list[mid]) <= y) {
+                        best = mid;
+                        lo = mid + 1;
+                    } else {
+                        hi = mid - 1;
+                    }
+                }
+                return best;
+            }
+
+            function paneHeadHeight(pane) {
+                const head = pane.querySelector('.md-pane-head');
+                return head ? head.offsetHeight : 0;
+            }
+
+            // Puts whatever sits at the top of `from` at the top of `to`, interpolating within
+            // the matched block so a long paragraph scrolls smoothly instead of in jumps.
+            function alignPanes(from, to) {
+                const view = from.closest('.md-view');
+                const index = markdownIndex(view);
+                if (!index.lines.length || !index.blocks.length) return;
+                const headTo = paneHeadHeight(to);
+                const y = from.scrollTop + paneHeadHeight(from);
+                const clamp = (v) => Math.min(1, Math.max(0, v));
+
+                if (from.contains(index.lines[0])) {
+                    const line = Number(
+                        index.lines[lastAtOrAbove(from, index.lines, y)].dataset.line,
+                    );
+                    const block = blockForLine(index, line) || index.blocks[0];
+                    const start = Number(block.dataset.start);
+                    const end = Number(block.dataset.end);
+                    const frac = clamp((line - start) / (end - start + 1));
+                    to.scrollTop = paneOffsetTop(to, block) - headTo + frac * block.offsetHeight;
+                } else {
+                    const block = index.blocks[lastAtOrAbove(from, index.blocks, y)];
+                    const start = Number(block.dataset.start);
+                    const end = Number(block.dataset.end);
+                    const frac = clamp(
+                        (y - paneOffsetTop(from, block)) / Math.max(1, block.offsetHeight),
+                    );
+                    const line = Math.round(start + frac * (end - start + 1));
+                    const el = index.lines[Math.min(index.lines.length, Math.max(1, line)) - 1];
+                    to.scrollTop = paneOffsetTop(to, el) - headTo;
+                }
+            }
+
+            // Scroll events don't bubble, so this runs on the capture phase from the panel.
+            function onMarkdownScroll(event) {
+                const pane = event.target.closest && event.target.closest('.md-pane');
+                if (!scrollSync || !pane || syncingPanes) return;
+                const panes = pane.closest('.md-view').querySelectorAll('.md-pane');
+                const other = panes[0] === pane ? panes[1] : panes[0];
+                if (!other) return;
+                // The scroll we're about to cause would otherwise bounce straight back.
+                syncingPanes = true;
+                alignPanes(pane, other);
+                requestAnimationFrame(() => {
+                    syncingPanes = false;
+                });
+            }
+
+            // With the panes unsynced, clicking in one brings the other alongside instead.
             function scrollMarkdownCounterpart(target) {
                 const view = target.closest('.md-view');
-                if (!view || window.getSelection().toString()) return;
+                if (!view || scrollSync || window.getSelection().toString()) return;
+                const index = markdownIndex(view);
                 const block = target.closest('.md-block');
                 const srcLine = target.closest('.md-src-line');
                 let counterpart = null;
                 if (block) {
-                    counterpart = view.querySelector(
-                        `.md-src-line[data-line="${block.dataset.start}"]`,
-                    );
+                    counterpart = index.lines[Number(block.dataset.start) - 1];
                 } else if (srcLine) {
-                    const n = Number(srcLine.dataset.line);
-                    counterpart = [...view.querySelectorAll('.md-block')].find(
-                        (b) => Number(b.dataset.start) <= n && n <= Number(b.dataset.end),
-                    );
+                    counterpart = blockForLine(index, Number(srcLine.dataset.line));
                 }
                 if (counterpart) counterpart.scrollIntoView({ block: 'center' });
             }
@@ -3256,7 +3406,18 @@
                 els.filesSummary.innerHTML = `${total} file${total === 1 ? '' : 's'} · <span style="color:var(--color-diff-add-fg)">+${adds}</span> <span style="color:var(--color-diff-del-fg)">−${dels}</span>${viewedText}`;
             }
 
+            // The side-by-side view needs the page wider than the reading width the rest of the
+            // tool uses, so the container only widens while one is open on the Files tab.
+            function updateWideLayout() {
+                document.body.classList.toggle(
+                    'md-wide',
+                    activeTab === 'files' &&
+                        files.some((f) => f.expanded && fileMode(f) === 'rich'),
+                );
+            }
+
             function renderFilesContent() {
+                updateWideLayout();
                 if (!prMeta) {
                     els.filesContent.innerHTML =
                         '<div class="empty-state">No pull request loaded yet.</div>';
@@ -3292,6 +3453,7 @@
                 els.tabFiles.classList.toggle('active', activeTab === 'files');
                 els.panelComments.hidden = activeTab !== 'comments';
                 els.panelFiles.hidden = activeTab !== 'files';
+                updateWideLayout();
             }
 
             function renderFilesPanel() {
@@ -4010,10 +4172,21 @@
                     syncMarkdownHover(event.target),
                 );
                 els.filesContent.addEventListener('change', (event) => {
+                    const sync = event.target.closest('.md-sync-input');
+                    if (sync) {
+                        scrollSync = sync.checked;
+                        localStorage.setItem(SCROLL_SYNC_KEY, String(scrollSync));
+                        // Every open rich view shares the setting, so keep the boxes in step.
+                        els.filesContent
+                            .querySelectorAll('.md-sync-input')
+                            .forEach((el) => (el.checked = scrollSync));
+                        return;
+                    }
                     const check = event.target.closest('.viewed-check-input');
                     if (!check) return;
                     toggleViewed(check.closest('.file-row').dataset.filePath, check);
                 });
+                els.filesContent.addEventListener('scroll', onMarkdownScroll, true);
 
                 els.content.addEventListener('click', (event) => {
                     const copyBtn = event.target.closest('.copy-link-btn');
