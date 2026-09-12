@@ -1157,6 +1157,21 @@
                 user-select: none;
             }
 
+            .md-src-num.commentable {
+                cursor: pointer;
+            }
+
+            .md-src-line:hover .md-src-num.commentable {
+                color: var(--color-accent-fg);
+            }
+
+            .md-pane-note {
+                color: var(--color-attention-fg);
+                font-weight: 500;
+                letter-spacing: 0;
+                text-transform: none;
+            }
+
             .md-src-text {
                 flex: 1 1 auto;
                 min-width: 0;
@@ -2279,6 +2294,31 @@
                 changed: { label: 'changed', cls: 'file-status-modified' },
             };
 
+            // GitHub drops `patch` from the per-file response once a diff gets large, which leaves
+            // the diff view with nothing to show and the rich view with no line it can anchor a
+            // comment to. The PR-level .diff media type still carries the hunks, so split it up
+            // per file and fill in the gaps.
+            async function fetchPRDiff(owner, repo, number) {
+                const patches = new Map();
+                const response = await fetch(
+                    `${REST_BASE}/repos/${owner}/${repo}/pulls/${number}`,
+                    { headers: { ...restHeaders(), Accept: 'application/vnd.github.diff' } },
+                );
+                // 406 on the diffs GitHub itself refuses to render; nothing to fall back to.
+                if (!response.ok) return patches;
+                const text = await response.text();
+                text.split(/^diff --git /m).forEach((section) => {
+                    if (!section.trim()) return;
+                    const hunkStart = section.search(/^@@ /m);
+                    if (hunkStart === -1) return; // binary, or a rename with no content change
+                    const newPath = section.match(/^\+\+\+ b\/(.+)$/m);
+                    const oldPath = section.match(/^--- a\/(.+)$/m);
+                    const path = newPath ? newPath[1] : oldPath && oldPath[1];
+                    if (path) patches.set(path, section.slice(hunkStart).replace(/\n$/, ''));
+                });
+                return patches;
+            }
+
             // The REST files endpoint carries the patch text and status; GraphQL supplies viewer
             // viewed-state (which REST cannot report), so we fetch REST always and overlay viewed.
             async function fetchFilesRest(owner, repo, number) {
@@ -2286,7 +2326,7 @@
                     `${REST_BASE}/repos/${owner}/${repo}/pulls/${number}/files`,
                 );
                 if (!Array.isArray(list)) return [];
-                return list.map((f) => ({
+                const mapped = list.map((f) => ({
                     path: f.filename,
                     previousPath: f.previous_filename || null,
                     status: f.status,
@@ -2298,6 +2338,17 @@
                     anchor: null,
                     expanded: false,
                 }));
+                // Only pay for the extra request when a patch actually came back missing.
+                if (mapped.some((f) => !f.patch && f.status !== 'renamed')) {
+                    const patches = await fetchPRDiff(owner, repo, number).catch((error) => {
+                        console.error('Failed to load the PR diff:', error);
+                        return new Map();
+                    });
+                    mapped.forEach((f) => {
+                        if (!f.patch) f.patch = patches.get(f.path) || null;
+                    });
+                }
+                return mapped;
             }
 
             async function sha256Hex(text) {
@@ -2369,6 +2420,7 @@
                     .replace(/\n$/, '')
                     .split('\n')
                     .forEach((line) => {
+                        if (!line) return; // an absent patch splits to one empty line
                         if (line.startsWith('@@')) {
                             const m = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
                             if (m) newLn = parseInt(m[1], 10);
@@ -2460,11 +2512,13 @@
                 return f.rich.lines
                     .map((content, i) => {
                         const num = i + 1;
-                        const btn = commentable.has(num)
+                        const canComment = !readOnly && commentable.has(num);
+                        const btn = canComment
                             ? commentButtonHtml(f.path, num, `Comment on line ${num}`)
                             : '';
+                        // The whole gutter is the click target, not just the small + button.
                         return `<div class="md-src-line ${added.has(num) ? 'md-add' : ''}" data-line="${num}">
-                        <span class="md-src-num">${btn}${num}</span><span class="md-src-text">${escapeHtml(content) || '&nbsp;'}</span>
+                        <span class="md-src-num ${canComment ? 'commentable' : ''}"${canComment ? ` title="Comment on line ${num}"` : ''}>${btn}${num}</span><span class="md-src-text">${escapeHtml(content) || '&nbsp;'}</span>
                     </div>`;
                     })
                     .join('');
@@ -2506,10 +2560,20 @@
                     return `<div class="file-diff"><div class="file-diff-note">${escapeHtml(rich.message)} <a href="${escapeHtml(fileDiffUrl(f))}" target="_blank" rel="noopener noreferrer">View on GitHub ↗</a></div></div>`;
                 }
                 const shaTag = prMeta.headSha ? ` · ${escapeHtml(prMeta.headSha.slice(0, 7))}` : '';
+                // Say why the comment buttons are missing rather than leaving dead lines.
+                let note = '';
+                if (readOnly) {
+                    note = 'Read-only — add a token to comment';
+                } else if (patchLineInfo(f).commentable.size === 0) {
+                    note = 'Diff unavailable — GitHub only accepts comments on lines in the diff';
+                }
+                const noteHtml = note
+                    ? `<span class="md-pane-note">${escapeHtml(note)}</span>`
+                    : '';
                 return `
                 <div class="md-view">
                     <div class="md-pane">
-                        <div class="md-pane-head"><span>Source${shaTag}</span></div>
+                        <div class="md-pane-head"><span>Source${shaTag}</span>${noteHtml}</div>
                         <div class="md-src">${renderMarkdownSource(f)}</div>
                     </div>
                     <div class="md-pane">
@@ -2675,6 +2739,20 @@
                 requestAnimationFrame(() => {
                     syncingPanes = false;
                 });
+            }
+
+            // Clicking a rendered block is the obvious way to comment on it, so treat it as a
+            // click on that block's + button. Returns false when there's nothing to comment on
+            // (read-only, a block outside the diff, or the click was a link or a text selection)
+            // so the caller can fall back to scrolling the panes together.
+            function commentOnMarkdownBlock(target) {
+                if (target.closest('a, button, label, .diff-comment-host')) return false;
+                if (window.getSelection().toString()) return false;
+                const block = target.closest('.md-block');
+                const button = block && block.querySelector(':scope > .diff-comment-btn');
+                if (!button) return false;
+                openInlineCommentForm(button);
+                return true;
             }
 
             // With the panes unsynced, clicking in one brings the other alongside instead.
@@ -4147,6 +4225,13 @@
                         openInlineCommentForm(addBtn);
                         return;
                     }
+                    // Clicking anywhere in a commentable line's gutter counts as clicking its +.
+                    const gutter = event.target.closest('.md-src-num.commentable');
+                    if (gutter) {
+                        const btn = gutter.querySelector('.diff-comment-btn');
+                        if (btn) openInlineCommentForm(btn);
+                        return;
+                    }
                     const cancelBtn = event.target.closest('.diff-comment-cancel-btn');
                     if (cancelBtn) {
                         cancelBtn.closest('.diff-comment-host').remove();
@@ -4161,7 +4246,8 @@
                     if (event.target.closest('.diff-comment-host')) return;
                     // Nor should reading, selecting, or following a link in the rich view.
                     if (event.target.closest('.md-view')) {
-                        scrollMarkdownCounterpart(event.target);
+                        commentOnMarkdownBlock(event.target) ||
+                            scrollMarkdownCounterpart(event.target);
                         return;
                     }
 
