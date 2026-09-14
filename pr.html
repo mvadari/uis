@@ -2741,15 +2741,15 @@
                 });
             }
 
-            // Clicking a rendered block is the obvious way to comment on it, so treat it as a
-            // click on that block's + button. Returns false when there's nothing to comment on
-            // (read-only, a block outside the diff, or the click was a link or a text selection)
-            // so the caller can fall back to scrolling the panes together.
-            function commentOnMarkdownBlock(target) {
+            // Clicking a source line or a rendered block is the obvious way to comment on it, so
+            // treat it as a click on that element's + button. Returns false when there's nothing
+            // to comment on (read-only, a line outside the diff, or the click was a link or a
+            // text selection) so the caller can fall back to scrolling the panes together.
+            function commentOnMarkdownClick(target) {
                 if (target.closest('a, button, label, .diff-comment-host')) return false;
                 if (window.getSelection().toString()) return false;
-                const block = target.closest('.md-block');
-                const button = block && block.querySelector(':scope > .diff-comment-btn');
+                const host = target.closest('.md-src-line, .md-block');
+                const button = host && host.querySelector('.diff-comment-btn');
                 if (!button) return false;
                 openInlineCommentForm(button);
                 return true;
@@ -4225,13 +4225,6 @@
                         openInlineCommentForm(addBtn);
                         return;
                     }
-                    // Clicking anywhere in a commentable line's gutter counts as clicking its +.
-                    const gutter = event.target.closest('.md-src-num.commentable');
-                    if (gutter) {
-                        const btn = gutter.querySelector('.diff-comment-btn');
-                        if (btn) openInlineCommentForm(btn);
-                        return;
-                    }
                     const cancelBtn = event.target.closest('.diff-comment-cancel-btn');
                     if (cancelBtn) {
                         cancelBtn.closest('.diff-comment-host').remove();
@@ -4246,7 +4239,7 @@
                     if (event.target.closest('.diff-comment-host')) return;
                     // Nor should reading, selecting, or following a link in the rich view.
                     if (event.target.closest('.md-view')) {
-                        commentOnMarkdownBlock(event.target) ||
+                        commentOnMarkdownClick(event.target) ||
                             scrollMarkdownCounterpart(event.target);
                         return;
                     }
