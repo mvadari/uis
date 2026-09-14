@@ -1338,6 +1338,18 @@
                 padding: 6px 0;
             }
 
+            .md-thread-actions {
+                border-top: 1px solid var(--color-border-muted);
+                padding: 10px 0;
+            }
+
+            .md-thread-actions .reply-input {
+                font-family: inherit;
+                min-height: 56px;
+                resize: vertical;
+                width: 100%;
+            }
+
             .tag-pending {
                 background: var(--color-attention-subtle);
                 color: var(--color-attention-fg);
@@ -2712,19 +2724,30 @@
                 return c.state === 'PENDING' ? '<span class="tag tag-pending">Pending</span>' : '';
             }
 
-            // A read-only rendering of a thread for the rich view; replying and resolving stay on
-            // the Comments tab, which already has that whole UI.
+            // A thread shown in the rich view, with the same reply/resolve/quote actions as the
+            // Comments tab. Only unresolved threads are placed inline, so the button is always
+            // Resolve — resolving one drops it from this view.
             function renderInlineThread(t) {
                 const count = (t.comments || []).length;
                 const badges = [];
                 if (t.isOutdated) badges.push('<span class="tag tag-outdated">Outdated</span>');
+                const actions = readOnly
+                    ? ''
+                    : `<div class="md-thread-actions">
+                        <textarea class="reply-input" placeholder="Reply to this thread..."></textarea>
+                        <div class="thread-buttons">
+                            <button class="btn btn-small resolve-btn" type="button">Resolve</button>
+                            <button class="btn btn-small btn-primary reply-btn" type="button">Reply</button>
+                        </div>
+                   </div>`;
                 return `
-                <div class="md-thread">
+                <div class="md-thread" data-thread-id="${escapeHtml(t.id)}">
                     <div class="md-thread-head">
                         <span>line ${escapeHtml(t.line)} · ${count} comment${count === 1 ? '' : 's'}</span>
                         <span class="thread-badges">${badges.join('')}</span>
                     </div>
-                    ${(t.comments || []).map((c, i) => renderComment(c, pendingBadge(c), i > 0)).join('')}
+                    ${(t.comments || []).map((c, i) => renderComment(c, pendingBadge(c), i > 0, !readOnly)).join('')}
+                    ${actions}
                 </div>`;
             }
 
@@ -3767,6 +3790,15 @@
                 renderFilesContent();
             }
 
+            // Re-render everything, keeping any reply or comment text still being typed. Actions
+            // that only mutate one thread (reply, resolve) shouldn't cost someone the draft they
+            // have open on another.
+            function renderAllKeepingDrafts() {
+                const drafts = captureDrafts();
+                renderAll();
+                restoreDrafts(drafts);
+            }
+
             function renderAll() {
                 renderPRHeader();
                 updateSummary();
@@ -3816,7 +3848,9 @@
             }
 
             function quoteIntoReply(commentId, button) {
-                const article = button.closest('.thread');
+                // Threads render in the Comments tab and inline in the rich view; both carry the
+                // thread id and a reply box.
+                const article = button.closest('.thread, .md-thread');
                 const textarea = article && article.querySelector('.reply-input');
                 if (!textarea) return;
 
@@ -3859,7 +3893,9 @@
                         thread._searchText = undefined;
                     }
                     showToast('Reply posted', 'success');
-                    renderAll();
+                    // It's sent — clear it before the re-render snapshots drafts, or it comes back.
+                    textarea.value = '';
+                    renderAllKeepingDrafts();
                 } catch (error) {
                     console.error('Failed to post reply:', error);
                     setError(error.message);
@@ -3879,7 +3915,7 @@
                     await graphql(resolving ? RESOLVE_MUTATION : UNRESOLVE_MUTATION, { threadId });
                     thread.isResolved = resolving;
                     showToast(resolving ? 'Thread resolved' : 'Thread reopened', 'success');
-                    renderAll();
+                    renderAllKeepingDrafts();
                 } catch (error) {
                     console.error('Failed to update thread:', error);
                     setError(error.message);
@@ -4270,6 +4306,14 @@
                         threadDrafts.set(article.dataset.threadId, textarea.value);
                     }
                 });
+                // Threads shown inline in the rich view have their own reply boxes.
+                const inlineDrafts = new Map();
+                els.filesContent.querySelectorAll('.md-thread').forEach((el) => {
+                    const textarea = el.querySelector('.reply-input');
+                    if (textarea && textarea.value.trim()) {
+                        inlineDrafts.set(el.dataset.threadId, textarea.value);
+                    }
+                });
                 const diffDrafts = [];
                 els.filesContent.querySelectorAll('.diff-comment-form').forEach((form) => {
                     const textarea = form.querySelector('.diff-comment-input');
@@ -4282,15 +4326,22 @@
                         });
                     }
                 });
-                return { threadDrafts, diffDrafts };
+                return { threadDrafts, inlineDrafts, diffDrafts };
             }
 
-            function restoreDrafts({ threadDrafts, diffDrafts }) {
+            function restoreDrafts({ threadDrafts, inlineDrafts, diffDrafts }) {
                 threadDrafts.forEach((value, threadId) => {
                     const article = els.content.querySelector(
                         `.thread[data-thread-id="${CSS.escape(threadId)}"]`,
                     );
                     const textarea = article && article.querySelector('.reply-input');
+                    if (textarea) textarea.value = value;
+                });
+                inlineDrafts.forEach((value, threadId) => {
+                    const thread = els.filesContent.querySelector(
+                        `.md-thread[data-thread-id="${CSS.escape(threadId)}"]`,
+                    );
+                    const textarea = thread && thread.querySelector('.reply-input');
                     if (textarea) textarea.value = value;
                 });
                 diffDrafts.forEach(({ path, line, side, value }) => {
@@ -4530,6 +4581,29 @@
                     const copyBtn = event.target.closest('.copy-link-btn');
                     if (copyBtn) {
                         copyLink(copyBtn.dataset.url, copyBtn);
+                        return;
+                    }
+                    const quoteBtn = event.target.closest('.quote-btn');
+                    if (quoteBtn) {
+                        quoteIntoReply(quoteBtn.dataset.quoteId, quoteBtn);
+                        return;
+                    }
+                    const replyBtn = event.target.closest('.reply-btn');
+                    if (replyBtn) {
+                        const thread = replyBtn.closest('.md-thread');
+                        submitReply(
+                            thread.dataset.threadId,
+                            thread.querySelector('.reply-input'),
+                            replyBtn,
+                        );
+                        return;
+                    }
+                    const resolveBtn = event.target.closest('.resolve-btn');
+                    if (resolveBtn) {
+                        toggleResolve(
+                            resolveBtn.closest('.md-thread').dataset.threadId,
+                            resolveBtn,
+                        );
                         return;
                     }
                     const modeBtn = event.target.closest('.md-mode-btn');
