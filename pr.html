@@ -1316,6 +1316,81 @@
                 margin: 16px 0;
             }
 
+            .md-thread {
+                background: var(--color-canvas-subtle);
+                border: 1px solid var(--color-border-default);
+                border-radius: 6px;
+                margin: 6px 12px 10px 24px;
+                padding: 0 12px;
+            }
+
+            .md-thread-head {
+                align-items: center;
+                border-bottom: 1px solid var(--color-border-muted);
+                color: var(--color-fg-muted);
+                display: flex;
+                font-family:
+                    ui-monospace, SFMono-Regular, 'SF Mono', Consolas, 'Liberation Mono', Menlo,
+                    monospace;
+                font-size: 11px;
+                gap: 8px;
+                justify-content: space-between;
+                padding: 6px 0;
+            }
+
+            .tag-pending {
+                background: var(--color-attention-subtle);
+                color: var(--color-attention-fg);
+            }
+
+            /* Floating so it stays reachable from anywhere in a long file. */
+            .review-bar {
+                align-items: center;
+                background: var(--color-canvas-default);
+                border: 1px solid var(--color-border-default);
+                border-radius: 8px;
+                bottom: 16px;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+                display: none;
+                gap: 10px;
+                font-size: 13px;
+                padding: 10px 14px;
+                position: fixed;
+                right: 16px;
+                z-index: 40;
+            }
+
+            .review-bar.visible {
+                display: flex;
+            }
+
+            .review-modal-count {
+                color: var(--color-fg-muted);
+                font-size: 13px;
+                margin-bottom: 10px;
+            }
+
+            #reviewBodyInput {
+                min-height: 90px;
+                resize: vertical;
+                width: 100%;
+            }
+
+            .review-events {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 14px;
+                margin-top: 12px;
+            }
+
+            .review-events label {
+                align-items: center;
+                cursor: pointer;
+                display: inline-flex;
+                font-size: 13px;
+                gap: 5px;
+            }
+
             .diff-comment-host > .diff-comment-form {
                 background: var(--color-canvas-subtle);
                 border-top: 1px solid var(--color-border-muted);
@@ -1523,6 +1598,51 @@
             </div>
         </div>
 
+        <div class="review-bar" id="reviewBar">
+            <span id="reviewBarCount">0 pending comments</span>
+            <button class="btn btn-small" id="discardReviewButton" type="button">Discard</button>
+            <button class="btn btn-small btn-primary" id="finishReviewButton" type="button">
+                Finish review…
+            </button>
+        </div>
+
+        <div class="modal" id="reviewModal">
+            <div class="modal-content" style="max-width: 560px">
+                <div class="modal-header">
+                    <h2 class="modal-title">Finish your review</h2>
+                    <button class="modal-close" id="closeReviewModal" type="button">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="reviewModalCount" class="review-modal-count"></div>
+                    <textarea
+                        class="reply-input"
+                        id="reviewBodyInput"
+                        placeholder="Review summary (optional)"
+                    ></textarea>
+                    <div class="review-events">
+                        <label
+                            ><input type="radio" name="reviewEvent" value="COMMENT" checked />
+                            Comment</label
+                        >
+                        <label
+                            ><input type="radio" name="reviewEvent" value="APPROVE" />
+                            Approve</label
+                        >
+                        <label
+                            ><input type="radio" name="reviewEvent" value="REQUEST_CHANGES" />
+                            Request changes</label
+                        >
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn" id="cancelReviewSubmit" type="button">Cancel</button>
+                    <button class="btn btn-primary" id="submitReviewButton" type="button">
+                        Submit review
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <div class="modal" id="tokenModal">
             <div class="modal-content" style="max-width: 560px">
                 <div class="modal-header">
@@ -1642,6 +1762,15 @@
                 filesViewedFilterSelect: document.getElementById('filesViewedFilterSelect'),
                 filesFilterInput: document.getElementById('filesFilterInput'),
                 filesContent: document.getElementById('filesContent'),
+                reviewBar: document.getElementById('reviewBar'),
+                reviewBarCount: document.getElementById('reviewBarCount'),
+                finishReviewButton: document.getElementById('finishReviewButton'),
+                discardReviewButton: document.getElementById('discardReviewButton'),
+                reviewModalCount: document.getElementById('reviewModalCount'),
+                reviewBodyInput: document.getElementById('reviewBodyInput'),
+                closeReviewModal: document.getElementById('closeReviewModal'),
+                cancelReviewSubmit: document.getElementById('cancelReviewSubmit'),
+                submitReviewButton: document.getElementById('submitReviewButton'),
                 closeTokenModal: document.getElementById('closeTokenModal'),
                 tokenInput: document.getElementById('tokenInput'),
                 toggleTokenVisibility: document.getElementById('toggleTokenVisibility'),
@@ -1747,12 +1876,13 @@
                     nodes { requestedReviewer { ... on User { login } } }
                   }
                   changesRequestedReviews: reviews(states:[CHANGES_REQUESTED]) { totalCount }
+                  pendingReviews: reviews(first:1, states:[PENDING]) { nodes { id comments { totalCount } } }
                   reviewThreads(first:50) {
                     pageInfo { hasNextPage endCursor }
                     nodes {
                       id isResolved isOutdated path line originalLine
                       comments(first:50) {
-                        nodes { id ${AUTHOR_FRAGMENT} bodyHTML body createdAt url diffHunk path }
+                        nodes { id ${AUTHOR_FRAGMENT} bodyHTML body createdAt url diffHunk path state }
                       }
                     }
                   }
@@ -1781,7 +1911,7 @@
                     nodes {
                       id isResolved isOutdated path line originalLine
                       comments(first:50) {
-                        nodes { id ${AUTHOR_FRAGMENT} bodyHTML body createdAt url diffHunk path }
+                        nodes { id ${AUTHOR_FRAGMENT} bodyHTML body createdAt url diffHunk path state }
                       }
                     }
                   }
@@ -1852,7 +1982,7 @@
             const REPLY_MUTATION = `
             mutation($threadId:ID!, $body:String!) {
               addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$threadId, body:$body}) {
-                comment { id ${AUTHOR_FRAGMENT} bodyHTML body createdAt url diffHunk path }
+                comment { id ${AUTHOR_FRAGMENT} bodyHTML body createdAt url diffHunk path state }
               }
             }`;
 
@@ -1861,6 +1991,36 @@
             const ADD_INLINE_COMMENT_MUTATION = `
             mutation($prId:ID!, $path:String!, $line:Int!, $side:DiffSide!, $body:String!) {
               addPullRequestReview(input:{pullRequestId:$prId, event:COMMENT, threads:[{path:$path, line:$line, side:$side, body:$body}]}) {
+                pullRequestReview { id }
+              }
+            }`;
+
+            // The same call without an event opens a pending review instead of publishing, which
+            // is GitHub's "Start a review".
+            const START_REVIEW_MUTATION = `
+            mutation($prId:ID!, $path:String!, $line:Int!, $side:DiffSide!, $body:String!) {
+              addPullRequestReview(input:{pullRequestId:$prId, threads:[{path:$path, line:$line, side:$side, body:$body}]}) {
+                pullRequestReview { id }
+              }
+            }`;
+
+            const ADD_REVIEW_THREAD_MUTATION = `
+            mutation($reviewId:ID!, $path:String!, $line:Int!, $side:DiffSide!, $body:String!) {
+              addPullRequestReviewThread(input:{pullRequestReviewId:$reviewId, path:$path, line:$line, side:$side, body:$body}) {
+                thread { id }
+              }
+            }`;
+
+            const SUBMIT_REVIEW_MUTATION = `
+            mutation($reviewId:ID!, $event:PullRequestReviewEvent!, $body:String) {
+              submitPullRequestReview(input:{pullRequestReviewId:$reviewId, event:$event, body:$body}) {
+                pullRequestReview { id state }
+              }
+            }`;
+
+            const DISCARD_REVIEW_MUTATION = `
+            mutation($reviewId:ID!) {
+              deletePullRequestReview(input:{pullRequestReviewId:$reviewId}) {
                 pullRequestReview { id }
               }
             }`;
@@ -2001,6 +2161,8 @@
                         changesRequestedCount: p.changesRequestedReviews
                             ? p.changesRequestedReviews.totalCount
                             : 0,
+                        // GitHub only reports a pending review to the viewer who owns it.
+                        pendingReview: pendingReviewFrom(p),
                         reviewRequests: [
                             ...(p.reviewRequests ? p.reviewRequests.nodes : [])
                                 .map((n) => n.requestedReviewer)
@@ -2031,6 +2193,12 @@
 
             function byCreatedAt(a, b) {
                 return new Date(a.createdAt) - new Date(b.createdAt);
+            }
+
+            function pendingReviewFrom(p) {
+                const node = p.pendingReviews && p.pendingReviews.nodes[0];
+                if (!node) return null;
+                return { id: node.id, count: node.comments ? node.comments.totalCount : 0 };
             }
 
             // ---------- REST fallback (read-only, no token) ----------
@@ -2507,7 +2675,64 @@
                 return `<button type="button" class="diff-comment-btn" data-path="${escapeHtml(path)}" data-line="${line}" data-side="RIGHT" title="${escapeHtml(title)}">+</button>`;
             }
 
-            function renderMarkdownSource(f) {
+            // Places each of the file's unresolved threads against a source line and a rendered
+            // block, so the rich view can show them in place. Not every line falls inside a block
+            // (blank lines between them don't) and a thread written against an older commit can
+            // point past the end of the file, so both are pinned to the nearest match — dropping
+            // a thread would quietly hide a review comment. Resolved threads stay in the
+            // Comments tab.
+            function inlineThreadPlacement(f) {
+                const byLine = new Map();
+                const byBlock = new Map();
+                const blocks = f.rich.blocks;
+                const lineCount = f.rich.lines.length;
+                const push = (map, key, t) => {
+                    if (!map.has(key)) map.set(key, []);
+                    map.get(key).push(t);
+                };
+                threads.forEach((t) => {
+                    if (t.path !== f.path || !t.line) return;
+                    if (t.isResolved && !t.resolutionUnknown) return;
+                    const line = Math.min(Math.max(t.line, 1), lineCount);
+                    push(byLine, line, t);
+                    if (!blocks.length) return;
+                    let index = blocks.findIndex((b) => b.start <= line && line <= b.end);
+                    if (index === -1) {
+                        index = 0;
+                        for (let i = 0; i < blocks.length; i++) {
+                            if (blocks[i].start <= line) index = i;
+                        }
+                    }
+                    push(byBlock, index, t);
+                });
+                return { byLine, byBlock };
+            }
+
+            function pendingBadge(c) {
+                return c.state === 'PENDING' ? '<span class="tag tag-pending">Pending</span>' : '';
+            }
+
+            // A read-only rendering of a thread for the rich view; replying and resolving stay on
+            // the Comments tab, which already has that whole UI.
+            function renderInlineThread(t) {
+                const count = (t.comments || []).length;
+                const badges = [];
+                if (t.isOutdated) badges.push('<span class="tag tag-outdated">Outdated</span>');
+                return `
+                <div class="md-thread">
+                    <div class="md-thread-head">
+                        <span>line ${escapeHtml(t.line)} · ${count} comment${count === 1 ? '' : 's'}</span>
+                        <span class="thread-badges">${badges.join('')}</span>
+                    </div>
+                    ${(t.comments || []).map((c, i) => renderComment(c, pendingBadge(c), i > 0)).join('')}
+                </div>`;
+            }
+
+            function inlineThreadsHtml(list) {
+                return (list || []).map(renderInlineThread).join('');
+            }
+
+            function renderMarkdownSource(f, placement) {
                 const { commentable, added } = patchLineInfo(f);
                 return f.rich.lines
                     .map((content, i) => {
@@ -2519,15 +2744,15 @@
                         // The whole gutter is the click target, not just the small + button.
                         return `<div class="md-src-line ${added.has(num) ? 'md-add' : ''}" data-line="${num}">
                         <span class="md-src-num ${canComment ? 'commentable' : ''}"${canComment ? ` title="Comment on line ${num}"` : ''}>${btn}${num}</span><span class="md-src-text">${escapeHtml(content) || '&nbsp;'}</span>
-                    </div>`;
+                    </div>${inlineThreadsHtml(placement.byLine.get(num))}`;
                     })
                     .join('');
             }
 
-            function renderMarkdownBlocks(f) {
+            function renderMarkdownBlocks(f, placement) {
                 const { commentable, added } = patchLineInfo(f);
                 return f.rich.blocks
-                    .map((b) => {
+                    .map((b, blockIndex) => {
                         // Anchor the block's comment to the first line of it that GitHub will
                         // accept — a block outside every diff hunk gets no button.
                         let anchor = 0;
@@ -2546,7 +2771,7 @@
                             anchor,
                             `Comment on line ${anchor} (lines ${b.start}–${b.end})`,
                         );
-                        return `<div class="md-block ${changed ? 'md-changed' : ''}" data-start="${b.start}" data-end="${b.end}">${btn}${b.html}</div>`;
+                        return `<div class="md-block ${changed ? 'md-changed' : ''}" data-start="${b.start}" data-end="${b.end}">${btn}${b.html}</div>${inlineThreadsHtml(placement.byBlock.get(blockIndex))}`;
                     })
                     .join('');
             }
@@ -2570,11 +2795,12 @@
                 const noteHtml = note
                     ? `<span class="md-pane-note">${escapeHtml(note)}</span>`
                     : '';
+                const placement = inlineThreadPlacement(f);
                 return `
                 <div class="md-view">
                     <div class="md-pane">
                         <div class="md-pane-head"><span>Source${shaTag}</span>${noteHtml}</div>
-                        <div class="md-src">${renderMarkdownSource(f)}</div>
+                        <div class="md-src">${renderMarkdownSource(f, placement)}</div>
                     </div>
                     <div class="md-pane">
                         <div class="md-pane-head">
@@ -2583,7 +2809,7 @@
                                 <input type="checkbox" class="md-sync-input" ${scrollSync ? 'checked' : ''}> Sync scroll
                             </label>
                         </div>
-                        <div class="md-rendered">${renderMarkdownBlocks(f)}</div>
+                        <div class="md-rendered">${renderMarkdownBlocks(f, placement)}</div>
                     </div>
                 </div>`;
             }
@@ -3070,7 +3296,7 @@
 
                 // Quoting is only offered when there is a reply box to quote into
                 const commentsHtml = comments
-                    .map((c, i) => renderComment(c, '', i > 0, !readOnly))
+                    .map((c, i) => renderComment(c, pendingBadge(c), i > 0, !readOnly))
                     .join('');
 
                 // For outdated threads, label the diff as "when commented" and offer the current code.
@@ -3545,6 +3771,7 @@
                 renderPRHeader();
                 updateSummary();
                 updateTabCounts();
+                updateReviewBar();
                 renderContent();
                 renderFilesPanel();
             }
@@ -3705,12 +3932,14 @@
             }
 
             function commentFormMarkup(path, line, side) {
+                const hasPending = Boolean(prMeta && prMeta.pendingReview);
                 return `
                 <div class="diff-comment-form" data-path="${escapeHtml(path)}" data-line="${escapeHtml(line)}" data-side="${escapeHtml(side)}">
                     <textarea class="reply-input diff-comment-input" placeholder="Leave a comment on line ${escapeHtml(line)}..."></textarea>
                     <div class="thread-buttons">
                         <button class="btn btn-small diff-comment-cancel-btn" type="button">Cancel</button>
-                        <button class="btn btn-small btn-primary diff-comment-post-btn" type="button">Comment</button>
+                        <button class="btn btn-small diff-comment-review-btn" type="button" title="Hold this comment in a pending review instead of publishing it now">${hasPending ? 'Add to review' : 'Start a review'}</button>
+                        <button class="btn btn-small btn-primary diff-comment-post-btn" type="button" title="Publish this comment on its own, right now">Comment</button>
                     </div>
                 </div>`;
             }
@@ -3721,15 +3950,19 @@
             function openInlineCommentForm(button) {
                 const host = button.closest('tr, .md-src-line, .md-block');
                 if (!host) return null;
-                const existing = host.nextElementSibling;
-                if (existing && existing.classList.contains('diff-comment-host')) {
-                    existing.remove();
-                    return null;
-                }
                 const scope = button.closest('.file-row') || document;
-                scope.querySelectorAll('.diff-comment-host').forEach((el) => el.remove());
-
                 const { path, line, side } = button.dataset;
+                // At most one box is open per file, but an inline thread can sit between a line
+                // and its box, so match on the target line rather than on DOM adjacency.
+                const open = scope.querySelector('.diff-comment-host .diff-comment-form');
+                const sameLine =
+                    open &&
+                    open.dataset.path === path &&
+                    open.dataset.line === line &&
+                    open.dataset.side === side;
+                if (open) open.closest('.diff-comment-host').remove();
+                if (sameLine) return null;
+
                 const node = document.createElement(host.tagName === 'TR' ? 'tr' : 'div');
                 node.className =
                     host.tagName === 'TR'
@@ -3745,7 +3978,9 @@
                 return textarea;
             }
 
-            async function submitInlineComment(button) {
+            // mode 'single' publishes the comment on its own; mode 'review' holds it in a pending
+            // review, starting one if this is the first comment of the review.
+            async function submitInlineComment(button, mode) {
                 const formEl = button.closest('.diff-comment-form');
                 const textarea = formEl.querySelector('.diff-comment-input');
                 const body = textarea.value.trim();
@@ -3754,19 +3989,31 @@
                     return;
                 }
                 const { path, line, side } = formEl.dataset;
+                const pending = prMeta.pendingReview;
                 setError('');
                 button.disabled = true;
                 const previous = button.textContent;
-                button.textContent = 'Commenting...';
+                button.textContent = mode === 'review' ? 'Adding...' : 'Commenting...';
+                const vars = { path, line: parseInt(line, 10), side, body };
                 try {
-                    await graphql(ADD_INLINE_COMMENT_MUTATION, {
-                        prId: prMeta.id,
-                        path,
-                        line: parseInt(line, 10),
-                        side,
-                        body,
-                    });
-                    showToast('Comment posted', 'success');
+                    if (mode !== 'review') {
+                        await graphql(ADD_INLINE_COMMENT_MUTATION, { ...vars, prId: prMeta.id });
+                    } else if (pending) {
+                        await graphql(ADD_REVIEW_THREAD_MUTATION, {
+                            ...vars,
+                            reviewId: pending.id,
+                        });
+                    } else {
+                        await graphql(START_REVIEW_MUTATION, { ...vars, prId: prMeta.id });
+                    }
+                    showToast(
+                        mode === 'review' ? 'Added to your review' : 'Comment posted',
+                        'success',
+                    );
+                    // The reload snapshots open comment boxes so a background refresh can't eat
+                    // what you're typing — which would restore this one, text and all. It's sent;
+                    // drop it first so the posted comment takes its place.
+                    formEl.closest('.diff-comment-host').remove();
                     // Refetching is the only way to get the new thread's id/isResolved/etc, so
                     // reload wholesale; loadPR restores the per-file view state it rebuilds.
                     await loadPR();
@@ -3775,6 +4022,75 @@
                     setError(error.message);
                     button.disabled = false;
                     button.textContent = previous;
+                }
+            }
+
+            // ---------- Pending review ----------
+
+            function pendingCountLabel(n) {
+                return `${n} pending comment${n === 1 ? '' : 's'}`;
+            }
+
+            function updateReviewBar() {
+                const pending = prMeta && prMeta.pendingReview;
+                els.reviewBar.classList.toggle('visible', Boolean(pending) && !readOnly);
+                if (pending) els.reviewBarCount.textContent = pendingCountLabel(pending.count);
+            }
+
+            function openReviewModal() {
+                if (!prMeta || !prMeta.pendingReview) return;
+                els.reviewModalCount.textContent = `${pendingCountLabel(prMeta.pendingReview.count)} will be published.`;
+                els.reviewBodyInput.value = '';
+                Modal.open('reviewModal');
+                els.reviewBodyInput.focus();
+            }
+
+            async function submitReview() {
+                const pending = prMeta && prMeta.pendingReview;
+                if (!pending) return;
+                const event = document.querySelector('input[name="reviewEvent"]:checked').value;
+                setError('');
+                els.submitReviewButton.disabled = true;
+                els.submitReviewButton.textContent = 'Submitting...';
+                try {
+                    await graphql(SUBMIT_REVIEW_MUTATION, {
+                        reviewId: pending.id,
+                        event,
+                        body: els.reviewBodyInput.value.trim() || null,
+                    });
+                    Modal.close('reviewModal');
+                    showToast('Review submitted', 'success');
+                    await loadPR();
+                } catch (error) {
+                    console.error('Failed to submit review:', error);
+                    setError(error.message);
+                } finally {
+                    els.submitReviewButton.disabled = false;
+                    els.submitReviewButton.textContent = 'Submit review';
+                }
+            }
+
+            async function discardReview() {
+                const pending = prMeta && prMeta.pendingReview;
+                if (!pending) return;
+                if (
+                    !window.confirm(
+                        `Discard your pending review? ${pendingCountLabel(pending.count)} will be deleted.`,
+                    )
+                ) {
+                    return;
+                }
+                setError('');
+                els.discardReviewButton.disabled = true;
+                try {
+                    await graphql(DISCARD_REVIEW_MUTATION, { reviewId: pending.id });
+                    showToast('Pending review discarded', 'success');
+                    await loadPR();
+                } catch (error) {
+                    console.error('Failed to discard review:', error);
+                    setError(error.message);
+                } finally {
+                    els.discardReviewButton.disabled = false;
                 }
             }
 
@@ -4089,6 +4405,7 @@
                     els.statusLine.style.display = 'none';
                     els.filesStatusLine.style.display = 'none';
                     els.tabNav.style.display = 'none';
+                    updateReviewBar();
                     els.content.innerHTML =
                         '<div class="empty-state">Could not load this pull request.</div>';
                     els.filesContent.innerHTML =
@@ -4209,6 +4526,12 @@
                     renderFilesContent();
                 });
                 els.filesContent.addEventListener('click', (event) => {
+                    // Inline threads reuse the comment markup, copy-link button and all.
+                    const copyBtn = event.target.closest('.copy-link-btn');
+                    if (copyBtn) {
+                        copyLink(copyBtn.dataset.url, copyBtn);
+                        return;
+                    }
                     const modeBtn = event.target.closest('.md-mode-btn');
                     if (modeBtn) {
                         setFileMode(
@@ -4232,7 +4555,12 @@
                     }
                     const postBtn = event.target.closest('.diff-comment-post-btn');
                     if (postBtn) {
-                        submitInlineComment(postBtn);
+                        submitInlineComment(postBtn, 'single');
+                        return;
+                    }
+                    const reviewBtn = event.target.closest('.diff-comment-review-btn');
+                    if (reviewBtn) {
+                        submitInlineComment(reviewBtn, 'review');
                         return;
                     }
                     // Clicking inside the open comment form (e.g. the textarea) shouldn't collapse the file.
@@ -4346,6 +4674,12 @@
                 els.bulkClear.addEventListener('click', clearSelection);
                 els.bulkHide.addEventListener('click', () => bulkSetHidden(true));
                 els.bulkUnhide.addEventListener('click', () => bulkSetHidden(false));
+
+                els.finishReviewButton.addEventListener('click', openReviewModal);
+                els.discardReviewButton.addEventListener('click', discardReview);
+                els.submitReviewButton.addEventListener('click', submitReview);
+                els.closeReviewModal.addEventListener('click', () => Modal.close('reviewModal'));
+                els.cancelReviewSubmit.addEventListener('click', () => Modal.close('reviewModal'));
 
                 els.tokenButton.addEventListener('click', openTokenModal);
                 els.closeTokenModal.addEventListener('click', () => Modal.close('tokenModal'));

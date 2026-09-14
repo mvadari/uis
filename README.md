@@ -81,8 +81,10 @@ A clean, focused view of a single pull request's unresolved conversation.
 - Includes top-level conversation comments and review summaries
 - Groups each thread's sub-comments (root + replies) in chronological order
 - Reply to threads and mark them resolved/unresolved directly from the view
-- Add a new inline comment on any diff line from the Files tab (posts immediately, like GitHub's "Add single comment")
+- Add a new inline comment on any diff line from the Files tab, either published on its own (like GitHub's "Add single comment") or held in a pending review
+- Batch comments into a review: a floating bar tracks the pending count, then submit as Comment/Approve/Request changes with a summary, or discard the draft
 - Rich view for Markdown files: the source beside its rendered output — click any source line or rendered block to comment on it, the panes scroll in sync (toggleable), and hovering either one highlights the matching lines
+- Unresolved threads show inline in the rich view, in both panes, so a comment you post appears where you wrote it (pending ones are badged)
 - Falls back to the PR-level diff when GitHub omits a file's patch for being too large, so big files still get a diff and comment anchors
 - Quote reply: drop any thread comment into that thread's reply box as a Markdown blockquote
 - Hide comments and review summaries with a reason (spam, off topic, resolved, etc.)
