@@ -16,6 +16,7 @@
                 --color-diff-del-fg: #d1242f;
                 --color-md-highlight: rgba(27, 31, 36, 0.05);
                 --color-md-highlight-bar: rgba(27, 31, 36, 0.25);
+                --color-md-selection: rgba(9, 105, 218, 0.12);
             }
 
             body {
@@ -1163,6 +1164,18 @@
                 cursor: pointer;
             }
 
+            .md-src-line.md-sel {
+                background-image: linear-gradient(
+                    var(--color-md-selection),
+                    var(--color-md-selection)
+                );
+                box-shadow: inset 2px 0 0 var(--color-accent-fg);
+            }
+
+            body.md-dragging {
+                user-select: none;
+            }
+
             .md-src-line:hover .md-src-num.commentable {
                 color: var(--color-accent-fg);
             }
@@ -1453,6 +1466,7 @@
                     --color-diff-del-fg: #f85149;
                     --color-md-highlight: rgba(255, 255, 255, 0.07);
                     --color-md-highlight-bar: rgba(255, 255, 255, 0.3);
+                    --color-md-selection: rgba(56, 139, 253, 0.2);
                 }
             }
         </style>
@@ -2008,30 +2022,38 @@
               }
             }`;
 
-            // Publishes immediately (event:COMMENT) as a single review comment, matching GitHub's
-            // "Add single comment" option rather than opening a pending review.
-            const ADD_INLINE_COMMENT_MUTATION = `
-            mutation($prId:ID!, $path:String!, $line:Int!, $side:DiffSide!, $body:String!) {
-              addPullRequestReview(input:{pullRequestId:$prId, event:COMMENT, threads:[{path:$path, line:$line, side:$side, body:$body}]}) {
-                pullRequestReview { id }
-              }
-            }`;
-
-            // The same call without an event opens a pending review instead of publishing, which
-            // is GitHub's "Start a review".
-            const START_REVIEW_MUTATION = `
-            mutation($prId:ID!, $path:String!, $line:Int!, $side:DiffSide!, $body:String!) {
-              addPullRequestReview(input:{pullRequestId:$prId, threads:[{path:$path, line:$line, side:$side, body:$body}]}) {
-                pullRequestReview { id }
-              }
-            }`;
-
-            const ADD_REVIEW_THREAD_MUTATION = `
-            mutation($reviewId:ID!, $path:String!, $line:Int!, $side:DiffSide!, $body:String!) {
-              addPullRequestReviewThread(input:{pullRequestReviewId:$reviewId, path:$path, line:$line, side:$side, body:$body}) {
-                thread { id }
-              }
-            }`;
+            // A comment spanning several lines is startLine..line. A single-line comment has to
+            // leave startLine out of the input entirely rather than pass it as null, so the two
+            // shapes are built as separate documents.
+            //   publish     — event:COMMENT, GitHub's "Add single comment"
+            //   startReview — the same call with no event, which opens a pending review
+            //   addToReview — a thread on an already-pending review
+            function threadMutations(multiLine) {
+                const startArg = multiLine ? ', $startLine:Int!' : '';
+                const range = multiLine ? 'startLine:$startLine, startSide:$side, ' : '';
+                const thread = `{path:$path, ${range}line:$line, side:$side, body:$body}`;
+                const args = `$path:String!, $line:Int!, $side:DiffSide!, $body:String!${startArg}`;
+                return {
+                    publish: `
+                    mutation($prId:ID!, ${args}) {
+                      addPullRequestReview(input:{pullRequestId:$prId, event:COMMENT, threads:[${thread}]}) {
+                        pullRequestReview { id }
+                      }
+                    }`,
+                    startReview: `
+                    mutation($prId:ID!, ${args}) {
+                      addPullRequestReview(input:{pullRequestId:$prId, threads:[${thread}]}) {
+                        pullRequestReview { id }
+                      }
+                    }`,
+                    addToReview: `
+                    mutation($reviewId:ID!, ${args}) {
+                      addPullRequestReviewThread(input:{pullRequestReviewId:$reviewId, path:$path, ${range}line:$line, side:$side, body:$body}) {
+                        thread { id }
+                      }
+                    }`,
+                };
+            }
 
             const SUBMIT_REVIEW_MUTATION = `
             mutation($reviewId:ID!, $event:PullRequestReviewEvent!, $body:String) {
@@ -3023,6 +3045,96 @@
                 syncEcho = { pane: other, top: other.scrollTop };
             }
 
+            // ---------- Multi-line selection ----------
+
+            // Dragging down the line-number gutter selects a range to comment on, the way
+            // GitHub's diff does. Only lines GitHub will accept a comment on can anchor a range,
+            // so the endpoints stick to those.
+            let lineDrag = null;
+
+            function paintLineSelection() {
+                document
+                    .querySelectorAll('.md-src-line.md-sel')
+                    .forEach((el) => el.classList.remove('md-sel'));
+                if (!lineDrag) return;
+                const index = markdownIndex(lineDrag.view);
+                const lo = Math.min(lineDrag.anchor, lineDrag.line);
+                const hi = Math.max(lineDrag.anchor, lineDrag.line);
+                for (let n = lo; n <= hi; n++) {
+                    if (index.lines[n - 1]) index.lines[n - 1].classList.add('md-sel');
+                }
+            }
+
+            function startLineDrag(gutter) {
+                const view = gutter.closest('.md-view');
+                const line = Number(gutter.closest('.md-src-line').dataset.line);
+                lineDrag = { view, anchor: line, line };
+                document.body.classList.add('md-dragging');
+                paintLineSelection();
+            }
+
+            function extendLineDrag(target) {
+                const lineEl = target.closest('.md-src-line');
+                // An endpoint outside the diff would be rejected by GitHub, so ignore it and
+                // keep the last valid one.
+                if (!lineEl || !lineEl.querySelector('.md-src-num.commentable')) return;
+                const line = Number(lineEl.dataset.line);
+                if (line === lineDrag.line) return;
+                lineDrag.line = line;
+                paintLineSelection();
+            }
+
+            function endLineDrag() {
+                if (!lineDrag) return;
+                const drag = lineDrag;
+                lineDrag = null;
+                document.body.classList.remove('md-dragging');
+                document
+                    .querySelectorAll('.md-src-line.md-sel')
+                    .forEach((el) => el.classList.remove('md-sel'));
+                // A press that never left its line is a plain click; let the click handler open
+                // the single-line box as before.
+                if (drag.anchor === drag.line) return;
+                // The click that ends a multi-line drag targets the common ancestor of its two
+                // endpoints — the pane, not either line — so it can't toggle the new box shut
+                // and needs no suppressing.
+                openCommentFormForRange(
+                    drag.view,
+                    Math.min(drag.anchor, drag.line),
+                    Math.max(drag.anchor, drag.line),
+                );
+            }
+
+            // GitHub anchors a range comment to its last line, with startLine marking the first.
+            function openCommentFormForRange(view, from, to, carriedText) {
+                const index = markdownIndex(view);
+                const endLine = index.lines[to - 1];
+                const button = endLine && endLine.querySelector('.diff-comment-btn');
+                if (!button) return;
+                const textarea = openInlineCommentForm(button, from);
+                if (textarea && carriedText) textarea.value = carriedText;
+            }
+
+            // Shift-clicking a line extends the open box to cover it, keeping what's typed.
+            function extendOpenFormTo(srcLine) {
+                const view = srcLine.closest('.md-view');
+                const open = srcLine
+                    .closest('.file-row')
+                    .querySelector('.diff-comment-host .diff-comment-form');
+                if (!open) return false;
+                if (!srcLine.querySelector('.md-src-num.commentable')) return false;
+                const anchor = Number(open.dataset.startLine || open.dataset.line);
+                const clicked = Number(srcLine.dataset.line);
+                const text = open.querySelector('.diff-comment-input').value;
+                openCommentFormForRange(
+                    view,
+                    Math.min(anchor, clicked),
+                    Math.max(anchor, clicked),
+                    text,
+                );
+                return true;
+            }
+
             // Clicking a source line or a rendered block is the obvious way to comment on it, so
             // treat it as a click on that element's + button. Returns false when there's nothing
             // to comment on (read-only, a line outside the diff, or the click was a link or a
@@ -4000,11 +4112,15 @@
                 }
             }
 
-            function commentFormMarkup(path, line, side) {
+            function commentFormMarkup(path, line, side, startLine) {
                 const hasPending = Boolean(prMeta && prMeta.pendingReview);
+                const isRange = startLine && Number(startLine) !== Number(line);
+                const target = isRange
+                    ? `lines ${escapeHtml(startLine)}–${escapeHtml(line)}`
+                    : `line ${escapeHtml(line)}`;
                 return `
-                <div class="diff-comment-form" data-path="${escapeHtml(path)}" data-line="${escapeHtml(line)}" data-side="${escapeHtml(side)}">
-                    <textarea class="reply-input diff-comment-input" placeholder="Leave a comment on line ${escapeHtml(line)}..."></textarea>
+                <div class="diff-comment-form" data-path="${escapeHtml(path)}" data-line="${escapeHtml(line)}" data-side="${escapeHtml(side)}" data-start-line="${isRange ? escapeHtml(startLine) : ''}">
+                    <textarea class="reply-input diff-comment-input" placeholder="Leave a comment on ${target}..."></textarea>
                     <div class="thread-buttons">
                         <button class="btn btn-small diff-comment-cancel-btn" type="button">Cancel</button>
                         <button class="btn btn-small diff-comment-review-btn" type="button" title="Hold this comment in a pending review instead of publishing it now">${hasPending ? 'Add to review' : 'Start a review'}</button>
@@ -4016,7 +4132,7 @@
             // Opens (or toggles shut) a comment box directly below whatever the button sits on:
             // a diff row, a source line, or a rendered markdown block. Returns the textarea so
             // callers restoring a draft can refill it.
-            function openInlineCommentForm(button) {
+            function openInlineCommentForm(button, startLine) {
                 const host = button.closest('tr, .md-src-line, .md-block');
                 if (!host) return null;
                 const scope = button.closest('.file-row') || document;
@@ -4024,23 +4140,22 @@
                 // At most one box is open per file, but an inline thread can sit between a line
                 // and its box, so match on the target line rather than on DOM adjacency.
                 const open = scope.querySelector('.diff-comment-host .diff-comment-form');
-                const sameLine =
+                const sameTarget =
                     open &&
                     open.dataset.path === path &&
                     open.dataset.line === line &&
-                    open.dataset.side === side;
+                    open.dataset.side === side &&
+                    open.dataset.startLine === (startLine ? String(startLine) : '');
                 if (open) open.closest('.diff-comment-host').remove();
-                if (sameLine) return null;
+                if (sameTarget) return null;
 
                 const node = document.createElement(host.tagName === 'TR' ? 'tr' : 'div');
                 node.className =
                     host.tagName === 'TR'
                         ? 'diff-comment-host diff-comment-form-row'
                         : 'diff-comment-host';
-                node.innerHTML =
-                    host.tagName === 'TR'
-                        ? `<td colspan="3">${commentFormMarkup(path, line, side)}</td>`
-                        : commentFormMarkup(path, line, side);
+                const markup = commentFormMarkup(path, line, side, startLine);
+                node.innerHTML = host.tagName === 'TR' ? `<td colspan="3">${markup}</td>` : markup;
                 host.after(node);
                 const textarea = node.querySelector('textarea');
                 textarea.focus();
@@ -4064,16 +4179,20 @@
                 const previous = button.textContent;
                 button.textContent = mode === 'review' ? 'Adding...' : 'Commenting...';
                 const vars = { path, line: parseInt(line, 10), side, body };
+                const startLine = parseInt(formEl.dataset.startLine, 10);
+                const multiLine = Boolean(startLine) && startLine !== vars.line;
+                if (multiLine) vars.startLine = startLine;
+                const mutations = threadMutations(multiLine);
                 try {
                     if (mode !== 'review') {
-                        await graphql(ADD_INLINE_COMMENT_MUTATION, { ...vars, prId: prMeta.id });
+                        await graphql(mutations.publish, { ...vars, prId: prMeta.id });
                     } else if (pending) {
-                        await graphql(ADD_REVIEW_THREAD_MUTATION, {
+                        await graphql(mutations.addToReview, {
                             ...vars,
                             reviewId: pending.id,
                         });
                     } else {
-                        await graphql(START_REVIEW_MUTATION, { ...vars, prId: prMeta.id });
+                        await graphql(mutations.startReview, { ...vars, prId: prMeta.id });
                     }
                     showToast(
                         mode === 'review' ? 'Added to your review' : 'Comment posted',
@@ -4610,6 +4729,8 @@
                     renderFilesContent();
                 });
                 els.filesContent.addEventListener('click', (event) => {
+                    const shiftLine = event.shiftKey && event.target.closest('.md-src-line');
+                    if (shiftLine && extendOpenFormTo(shiftLine)) return;
                     // Inline threads reuse the comment markup, copy-link button and all.
                     const copyBtn = event.target.closest('.copy-link-btn');
                     if (copyBtn) {
@@ -4682,9 +4803,22 @@
                     const row = event.target.closest('.file-row');
                     if (row) toggleFileExpanded(row.dataset.filePath);
                 });
-                els.filesContent.addEventListener('mouseover', (event) =>
-                    syncMarkdownHover(event.target),
-                );
+                els.filesContent.addEventListener('mousedown', (event) => {
+                    const gutter = event.target.closest('.md-src-num.commentable');
+                    if (!gutter || event.button !== 0 || event.shiftKey) return;
+                    // Suppress the text selection a drag would otherwise start.
+                    event.preventDefault();
+                    startLineDrag(gutter);
+                });
+                els.filesContent.addEventListener('mouseover', (event) => {
+                    if (lineDrag) {
+                        extendLineDrag(event.target);
+                        return; // the hover highlight would fight the drag selection
+                    }
+                    syncMarkdownHover(event.target);
+                });
+                // The press can end anywhere, including outside the panel.
+                document.addEventListener('mouseup', endLineDrag);
                 els.filesContent.addEventListener('change', (event) => {
                     const sync = event.target.closest('.md-sync-input');
                     if (sync) {
