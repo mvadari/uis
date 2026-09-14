@@ -14,6 +14,8 @@
                 --color-diff-add-fg: #1a7f37;
                 --color-diff-del-bg: #ffebe9;
                 --color-diff-del-fg: #d1242f;
+                --color-md-highlight: rgba(27, 31, 36, 0.05);
+                --color-md-highlight-bar: rgba(27, 31, 36, 0.25);
             }
 
             body {
@@ -1188,9 +1190,15 @@
                 color: var(--color-diff-add-fg);
             }
 
+            /* A translucent wash layered as a background *image* so the add/delete background
+               colour underneath still reads, plus a thin bar marking the exact span. */
             .md-src-line.md-hl,
             .md-block.md-hl {
-                background: var(--color-attention-subtle);
+                background-image: linear-gradient(
+                    var(--color-md-highlight),
+                    var(--color-md-highlight)
+                );
+                box-shadow: inset 2px 0 0 var(--color-md-highlight-bar);
             }
 
             .md-block {
@@ -1443,6 +1451,8 @@
                     --color-diff-add-fg: #3fb950;
                     --color-diff-del-bg: #25171c;
                     --color-diff-del-fg: #f85149;
+                    --color-md-highlight: rgba(255, 255, 255, 0.07);
+                    --color-md-highlight-bar: rgba(255, 255, 255, 0.3);
                 }
             }
         </style>
@@ -2910,7 +2920,8 @@
 
             // ---------- Markdown scroll sync ----------
 
-            let syncingPanes = false;
+            // The pane and scrollTop of an adjustment we made ourselves, awaiting its echo.
+            let syncEcho = null;
 
             function paneOffsetTop(pane, el) {
                 return (
@@ -2953,6 +2964,7 @@
                 const y = from.scrollTop + paneHeadHeight(from);
                 const clamp = (v) => Math.min(1, Math.max(0, v));
 
+                let target;
                 if (from.contains(index.lines[0])) {
                     const line = Number(
                         index.lines[lastAtOrAbove(from, index.lines, y)].dataset.line,
@@ -2961,7 +2973,7 @@
                     const start = Number(block.dataset.start);
                     const end = Number(block.dataset.end);
                     const frac = clamp((line - start) / (end - start + 1));
-                    to.scrollTop = paneOffsetTop(to, block) - headTo + frac * block.offsetHeight;
+                    target = paneOffsetTop(to, block) - headTo + frac * block.offsetHeight;
                 } else {
                     const block = index.blocks[lastAtOrAbove(from, index.blocks, y)];
                     const start = Number(block.dataset.start);
@@ -2971,23 +2983,44 @@
                     );
                     const line = Math.round(start + frac * (end - start + 1));
                     const el = index.lines[Math.min(index.lines.length, Math.max(1, line)) - 1];
-                    to.scrollTop = paneOffsetTop(to, el) - headTo;
+                    target = paneOffsetTop(to, el) - headTo;
                 }
+
+                // The panes are different heights, so the last screenful of one has no matching
+                // content in the other: aligning the top line there leaves the other pane short
+                // of its end. Ease to the bottom across that final screenful so both land on the
+                // end of the document together.
+                const maxFrom = from.scrollHeight - from.clientHeight;
+                const maxTo = to.scrollHeight - to.clientHeight;
+                const tail = Math.min(from.clientHeight, maxFrom);
+                if (tail > 0 && from.scrollTop > maxFrom - tail) {
+                    const t = clamp((from.scrollTop - (maxFrom - tail)) / tail);
+                    target += (maxTo - target) * t;
+                }
+                to.scrollTop = Math.max(0, Math.min(maxTo, target));
             }
 
             // Scroll events don't bubble, so this runs on the capture phase from the panel.
             function onMarkdownScroll(event) {
                 const pane = event.target.closest && event.target.closest('.md-pane');
-                if (!scrollSync || !pane || syncingPanes) return;
+                if (!scrollSync || !pane) return;
+                // Moving the other pane fires its own scroll event, which would bounce straight
+                // back. Swallow exactly that echo by recognizing the value we just set, rather
+                // than gating on a timer — a hidden or throttled page can starve the callback
+                // that would clear such a gate, which silently kills the sync for good.
+                if (
+                    syncEcho &&
+                    syncEcho.pane === pane &&
+                    Math.abs(pane.scrollTop - syncEcho.top) < 1.5
+                ) {
+                    syncEcho = null;
+                    return;
+                }
                 const panes = pane.closest('.md-view').querySelectorAll('.md-pane');
                 const other = panes[0] === pane ? panes[1] : panes[0];
                 if (!other) return;
-                // The scroll we're about to cause would otherwise bounce straight back.
-                syncingPanes = true;
                 alignPanes(pane, other);
-                requestAnimationFrame(() => {
-                    syncingPanes = false;
-                });
+                syncEcho = { pane: other, top: other.scrollTop };
             }
 
             // Clicking a source line or a rendered block is the obvious way to comment on it, so
