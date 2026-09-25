@@ -921,12 +921,11 @@
                         entry: registry.get(key),
                     };
                 });
-                const rank = { idle: 0, disagreeing: 1, waiting: 2, ok: 3 };
+                // Alphabetical by domain; validators without one go last.
                 return rows.sort(
                     (a, b) =>
-                        b.onNunl - a.onNunl ||
-                        rank[a.state] - rank[b.state] ||
-                        (a.entry?.domain || '~').localeCompare(b.entry?.domain || '~'),
+                        !a.entry?.domain - !b.entry?.domain ||
+                        (a.entry?.domain || a.key).localeCompare(b.entry?.domain || b.key),
                 );
             }
 
