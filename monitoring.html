@@ -366,10 +366,10 @@
             }
 
             /* Validator grid */
+            /* Columns fill top to bottom, then left to right. */
             .validator-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-                gap: 1px;
+                columns: 240px;
+                column-gap: 1px;
                 padding: 1px;
             }
 
@@ -378,8 +378,10 @@
                 align-items: center;
                 gap: 8px;
                 padding: 7px 10px;
+                margin-bottom: 1px;
                 outline: 1px solid var(--border);
                 font-size: 12px;
+                break-inside: avoid;
             }
 
             .vcell .dot {
