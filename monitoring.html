@@ -24,7 +24,6 @@
                 --green: #32e685;
                 --orange: #ff6719;
                 --pink: #ff668b;
-                --blue: #19a3ff;
             }
 
             * {
@@ -64,7 +63,7 @@
             .container {
                 max-width: 1280px;
                 margin: 0 auto;
-                padding: 24px 32px 64px;
+                padding: 16px 24px 32px;
             }
 
             header {
@@ -72,14 +71,14 @@
                 align-items: center;
                 justify-content: space-between;
                 flex-wrap: wrap;
-                gap: 16px;
-                padding-bottom: 24px;
+                gap: 12px;
+                padding-bottom: 12px;
                 border-bottom: 1px solid var(--border);
             }
 
             h1 {
                 color: var(--fg);
-                font-size: 24px;
+                font-size: 20px;
                 font-weight: 700;
             }
 
@@ -89,7 +88,15 @@
                 font-weight: 700;
                 letter-spacing: 0.04em;
                 text-transform: uppercase;
-                margin-bottom: 16px;
+            }
+
+            .section-head {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                flex-wrap: wrap;
+                gap: 8px 24px;
+                margin-bottom: 10px;
             }
 
             .controls {
@@ -108,7 +115,7 @@
                 color: var(--fg);
                 font: inherit;
                 font-size: 13px;
-                padding: 8px 12px;
+                padding: 6px 10px;
             }
 
             input[type='text'] {
@@ -148,20 +155,24 @@
             }
 
             section {
-                margin-top: 32px;
+                margin-top: 20px;
             }
 
             .stats {
                 display: grid;
-                grid-template-columns: repeat(6, 1fr);
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                grid-auto-flow: dense;
                 gap: 1px;
-                background: var(--border);
-                border: 1px solid var(--border);
+                padding: 1px;
             }
 
             .stat {
-                padding: 20px 24px;
-                background: var(--bg);
+                padding: 12px 16px;
+                outline: 1px solid var(--border);
+            }
+
+            .stat.wide {
+                grid-column: span 2;
             }
 
             .stat-label {
@@ -173,14 +184,21 @@
 
             .stat-value {
                 color: var(--fg);
-                font-size: 22px;
+                font-size: 20px;
                 font-weight: 600;
-                margin-top: 8px;
+                margin-top: 4px;
+            }
+
+            .stat-unit {
+                color: var(--fg-muted);
+                font-size: 12px;
+                font-weight: 500;
             }
 
             .stat-sub {
-                margin-top: 4px;
+                margin-top: 2px;
                 font-size: 11px;
+                line-height: 1.4;
             }
 
             .ok {
@@ -191,63 +209,11 @@
                 color: var(--orange);
             }
 
-            /* Negative UNL */
-            .nunl {
-                border: 1px solid var(--border);
-                padding: 24px;
-                display: grid;
-                grid-template-columns: 220px 1fr;
-                gap: 32px;
-            }
-
-            .nunl-state {
-                font-size: 28px;
-                font-weight: 700;
-            }
-
-            .nunl-note {
-                margin-top: 8px;
-                line-height: 1.5;
-            }
-
-            .nunl-list {
-                display: flex;
-                flex-direction: column;
-                gap: 8px;
-            }
-
-            .nunl-row {
-                display: flex;
-                justify-content: space-between;
-                gap: 16px;
-                padding: 12px 16px;
-                background: var(--surface-raised);
-                border-left: 2px solid var(--orange);
-            }
-
-            .nunl-row.pending {
-                border-left-color: var(--blue);
-            }
-
-            .nunl-row b {
-                color: var(--fg);
-                font-size: 13px;
-            }
-
-            .muted-block {
-                padding: 12px 16px;
-                border: 1px dashed var(--border);
-                line-height: 1.5;
-            }
-
             /* Ledger stream, modeled on livenet.xrpl.org */
             .legend {
                 display: flex;
                 flex-wrap: wrap;
-                gap: 24px;
-                padding: 12px 16px;
-                border: 1px solid var(--border);
-                margin-bottom: 16px;
+                gap: 16px;
                 text-transform: uppercase;
                 font-size: 10px;
                 font-weight: 700;
@@ -268,7 +234,7 @@
 
             .ledger-list {
                 display: flex;
-                gap: 24px;
+                gap: 12px;
                 overflow-x: auto;
                 padding-bottom: 8px;
                 scrollbar-width: thin;
@@ -276,7 +242,7 @@
             }
 
             .ledger {
-                width: 196px;
+                width: 160px;
                 flex-shrink: 0;
             }
 
@@ -292,7 +258,7 @@
             }
 
             .ledger-head {
-                padding: 24px;
+                padding: 10px 12px;
                 border: 1px solid var(--border);
                 border-bottom: 0;
                 font-size: 10px;
@@ -318,7 +284,7 @@
             .ledger-head .row {
                 display: flex;
                 justify-content: space-between;
-                margin-top: 8px;
+                margin-top: 6px;
             }
 
             .ledger-head .row b {
@@ -327,7 +293,7 @@
             }
 
             .hash {
-                padding: 0 24px 24px;
+                padding: 0 12px 12px;
                 border: 1px solid var(--border-strong);
                 border-top: 0;
                 background: rgba(35, 35, 37, 0.7);
@@ -336,7 +302,7 @@
 
             .hash .bar {
                 height: 2px;
-                margin: 0 -24px;
+                margin: 0 -12px;
                 background: var(--green);
             }
 
@@ -353,8 +319,8 @@
                 align-items: center;
                 justify-content: center;
                 gap: 8px;
-                padding-top: 20px;
-                font-size: 14px;
+                padding-top: 10px;
+                font-size: 13px;
                 font-weight: 700;
             }
 
@@ -365,8 +331,7 @@
             .hash .subtitle {
                 display: flex;
                 flex-direction: column;
-                gap: 2px;
-                padding: 16px 2px 16px;
+                padding: 8px 2px;
                 color: var(--fg-muted);
                 font-size: 10px;
                 font-weight: 700;
@@ -384,121 +349,88 @@
                 font-size: 11px;
             }
 
+            .hash .subtitle .partial b {
+                color: var(--pink);
+            }
+
             .hash .subtitle .missed b {
                 background: var(--orange);
                 border-radius: 2px;
                 padding: 0 3px;
-                cursor: help;
             }
 
-            .validations {
+            /* Validator grid */
+            .validator-grid {
                 display: grid;
-                grid-template-columns: repeat(5, 1fr);
-                gap: 4px 8px;
+                grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+                gap: 1px;
+                padding: 1px;
             }
 
-            .validation {
-                height: 4px;
-                border-radius: 4px;
-                background: var(--fg-subtle);
-                opacity: 0.85;
-                overflow: hidden;
+            .vcell {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 7px 10px;
+                outline: 1px solid var(--border);
+                font-size: 12px;
             }
 
-            .validation.trusted {
-                background: var(--fg);
+            .vcell .dot {
+                flex-shrink: 0;
             }
 
-            .validation.partial::after {
-                content: '';
-                display: block;
-                width: 50%;
-                height: 100%;
-                background: var(--pink);
+            .vcell.ok .dot {
+                background: var(--green);
             }
 
-            /* Validator table */
-            table {
-                width: 100%;
-                border-collapse: collapse;
-                border: 1px solid var(--border);
+            .vcell.warn .dot {
+                background: var(--orange);
             }
 
-            th {
-                text-align: left;
-                font-size: 10px;
-                font-weight: 700;
-                text-transform: uppercase;
-                letter-spacing: 0.04em;
-                padding: 12px 16px;
-                border-bottom: 1px solid var(--border);
-                background: var(--surface);
-            }
-
-            td {
-                padding: 10px 16px;
-                border-bottom: 1px solid var(--border);
-                font-size: 13px;
-                vertical-align: middle;
-            }
-
-            tr:last-child td {
-                border-bottom: 0;
-            }
-
-            td.domain {
-                color: var(--fg);
-            }
-
-            td.key {
-                font-size: 11px;
-                max-width: 220px;
+            .vname {
+                flex: 1;
+                min-width: 0;
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
+                color: var(--fg);
+            }
+
+            .vstat {
+                flex-shrink: 0;
+                font-size: 11px;
+            }
+
+            .vcell.warn .vstat {
+                color: var(--orange);
             }
 
             .badge {
-                display: inline-block;
-                padding: 2px 8px;
+                flex-shrink: 0;
+                padding: 1px 6px;
                 border-radius: 2px;
                 font-size: 10px;
                 font-weight: 700;
                 text-transform: uppercase;
-                background: var(--surface-raised);
-                color: var(--fg-muted);
-            }
-
-            .badge.ok {
-                color: var(--green);
-            }
-
-            .badge.warn {
-                color: var(--orange);
-            }
-
-            .badge.nunl {
                 background: var(--orange);
                 color: var(--fg);
             }
 
-            .agreement {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-
-            .meter {
-                width: 60px;
-                height: 4px;
+            #tooltip {
+                position: fixed;
+                z-index: 10;
+                max-width: 340px;
+                padding: 8px 10px;
+                border: 1px solid var(--border-strong);
                 border-radius: 4px;
-                background: var(--border);
-                overflow: hidden;
-            }
-
-            .meter div {
-                height: 100%;
-                background: var(--green);
+                background: var(--surface-raised);
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+                color: var(--fg);
+                font-size: 12px;
+                line-height: 1.5;
+                white-space: pre-line;
+                pointer-events: none;
             }
 
             .empty {
@@ -512,23 +444,9 @@
                 color: var(--orange);
             }
 
-            @media (max-width: 1000px) {
-                .stats {
-                    grid-template-columns: repeat(3, 1fr);
-                }
-            }
-
             @media (max-width: 720px) {
-                .stats {
-                    grid-template-columns: repeat(2, 1fr);
-                }
-
                 .container {
-                    padding: 16px;
-                }
-
-                .nunl {
-                    grid-template-columns: 1fr;
+                    padding: 12px;
                 }
 
                 input[type='text'] {
@@ -564,43 +482,32 @@
             </section>
 
             <section>
-                <h2>Negative UNL</h2>
-                <div class="nunl" id="nunl"></div>
-            </section>
-
-            <section>
-                <h2>Ledger validations</h2>
-                <div class="legend">
-                    <span><i class="swatch" style="background: var(--fg)"></i>UNL validator</span>
-                    <span
-                        ><i class="swatch" style="background: var(--fg-subtle)"></i>Other
-                        validator</span
-                    >
-                    <span
-                        ><i
-                            class="swatch"
-                            style="
-                                background: linear-gradient(90deg, var(--pink) 50%, var(--fg) 50%);
-                            "
-                        ></i
-                        >Partial validation</span
-                    >
-                    <span
-                        ><i class="swatch" style="background: var(--green)"></i>Validated hash</span
-                    >
-                    <span
-                        ><i class="swatch" style="background: var(--orange)"></i>Different
-                        hash</span
-                    >
+                <div class="section-head">
+                    <h2>Ledger validations</h2>
+                    <div class="legend">
+                        <span
+                            ><i class="swatch" style="background: var(--green)"></i>Validated
+                            hash</span
+                        >
+                        <span
+                            ><i class="swatch" style="background: var(--orange)"></i>Different
+                            hash</span
+                        >
+                    </div>
                 </div>
                 <div class="ledger-list" id="ledgers"></div>
             </section>
 
             <section>
-                <h2 id="validatorsTitle">UNL validators</h2>
+                <div class="section-head">
+                    <h2 id="validatorsTitle">UNL validators</h2>
+                    <span id="validatorsNote"></span>
+                </div>
                 <div id="validators"></div>
             </section>
         </div>
+
+        <div id="tooltip" role="tooltip" hidden></div>
 
         <script src="shared-utils.js"></script>
         <script>
@@ -651,6 +558,7 @@
             let nunl = null; // { exists, ledgerIndex, disabled, toDisable, toReEnable, error }
             let ledgers = new Map(); // index -> { index, hash, closeTime, txnCount, validations }
             let lastValidated = null;
+            let firstValidated = null;
             let lastSeen = new Map(); // validator key -> last ledger index it validated
             let renderTimer = null;
             let renderedLedgers = new Set(); // animate a ledger card only on first render
@@ -702,6 +610,7 @@
                 nunl = null;
                 ledgers = new Map();
                 lastValidated = null;
+                firstValidated = null;
                 lastSeen = new Map();
                 renderedLedgers = new Set();
                 pending.clear();
@@ -780,6 +689,7 @@
                 ledger.closeTime = msg.ledger_time;
                 ledger.txnCount = msg.txn_count ?? null;
                 lastValidated = Math.max(lastValidated ?? 0, msg.ledger_index);
+                firstValidated ??= msg.ledger_index;
                 // The NegativeUNL object only changes on flag ledgers, but a lookup per ledger is
                 // cheap and avoids missing a change across a reconnect.
                 refreshNegativeUnl();
@@ -915,6 +825,51 @@
                 return [...ledgers.values()].filter((l) => l.hash && l.index < lastValidated);
             }
 
+            // Classifies each UNL validator from the ledgers seen since connecting.
+            function unlHealth() {
+                const nunlSet = nunlKeys();
+                const settled = settledLedgers().sort((a, b) => a.index - b.index);
+                const recent = settled.slice(-5);
+                const warmingUp =
+                    lastValidated == null || lastValidated - firstValidated <= LAG_THRESHOLD;
+                const rows = [...unl].map((key) => {
+                    const seen = lastSeen.get(key);
+                    const agreed = settled.filter(
+                        (l) => l.validations.get(key)?.hash === l.hash,
+                    ).length;
+                    let state = 'ok';
+                    let label = 'Validating';
+                    if (seen == null) {
+                        [state, label] = warmingUp ? ['waiting', 'Waiting'] : ['idle', 'Not seen'];
+                    } else if (lastValidated - seen > LAG_THRESHOLD) {
+                        [state, label] = ['idle', `${lastValidated - seen} behind`];
+                    } else if (
+                        recent.some(
+                            (l) => l.validations.has(key) && l.validations.get(key).hash !== l.hash,
+                        )
+                    ) {
+                        [state, label] = ['disagreeing', 'Different hash'];
+                    }
+                    return {
+                        key,
+                        state,
+                        label,
+                        cls: { ok: 'ok', waiting: '' }[state] ?? 'warn',
+                        agreed,
+                        settled: settled.length,
+                        onNunl: nunlSet.has(key),
+                        entry: registry.get(key),
+                    };
+                });
+                const rank = { idle: 0, disagreeing: 1, waiting: 2, ok: 3 };
+                return rows.sort(
+                    (a, b) =>
+                        b.onNunl - a.onNunl ||
+                        rank[a.state] - rank[b.state] ||
+                        (a.entry?.domain || '~').localeCompare(b.entry?.domain || '~'),
+                );
+            }
+
             function trustedCount(ledger, hash) {
                 let n = 0;
                 for (const [key, v] of ledger.validations)
@@ -946,21 +901,55 @@
             }
 
             function render() {
-                renderStats();
-                renderNegativeUnl();
+                const health = unlHealth();
+                renderStats(health);
                 renderLedgers();
-                renderValidators();
+                renderValidators(health);
+                updateTooltip();
             }
 
-            function stat(label, value, sub = '', cls = '') {
-                return `<div class="stat">
+            function stat(label, value, sub = '', cls = '', extra = '') {
+                return `<div class="stat ${extra}">
                     <div class="stat-label">${label}</div>
                     <div class="stat-value ${cls}">${value ?? '—'}</div>
                     <div class="stat-sub">${sub}</div>
                 </div>`;
             }
 
-            function renderStats() {
+            function nameList(rows, withLabel) {
+                return rows
+                    .map(
+                        (r) =>
+                            `<span data-tip="${escapeHtml(r.key)}">${escapeHtml(validatorName(r.key) || short(r.key))}</span>` +
+                            (withLabel ? ` (${escapeHtml(r.label.toLowerCase())})` : ''),
+                    )
+                    .join(', ');
+            }
+
+            function nunlStat() {
+                if (!nunl) return stat('Negative UNL', null, '', '', 'wide');
+                if (nunl.error)
+                    return stat('Negative UNL', 'Unknown', escapeHtml(nunl.error), 'warn', 'wide');
+                const label = (key) => nameList([{ key }]);
+                const lines = nunl.disabled.map(
+                    (d) => `${label(d.key)} (since ${d.since.toLocaleString()})`,
+                );
+                if (nunl.toDisable) lines.push(`Disabling at next flag: ${label(nunl.toDisable)}`);
+                if (nunl.toReEnable)
+                    lines.push(`Re-enabling at next flag: ${label(nunl.toReEnable)}`);
+                if (!nunl.exists) lines.push('No NegativeUNL object');
+                const count = nunl.disabled.length;
+                const max = unl.size ? ` / max ${Math.floor(unl.size * 0.25)}` : '';
+                return stat(
+                    'Negative UNL',
+                    `${count}<span class="stat-unit">${max}</span>`,
+                    lines.join('<br>'),
+                    count ? 'warn' : 'ok',
+                    'wide',
+                );
+            }
+
+            function renderStats(health) {
                 const q = quorum();
                 const interval = avgCloseInterval();
                 const latest = lastValidated ? ledgers.get(lastValidated) : null;
@@ -968,8 +957,20 @@
                 const others = latest
                     ? [...latest.validations.keys()].filter((k) => !unl.has(k)).length
                     : null;
-                const nunlCount = nunl?.disabled?.length;
                 const flag = nextFlagLedger();
+
+                const idle = health.filter((r) => r.state === 'idle');
+                const disagreeing = health.filter((r) => r.state === 'disagreeing');
+                let unlSub = others != null ? `${others} other validators` : '';
+                if (health.length && health.every((r) => r.state === 'waiting')) {
+                    unlSub += '<br>Checking which validators are active…';
+                } else if (health.length) {
+                    unlSub += idle.length
+                        ? `<br><span class="warn">Not validating: ${nameList(idle, true)}</span>`
+                        : '<br><span class="ok">All UNL validators are validating</span>';
+                    if (disagreeing.length)
+                        unlSub += `<br><span class="warn">Different hash: ${nameList(disagreeing)}</span>`;
+                }
 
                 document.getElementById('stats').innerHTML = [
                     stat(
@@ -985,16 +986,12 @@
                     stat(
                         'UNL validations',
                         trusted != null && unl.size ? `${trusted} / ${unl.size}` : null,
-                        others != null ? `${others} other validators` : '',
+                        unlSub,
                         trusted != null && q ? (trusted >= q ? 'ok' : 'warn') : '',
+                        'wide',
                     ),
                     stat('Quorum', q, reportedQuorum ? 'Reported by server' : 'Computed from UNL'),
-                    stat(
-                        'Negative UNL',
-                        nunlCount,
-                        nunl?.exists === false ? 'No NegativeUNL object' : '',
-                        nunlCount ? 'warn' : nunlCount === 0 ? 'ok' : '',
-                    ),
+                    nunlStat(),
                     stat(
                         'Next flag ledger',
                         flag?.toLocaleString(),
@@ -1003,101 +1000,53 @@
                 ].join('');
             }
 
-            function validatorLabel(key) {
-                const name = validatorName(key);
-                return `<b>${escapeHtml(name || 'Unknown domain')}</b>
-                    <span class="mono" title="${escapeHtml(key)}">${escapeHtml(short(key))}</span>`;
-            }
-
-            function renderNegativeUnl() {
-                const el = document.getElementById('nunl');
-                if (!nunl) {
-                    el.innerHTML = '<div>Loading…</div>';
-                    return;
-                }
-                if (nunl.error) {
-                    el.innerHTML = `<div class="nunl-state warn">Unknown</div>
-                        <div class="muted-block">Could not read the NegativeUNL object: ${escapeHtml(nunl.error)}</div>`;
-                    return;
-                }
-                const count = nunl.disabled.length;
-                const max = unl.size ? Math.floor(unl.size * 0.25) : null;
-                const state = count
-                    ? `<div class="nunl-state warn">${count} disabled</div>`
-                    : '<div class="nunl-state ok">Empty</div>';
-                const note = nunl.exists
-                    ? `NegativeUNL object present in validated ledger ${nunl.ledgerIndex?.toLocaleString()}.`
-                    : `No NegativeUNL object in validated ledger ${nunl.ledgerIndex?.toLocaleString() ?? ''}.`;
-                const limit =
-                    max != null
-                        ? ` At most ${max} of ${unl.size} UNL validators can be disabled.`
-                        : '';
-
-                const rows = nunl.disabled.map(
-                    (d) => `<div class="nunl-row">
-                        <div>${validatorLabel(d.key)}</div>
-                        <div>Disabled since ledger <b>${d.since.toLocaleString()}</b></div>
-                    </div>`,
-                );
-                const flag = nextFlagLedger();
-                if (nunl.toDisable)
-                    rows.push(`<div class="nunl-row pending">
-                        <div>${validatorLabel(nunl.toDisable)}</div>
-                        <div>To be disabled at flag ledger <b>${flag?.toLocaleString() ?? ''}</b></div>
-                    </div>`);
-                if (nunl.toReEnable)
-                    rows.push(`<div class="nunl-row pending">
-                        <div>${validatorLabel(nunl.toReEnable)}</div>
-                        <div>To be re-enabled at flag ledger <b>${flag?.toLocaleString() ?? ''}</b></div>
-                    </div>`);
-
-                el.innerHTML = `<div>
-                        ${state}
-                        <div class="nunl-note">${note}${limit}</div>
-                    </div>
-                    <div class="nunl-list">${
-                        rows.length
-                            ? rows.join('')
-                            : '<div class="muted-block">No validators are disabled or scheduled for a change. The NegativeUNL only changes on flag ledgers (every 256 ledgers).</div>'
-                    }</div>`;
+            function names(keys) {
+                return keys
+                    .map((k) => validatorName(k) || short(k))
+                    .sort()
+                    .join('\n');
             }
 
             function renderHash(ledger, hash, validations) {
                 const isValidated = ledger.hash && hash === ledger.hash;
                 const cls = !ledger.hash ? 'pending' : isValidated ? '' : 'other';
-                const sorted = validations.sort(
-                    (a, b) => unl.has(b.key) - unl.has(a.key) || a.key.localeCompare(b.key),
-                );
-                const bars = sorted
-                    .map(({ key, full }) => {
-                        const name = validatorName(key) || key;
-                        const kind = unl.has(key) ? 'trusted' : '';
-                        return `<div class="validation ${kind} ${full ? '' : 'partial'}" title="${escapeHtml(name)}${full ? '' : ' (partial)'}"></div>`;
-                    })
-                    .join('');
-                const trusted = sorted.filter((v) => unl.has(v.key)).length;
+                const trusted = validations.filter((v) => unl.has(v.key));
+                const others = validations.length - trusted.length;
+                const partial = validations.filter((v) => !v.full);
 
-                let missed = '';
+                let unlRow = '';
+                if (unl.size) {
+                    const tip = trusted.length
+                        ? `UNL validators:\n${names(trusted.map((v) => v.key))}`
+                        : '';
+                    unlRow = `<span>UNL <b data-tip="${escapeHtml(tip)}">${trusted.length}/${unl.size}</b></span>`;
+                }
+                let partialRow = '';
+                if (partial.length) {
+                    const tip = `Partial validations:\n${names(partial.map((v) => v.key))}`;
+                    partialRow = `<span class="partial">Partial <b data-tip="${escapeHtml(tip)}">${partial.length}</b></span>`;
+                }
+                let missedRow = '';
                 if (isValidated && unl.size) {
                     const missing = [...unl].filter((k) => !ledger.validations.has(k));
                     if (missing.length) {
-                        const names = missing.map((k) => validatorName(k) || short(k)).join('\n');
-                        missed = `<span class="missed">Missed <b title="${escapeHtml(names)}">${missing.length}</b></span>`;
+                        const tip = `Missed by:\n${names(missing)}`;
+                        missedRow = `<span class="missed">Missed <b data-tip="${escapeHtml(tip)}">${missing.length}</b></span>`;
                     }
                 }
 
                 return `<div class="hash ${cls}">
                     <div class="bar"></div>
                     <div class="hash-title">
-                        <span class="mono" title="${escapeHtml(hash)}">${escapeHtml(hash.slice(0, 6))}</span>
+                        <span class="mono" data-tip="${escapeHtml(hash)}">${escapeHtml(hash.slice(0, 6))}</span>
                         ${isValidated ? '<span class="check" aria-label="validated">✓</span>' : ''}
                     </div>
                     <div class="subtitle">
-                        ${unl.size ? `<span>UNL <b>${trusted}/${unl.size}</b></span>` : ''}
-                        <span>Total <b>${sorted.length}</b></span>
-                        ${missed}
+                        ${unlRow}
+                        <span>Other <b>${others}</b></span>
+                        ${partialRow}
+                        ${missedRow}
                     </div>
-                    <div class="validations">${bars}</div>
                 </div>`;
             }
 
@@ -1149,25 +1098,10 @@
                     .join('');
             }
 
-            function validatorStatus(key, nunlSet, settled) {
-                if (nunlSet.has(key)) return ['nUNL', 'nunl'];
-                const seen = lastSeen.get(key);
-                if (seen == null) return ['Not seen', 'warn'];
-                if (lastValidated - seen > LAG_THRESHOLD)
-                    return [`${lastValidated - seen} behind`, 'warn'];
-                const recent = settled.slice(-5);
-                if (
-                    recent.some(
-                        (l) => l.validations.has(key) && l.validations.get(key).hash !== l.hash,
-                    )
-                )
-                    return ['Disagreeing', 'warn'];
-                return ['Validating', 'ok'];
-            }
-
-            function renderValidators() {
+            function renderValidators(health) {
                 const el = document.getElementById('validators');
                 const title = document.getElementById('validatorsTitle');
+                const note = document.getElementById('validatorsNote');
                 if (!unl.size) {
                     const why =
                         registryError ||
@@ -1175,50 +1109,72 @@
                             ? `No known UNL publisher for network ID ${networkId}.`
                             : 'Loading the UNL…');
                     title.textContent = 'UNL validators';
+                    note.textContent = '';
                     el.innerHTML = `<div class="empty">${escapeHtml(why)}</div>`;
                     return;
                 }
-                const nunlSet = nunlKeys();
-                const settled = settledLedgers().sort((a, b) => a.index - b.index);
-                const rows = [...unl].map((key) => {
-                    const [label, cls] = validatorStatus(key, nunlSet, settled);
-                    const agreed = settled.filter(
-                        (l) => l.validations.get(key)?.hash === l.hash,
-                    ).length;
-                    const pct = settled.length ? (agreed / settled.length) * 100 : null;
-                    return { key, label, cls, agreed, pct, entry: registry.get(key) };
-                });
-                const rank = { nunl: 0, warn: 1, ok: 2 };
-                rows.sort(
-                    (a, b) =>
-                        rank[a.cls] - rank[b.cls] ||
-                        (a.entry?.domain || '~').localeCompare(b.entry?.domain || '~'),
-                );
-
+                const settledCount = health[0]?.settled ?? 0;
                 title.textContent = `UNL validators (${unl.size}, from ${UNL_PUBLISHERS[networkId]})`;
-                el.innerHTML = `<table>
-                    <thead><tr>
-                        <th>Validator</th><th>Master key</th><th>Status</th>
-                        <th>Last ledger</th><th>Agreement (${settled.length} ledgers)</th><th>Version</th>
-                    </tr></thead>
-                    <tbody>${rows
-                        .map(
-                            (r) => `<tr>
-                        <td class="domain">${escapeHtml(r.entry?.domain || 'Unknown domain')}</td>
-                        <td class="key mono" title="${escapeHtml(r.key)}">${escapeHtml(r.key)}</td>
-                        <td><span class="badge ${r.cls}">${r.label}</span></td>
-                        <td>${lastSeen.get(r.key)?.toLocaleString() ?? '—'}</td>
-                        <td>${
-                            r.pct == null
-                                ? '—'
-                                : `<div class="agreement"><div class="meter"><div style="width:${r.pct}%"></div></div>${r.agreed}/${settled.length}</div>`
-                        }</td>
-                        <td>${escapeHtml(r.entry?.server_version || '—')}</td>
-                    </tr>`,
-                        )
-                        .join('')}</tbody>
-                </table>${registryError ? `<div class="notice">${escapeHtml(registryError)}</div>` : ''}`;
+                note.textContent = `Agreement over the last ${settledCount} ledgers`;
+                el.innerHTML = `<div class="validator-grid">${health
+                    .map((r) => {
+                        const name = r.entry?.domain || 'Unknown domain';
+                        const tip = [
+                            name,
+                            r.key,
+                            `Status: ${r.label}${r.onNunl ? ' (on the Negative UNL)' : ''}`,
+                            `Last ledger: ${lastSeen.get(r.key)?.toLocaleString() ?? '—'}`,
+                            `Agreement: ${r.agreed}/${r.settled} ledgers`,
+                            `Version: ${r.entry?.server_version || '—'}`,
+                        ].join('\n');
+                        const value = r.cls === 'ok' ? `${r.agreed}/${r.settled}` : r.label;
+                        return `<div class="vcell ${r.cls}" data-tip="${escapeHtml(tip)}">
+                            <span class="dot"></span>
+                            <span class="vname">${escapeHtml(name)}</span>
+                            ${r.onNunl ? '<span class="badge">nUNL</span>' : ''}
+                            <span class="vstat">${escapeHtml(value)}</span>
+                        </div>`;
+                    })
+                    .join(
+                        '',
+                    )}</div>${registryError ? `<div class="notice">${escapeHtml(registryError)}</div>` : ''}`;
             }
+
+            // ---------- Tooltip ----------
+
+            // Sections re-render several times a second, which replaces the hovered element before a
+            // native title tooltip can appear. One tooltip follows the pointer instead.
+            const tooltip = document.getElementById('tooltip');
+            let pointer = null;
+
+            function updateTooltip() {
+                const target =
+                    pointer &&
+                    document.elementFromPoint(pointer.x, pointer.y)?.closest('[data-tip]');
+                if (!target || !target.dataset.tip) {
+                    tooltip.hidden = true;
+                    return;
+                }
+                tooltip.textContent = target.dataset.tip;
+                tooltip.hidden = false;
+                const { width, height } = tooltip.getBoundingClientRect();
+                let x = pointer.x + 12;
+                let y = pointer.y + 16;
+                if (x + width > window.innerWidth - 8) x = pointer.x - width - 12;
+                if (y + height > window.innerHeight - 8) y = pointer.y - height - 12;
+                tooltip.style.left = `${Math.max(8, x)}px`;
+                tooltip.style.top = `${Math.max(8, y)}px`;
+            }
+
+            document.addEventListener('mousemove', (e) => {
+                pointer = { x: e.clientX, y: e.clientY };
+                updateTooltip();
+            });
+            document.documentElement.addEventListener('mouseleave', () => {
+                pointer = null;
+                updateTooltip();
+            });
+            window.addEventListener('scroll', updateTooltip, true);
 
             // ---------- Setup ----------
 
