@@ -403,8 +403,9 @@
                 font-size: 11px;
             }
 
-            .vversion {
-                color: var(--fg-subtle);
+            #validatorsNote .vversion {
+                margin-right: 8px;
+                font-weight: 700;
             }
 
             .vcell.warn .vstat {
@@ -547,6 +548,15 @@
             const LEDGERS_SHOWN = 12;
             const LAG_THRESHOLD = 3;
             const URL_KEY = 'monitoring_url';
+            // Distinct hues for versions, newest first. Orange is left out: it means a problem here.
+            const VERSION_COLORS = [
+                '#32e685',
+                '#19a3ff',
+                '#c28cff',
+                '#ffd24d',
+                '#4de0e6',
+                '#ff8fb1',
+            ];
             const XRPL_ALPHABET = 'rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz';
 
             let ws = null;
@@ -565,6 +575,7 @@
             let lastValidated = null;
             let firstValidated = null;
             let lastSeen = new Map(); // validator key -> last ledger index it validated
+            let versions = new Map(); // validator key -> { version, ledger } from its validations
             let renderTimer = null;
             let renderedLedgers = new Set(); // animate a ledger card only on first render
 
@@ -617,6 +628,7 @@
                 lastValidated = null;
                 firstValidated = null;
                 lastSeen = new Map();
+                versions = new Map();
                 renderedLedgers = new Set();
                 pending.clear();
             }
@@ -719,6 +731,9 @@
                     full: msg.full !== false,
                 });
                 lastSeen.set(key, Math.max(lastSeen.get(key) ?? 0, index));
+                // Validators only include ServerVersion on voting ledgers (one per 256).
+                const version = msg.server_version && decodeServerVersion(msg.server_version);
+                if (version) versions.set(key, { version, ledger: index });
                 scheduleRender();
             }
 
@@ -825,9 +840,12 @@
                 return (last.closeTime - first.closeTime) / (last.index - first.index);
             }
 
-            // Ledgers old enough that late validations have arrived.
+            // Ledgers old enough that late validations have arrived. The first validated ledger is
+            // skipped: most of its validations arrived before the subscription started.
             function settledLedgers() {
-                return [...ledgers.values()].filter((l) => l.hash && l.index < lastValidated);
+                return [...ledgers.values()].filter(
+                    (l) => l.hash && l.index > firstValidated && l.index < lastValidated,
+                );
             }
 
             // Classifies each UNL validator from the ledgers seen since connecting.
@@ -893,6 +911,44 @@
             function explorerLedger(index) {
                 const base = EXPLORERS[networkId];
                 return base ? `${base}/ledgers/${index}` : null;
+            }
+
+            // Decodes rippled's 64-bit ServerVersion (BuildInfo::encodeSoftwareVersion): a 0x183B
+            // implementation ID, then major, minor, patch, and a pre-release byte (0x40 | n for
+            // -bN, 0x80 | n for -rcN, 0xC0 for a release). Returns null for other implementations.
+            function decodeServerVersion(value) {
+                const v = BigInt(value);
+                if (v >> 48n !== 0x183bn) return null;
+                const byte = (shift) => Number((v >> BigInt(shift)) & 0xffn);
+                const pre = byte(16);
+                const n = pre & 0x3f;
+                const suffix = { 0x40: `-b${n}`, 0x80: `-rc${n}` }[pre & 0xc0] ?? '';
+                return `${byte(40)}.${byte(32)}.${byte(24)}${suffix}`;
+            }
+
+            // Newest version first; a release sorts above its release candidates and betas.
+            function compareVersions(a, b) {
+                const parse = (v) => {
+                    const m = /^(\d+)\.(\d+)\.(\d+)(?:-(b|rc)(\d+))?/.exec(v) || [];
+                    const type = { b: 0, rc: 1 }[m[4]] ?? 2;
+                    return [+m[1] || 0, +m[2] || 0, +m[3] || 0, type, +m[5] || 0];
+                };
+                const pa = parse(a);
+                const pb = parse(b);
+                for (let i = 0; i < pa.length; i++) if (pa[i] !== pb[i]) return pb[i] - pa[i];
+                return 0;
+            }
+
+            // A validation's version beats the registry's, which may be stale.
+            function versionOf(key) {
+                const live = versions.get(key);
+                if (live)
+                    return {
+                        version: live.version,
+                        source: `from validation of ledger ${live.ledger.toLocaleString()}`,
+                    };
+                const registered = registry.get(key)?.server_version;
+                return registered ? { version: registered, source: 'from data.xrpl.org' } : null;
             }
 
             // ---------- Rendering ----------
@@ -1032,7 +1088,7 @@
                     partialRow = `<span class="partial">Partial <b data-tip="${escapeHtml(tip)}">${partial.length}</b></span>`;
                 }
                 let missedRow = '';
-                if (isValidated && unl.size) {
+                if (isValidated && unl.size && ledger.index > firstValidated) {
                     const missing = [...unl].filter((k) => !ledger.validations.has(k));
                     if (missing.length) {
                         const tip = `Missed by:\n${names(missing)}`;
@@ -1119,8 +1175,24 @@
                     return;
                 }
                 const settledCount = health[0]?.settled ?? 0;
+                const counts = new Map();
+                for (const r of health) {
+                    r.version = versionOf(r.key);
+                    const v = r.version?.version;
+                    if (v) counts.set(v, (counts.get(v) || 0) + 1);
+                }
+                const colors = new Map(
+                    [...counts.keys()]
+                        .sort(compareVersions)
+                        .map((v, i) => [v, VERSION_COLORS[i] || 'var(--fg-subtle)']),
+                );
+                const versionTag = (v, text) =>
+                    `<span class="vversion" style="color: ${colors.get(v)}">${escapeHtml(text)}</span>`;
+
                 title.textContent = `UNL validators (${unl.size}, from ${UNL_PUBLISHERS[networkId]})`;
-                note.textContent = `Agreement over the last ${settledCount} ledgers`;
+                note.innerHTML = `${[...colors.keys()]
+                    .map((v) => versionTag(v, `${v} ×${counts.get(v)}`))
+                    .join(' ')} · Agreement over the last ${settledCount} ledgers`;
                 el.innerHTML = `<div class="validator-grid">${health
                     .map((r) => {
                         const name = r.entry?.domain || 'Unknown domain';
@@ -1130,14 +1202,16 @@
                             `Status: ${r.label}${r.onNunl ? ' (on the Negative UNL)' : ''}`,
                             `Last ledger: ${lastSeen.get(r.key)?.toLocaleString() ?? '—'}`,
                             `Agreement: ${r.agreed}/${r.settled} ledgers`,
-                            `Version: ${r.entry?.server_version || '—'}`,
+                            r.version
+                                ? `Version: ${r.version.version} (${r.version.source})`
+                                : 'Version: unknown',
                         ].join('\n');
                         const value = r.cls === 'ok' ? `${r.agreed}/${r.settled}` : r.label;
                         return `<div class="vcell ${r.cls}" data-tip="${escapeHtml(tip)}">
                             <span class="dot"></span>
                             <span class="vname">${escapeHtml(name)}</span>
                             ${r.onNunl ? '<span class="badge">nUNL</span>' : ''}
-                            <span class="vversion">${escapeHtml(r.entry?.server_version || '')}</span>
+                            ${r.version ? versionTag(r.version.version, r.version.version) : ''}
                             <span class="vstat">${escapeHtml(value)}</span>
                         </div>`;
                     })
