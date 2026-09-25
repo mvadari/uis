@@ -1,0 +1,1286 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>XRPL Network Monitor</title>
+        <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+            rel="stylesheet"
+            href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&display=swap"
+        />
+        <style>
+            /* Palette taken from livenet.xrpl.org. */
+            :root {
+                --bg: #000;
+                --surface: #111112;
+                --surface-raised: #232325;
+                --border: #343437;
+                --border-strong: #454549;
+                --fg: #fff;
+                --fg-muted: #a2a2a4;
+                --fg-subtle: #838386;
+                --green: #32e685;
+                --orange: #ff6719;
+                --pink: #ff668b;
+                --blue: #19a3ff;
+            }
+
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            body {
+                background: var(--bg);
+                color: var(--fg-muted);
+                font-family:
+                    'Work Sans',
+                    system-ui,
+                    -apple-system,
+                    'Segoe UI',
+                    Roboto,
+                    sans-serif;
+                font-size: 12px;
+                font-weight: 500;
+                min-height: 100vh;
+            }
+
+            a {
+                color: inherit;
+                text-decoration: none;
+            }
+
+            a:hover {
+                color: var(--fg);
+            }
+
+            .mono {
+                font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            }
+
+            .container {
+                max-width: 1280px;
+                margin: 0 auto;
+                padding: 24px 32px 64px;
+            }
+
+            header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                flex-wrap: wrap;
+                gap: 16px;
+                padding-bottom: 24px;
+                border-bottom: 1px solid var(--border);
+            }
+
+            h1 {
+                color: var(--fg);
+                font-size: 24px;
+                font-weight: 700;
+            }
+
+            h2 {
+                color: var(--fg-muted);
+                font-size: 12px;
+                font-weight: 700;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+                margin-bottom: 16px;
+            }
+
+            .controls {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                flex-wrap: wrap;
+            }
+
+            select,
+            input[type='text'],
+            button {
+                background: var(--surface-raised);
+                border: 1px solid var(--border);
+                border-radius: 4px;
+                color: var(--fg);
+                font: inherit;
+                font-size: 13px;
+                padding: 8px 12px;
+            }
+
+            input[type='text'] {
+                width: 320px;
+            }
+
+            button {
+                cursor: pointer;
+            }
+
+            button:hover {
+                border-color: var(--border-strong);
+            }
+
+            .conn {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-size: 12px;
+                text-transform: uppercase;
+                font-weight: 700;
+            }
+
+            .dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: var(--fg-subtle);
+            }
+
+            .conn.connected .dot {
+                background: var(--green);
+            }
+
+            .conn.error .dot {
+                background: var(--orange);
+            }
+
+            section {
+                margin-top: 32px;
+            }
+
+            .stats {
+                display: grid;
+                grid-template-columns: repeat(6, 1fr);
+                gap: 1px;
+                background: var(--border);
+                border: 1px solid var(--border);
+            }
+
+            .stat {
+                padding: 20px 24px;
+                background: var(--bg);
+            }
+
+            .stat-label {
+                font-size: 10px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+            }
+
+            .stat-value {
+                color: var(--fg);
+                font-size: 22px;
+                font-weight: 600;
+                margin-top: 8px;
+            }
+
+            .stat-sub {
+                margin-top: 4px;
+                font-size: 11px;
+            }
+
+            .ok {
+                color: var(--green);
+            }
+
+            .warn {
+                color: var(--orange);
+            }
+
+            /* Negative UNL */
+            .nunl {
+                border: 1px solid var(--border);
+                padding: 24px;
+                display: grid;
+                grid-template-columns: 220px 1fr;
+                gap: 32px;
+            }
+
+            .nunl-state {
+                font-size: 28px;
+                font-weight: 700;
+            }
+
+            .nunl-note {
+                margin-top: 8px;
+                line-height: 1.5;
+            }
+
+            .nunl-list {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .nunl-row {
+                display: flex;
+                justify-content: space-between;
+                gap: 16px;
+                padding: 12px 16px;
+                background: var(--surface-raised);
+                border-left: 2px solid var(--orange);
+            }
+
+            .nunl-row.pending {
+                border-left-color: var(--blue);
+            }
+
+            .nunl-row b {
+                color: var(--fg);
+                font-size: 13px;
+            }
+
+            .muted-block {
+                padding: 12px 16px;
+                border: 1px dashed var(--border);
+                line-height: 1.5;
+            }
+
+            /* Ledger stream, modeled on livenet.xrpl.org */
+            .legend {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 24px;
+                padding: 12px 16px;
+                border: 1px solid var(--border);
+                margin-bottom: 16px;
+                text-transform: uppercase;
+                font-size: 10px;
+                font-weight: 700;
+            }
+
+            .legend span {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .swatch {
+                display: inline-block;
+                width: 14px;
+                height: 4px;
+                border-radius: 4px;
+            }
+
+            .ledger-list {
+                display: flex;
+                gap: 24px;
+                overflow-x: auto;
+                padding-bottom: 8px;
+                scrollbar-width: thin;
+                scrollbar-color: var(--border) transparent;
+            }
+
+            .ledger {
+                width: 196px;
+                flex-shrink: 0;
+            }
+
+            .ledger.new {
+                animation: ledger-enter 0.4s;
+            }
+
+            @keyframes ledger-enter {
+                from {
+                    opacity: 0;
+                    transform: translateX(-20px);
+                }
+            }
+
+            .ledger-head {
+                padding: 24px;
+                border: 1px solid var(--border);
+                border-bottom: 0;
+                font-size: 10px;
+                font-weight: 700;
+                line-height: 12px;
+                text-align: center;
+                text-transform: uppercase;
+            }
+
+            .ledger-index {
+                color: var(--fg);
+                font-size: 14px;
+                line-height: 16px;
+                padding-bottom: 3px;
+            }
+
+            .ledger-index.flag a {
+                background: var(--border);
+                border-radius: 2px;
+                padding: 2px 4px;
+            }
+
+            .ledger-head .row {
+                display: flex;
+                justify-content: space-between;
+                margin-top: 8px;
+            }
+
+            .ledger-head .row b {
+                color: var(--fg);
+                font-weight: 500;
+            }
+
+            .hash {
+                padding: 0 24px 24px;
+                border: 1px solid var(--border-strong);
+                border-top: 0;
+                background: rgba(35, 35, 37, 0.7);
+                color: var(--fg);
+            }
+
+            .hash .bar {
+                height: 2px;
+                margin: 0 -24px;
+                background: var(--green);
+            }
+
+            .hash.other .bar {
+                background: var(--orange);
+            }
+
+            .hash.pending .bar {
+                background: var(--fg-subtle);
+            }
+
+            .hash-title {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                padding-top: 20px;
+                font-size: 14px;
+                font-weight: 700;
+            }
+
+            .hash-title .check {
+                color: var(--green);
+            }
+
+            .hash .subtitle {
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
+                padding: 16px 2px 16px;
+                color: var(--fg-muted);
+                font-size: 10px;
+                font-weight: 700;
+                line-height: 14px;
+                text-transform: uppercase;
+            }
+
+            .hash .subtitle span {
+                display: flex;
+                justify-content: space-between;
+            }
+
+            .hash .subtitle b {
+                color: var(--fg);
+                font-size: 11px;
+            }
+
+            .hash .subtitle .missed b {
+                background: var(--orange);
+                border-radius: 2px;
+                padding: 0 3px;
+                cursor: help;
+            }
+
+            .validations {
+                display: grid;
+                grid-template-columns: repeat(5, 1fr);
+                gap: 4px 8px;
+            }
+
+            .validation {
+                height: 4px;
+                border-radius: 4px;
+                background: var(--fg-subtle);
+                opacity: 0.85;
+                overflow: hidden;
+            }
+
+            .validation.trusted {
+                background: var(--fg);
+            }
+
+            .validation.partial::after {
+                content: '';
+                display: block;
+                width: 50%;
+                height: 100%;
+                background: var(--pink);
+            }
+
+            /* Validator table */
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                border: 1px solid var(--border);
+            }
+
+            th {
+                text-align: left;
+                font-size: 10px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+                padding: 12px 16px;
+                border-bottom: 1px solid var(--border);
+                background: var(--surface);
+            }
+
+            td {
+                padding: 10px 16px;
+                border-bottom: 1px solid var(--border);
+                font-size: 13px;
+                vertical-align: middle;
+            }
+
+            tr:last-child td {
+                border-bottom: 0;
+            }
+
+            td.domain {
+                color: var(--fg);
+            }
+
+            td.key {
+                font-size: 11px;
+                max-width: 220px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .badge {
+                display: inline-block;
+                padding: 2px 8px;
+                border-radius: 2px;
+                font-size: 10px;
+                font-weight: 700;
+                text-transform: uppercase;
+                background: var(--surface-raised);
+                color: var(--fg-muted);
+            }
+
+            .badge.ok {
+                color: var(--green);
+            }
+
+            .badge.warn {
+                color: var(--orange);
+            }
+
+            .badge.nunl {
+                background: var(--orange);
+                color: var(--fg);
+            }
+
+            .agreement {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .meter {
+                width: 60px;
+                height: 4px;
+                border-radius: 4px;
+                background: var(--border);
+                overflow: hidden;
+            }
+
+            .meter div {
+                height: 100%;
+                background: var(--green);
+            }
+
+            .empty {
+                padding: 32px;
+                text-align: center;
+                border: 1px dashed var(--border);
+            }
+
+            .notice {
+                margin-top: 12px;
+                color: var(--orange);
+            }
+
+            @media (max-width: 1000px) {
+                .stats {
+                    grid-template-columns: repeat(3, 1fr);
+                }
+            }
+
+            @media (max-width: 720px) {
+                .stats {
+                    grid-template-columns: repeat(2, 1fr);
+                }
+
+                .container {
+                    padding: 16px;
+                }
+
+                .nunl {
+                    grid-template-columns: 1fr;
+                }
+
+                input[type='text'] {
+                    width: 100%;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <header>
+                <h1>XRPL Network Monitor</h1>
+                <div class="controls">
+                    <label for="network" class="stat-label">Network</label>
+                    <select id="network">
+                        <option value="mainnet">Mainnet</option>
+                        <option value="testnet">Testnet</option>
+                        <option value="devnet">Devnet</option>
+                        <option value="other">Other</option>
+                    </select>
+                    <label for="nodeUrl" class="stat-label">Node</label>
+                    <input type="text" id="nodeUrl" placeholder="wss://..." list="nodeList" />
+                    <datalist id="nodeList"></datalist>
+                    <button id="connectBtn">Connect</button>
+                    <div class="conn" id="conn" role="status">
+                        <span class="dot"></span><span id="connText">Disconnected</span>
+                    </div>
+                </div>
+            </header>
+
+            <section>
+                <div class="stats" id="stats"></div>
+            </section>
+
+            <section>
+                <h2>Negative UNL</h2>
+                <div class="nunl" id="nunl"></div>
+            </section>
+
+            <section>
+                <h2>Ledger validations</h2>
+                <div class="legend">
+                    <span><i class="swatch" style="background: var(--fg)"></i>UNL validator</span>
+                    <span
+                        ><i class="swatch" style="background: var(--fg-subtle)"></i>Other
+                        validator</span
+                    >
+                    <span
+                        ><i
+                            class="swatch"
+                            style="
+                                background: linear-gradient(90deg, var(--pink) 50%, var(--fg) 50%);
+                            "
+                        ></i
+                        >Partial validation</span
+                    >
+                    <span
+                        ><i class="swatch" style="background: var(--green)"></i>Validated hash</span
+                    >
+                    <span
+                        ><i class="swatch" style="background: var(--orange)"></i>Different
+                        hash</span
+                    >
+                </div>
+                <div class="ledger-list" id="ledgers"></div>
+            </section>
+
+            <section>
+                <h2 id="validatorsTitle">UNL validators</h2>
+                <div id="validators"></div>
+            </section>
+        </div>
+
+        <script src="shared-utils.js"></script>
+        <script>
+            // Public nodes per network; the first is the default. Any node can be typed in.
+            const NETWORKS = {
+                mainnet: ['wss://s1.ripple.com', 'wss://s2.ripple.com', 'wss://xrplcluster.com'],
+                testnet: [
+                    'wss://s.altnet.rippletest.net:51233',
+                    'wss://clio.altnet.rippletest.net:51233',
+                    'wss://testnet.xrpl-labs.com',
+                ],
+                devnet: ['wss://s.devnet.rippletest.net:51233'],
+            };
+            const NETWORK_IDS = { 0: 'mainnet', 1: 'testnet', 2: 'devnet' };
+            // The UNL publisher sites send no CORS headers, so UNL membership comes from the
+            // data.xrpl.org registry, which records each validator's publisher. Keyed by network_id.
+            const UNL_PUBLISHERS = {
+                0: 'vl.ripple.com',
+                1: 'vl.altnet.rippletest.net',
+                2: 'vl.devnet.rippletest.net',
+            };
+            const EXPLORERS = {
+                0: 'https://livenet.xrpl.org',
+                1: 'https://testnet.xrpl.org',
+                2: 'https://devnet.xrpl.org',
+            };
+            const REGISTRY_URL = 'https://data.xrpl.org/v1/network/validators';
+            const NEGATIVE_UNL_INDEX =
+                '2E8A59AA9D3B5B186B0B9E0F62E6C02587CA74A4D778938E957B6357D364B244';
+            const FLAG_LEDGER_INTERVAL = 256;
+            const LEDGERS_KEPT = 50;
+            const LEDGERS_SHOWN = 12;
+            const LAG_THRESHOLD = 3;
+            const URL_KEY = 'monitoring_url';
+            const XRPL_ALPHABET = 'rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz';
+
+            let ws = null;
+            let reconnectTimer = null;
+            let requestId = 0;
+            const pending = new Map();
+
+            let networkId = null;
+            let reportedQuorum = 0;
+            let registry = new Map(); // master key -> registry entry
+            let signingToMaster = new Map();
+            let unl = new Set(); // master keys
+            let registryError = null;
+            let nunl = null; // { exists, ledgerIndex, disabled, toDisable, toReEnable, error }
+            let ledgers = new Map(); // index -> { index, hash, closeTime, txnCount, validations }
+            let lastValidated = null;
+            let lastSeen = new Map(); // validator key -> last ledger index it validated
+            let renderTimer = null;
+            let renderedLedgers = new Set(); // animate a ledger card only on first render
+
+            // ---------- Key encoding ----------
+
+            // Converts a hex node public key (as stored in NegativeUNL) to the base58 "n..." form
+            // that the validations stream and registry use.
+            async function nodePublicKey(hex) {
+                const payload = new Uint8Array([
+                    0x1c,
+                    ...hex.match(/../g).map((h) => parseInt(h, 16)),
+                ]);
+                const h1 = await crypto.subtle.digest('SHA-256', payload);
+                const h2 = new Uint8Array(await crypto.subtle.digest('SHA-256', h1));
+                const bytes = [...payload, ...h2.slice(0, 4)];
+                let n = BigInt('0x' + bytes.map((b) => b.toString(16).padStart(2, '0')).join(''));
+                let out = '';
+                while (n > 0n) {
+                    out = XRPL_ALPHABET[Number(n % 58n)] + out;
+                    n /= 58n;
+                }
+                for (const b of bytes) {
+                    if (b !== 0) break;
+                    out = XRPL_ALPHABET[0] + out;
+                }
+                return out;
+            }
+
+            // ---------- Connection ----------
+
+            function request(command) {
+                return new Promise((resolve) => {
+                    const id = ++requestId;
+                    pending.set(id, resolve);
+                    ws.send(JSON.stringify({ ...command, id }));
+                });
+            }
+
+            function setConn(state, text) {
+                document.getElementById('conn').className = `conn ${state}`;
+                document.getElementById('connText').textContent = text;
+            }
+
+            function resetState() {
+                networkId = null;
+                reportedQuorum = 0;
+                unl = new Set();
+                nunl = null;
+                ledgers = new Map();
+                lastValidated = null;
+                lastSeen = new Map();
+                renderedLedgers = new Set();
+                pending.clear();
+            }
+
+            function connect(url) {
+                clearTimeout(reconnectTimer);
+                if (ws) {
+                    ws.onopen = ws.onmessage = ws.onclose = null;
+                    ws.close();
+                }
+                resetState();
+                render();
+                Storage.set(URL_KEY, url);
+                setConn('', `Connecting to ${url}`);
+
+                let socket;
+                try {
+                    socket = new WebSocket(url);
+                } catch (e) {
+                    setConn('error', `Invalid URL: ${url}`);
+                    return;
+                }
+                ws = socket;
+                socket.onopen = () => onOpen(url);
+                socket.onmessage = (e) => onMessage(JSON.parse(e.data));
+                socket.onclose = () => {
+                    setConn('error', 'Disconnected, retrying…');
+                    reconnectTimer = setTimeout(() => connect(url), 3000);
+                };
+            }
+
+            async function onOpen(url) {
+                setConn('connected', url.replace(/^wss?:\/\//, ''));
+                const info = await request({ command: 'server_info' });
+                networkId = info.result?.info?.network_id ?? 0;
+                reportedQuorum = info.result?.info?.validation_quorum || 0;
+                syncNetworkSelect();
+                applyUnl();
+                await request({ command: 'subscribe', streams: ['ledger', 'validations'] });
+                refreshNegativeUnl();
+                render();
+            }
+
+            function onMessage(msg) {
+                if (msg.type === 'response') {
+                    const resolve = pending.get(msg.id);
+                    pending.delete(msg.id);
+                    if (resolve) resolve(msg);
+                    return;
+                }
+                if (msg.type === 'ledgerClosed') onLedger(msg);
+                else if (msg.type === 'validationReceived') onValidation(msg);
+            }
+
+            function getLedger(index) {
+                let ledger = ledgers.get(index);
+                if (!ledger) {
+                    ledger = { index, hash: null, closeTime: null, txnCount: null };
+                    ledger.validations = new Map();
+                    ledgers.set(index, ledger);
+                    const oldest = [...ledgers.keys()].sort((a, b) => a - b);
+                    while (oldest.length > LEDGERS_KEPT) {
+                        const index = oldest.shift();
+                        ledgers.delete(index);
+                        renderedLedgers.delete(index);
+                    }
+                }
+                return ledger;
+            }
+
+            // The ledger stream only reports validated ledgers.
+            function onLedger(msg) {
+                const ledger = getLedger(msg.ledger_index);
+                ledger.hash = msg.ledger_hash;
+                ledger.closeTime = msg.ledger_time;
+                ledger.txnCount = msg.txn_count ?? null;
+                lastValidated = Math.max(lastValidated ?? 0, msg.ledger_index);
+                // The NegativeUNL object only changes on flag ledgers, but a lookup per ledger is
+                // cheap and avoids missing a change across a reconnect.
+                refreshNegativeUnl();
+                scheduleRender();
+            }
+
+            function validatorKey(msg) {
+                return (
+                    msg.master_key ||
+                    signingToMaster.get(msg.validation_public_key) ||
+                    msg.validation_public_key
+                );
+            }
+
+            function onValidation(msg) {
+                const index = Number(msg.ledger_index);
+                // Ignore stragglers for ledgers already pruned.
+                if (lastValidated && index < lastValidated - LEDGERS_KEPT) return;
+                const key = validatorKey(msg);
+                getLedger(index).validations.set(key, {
+                    hash: msg.ledger_hash,
+                    full: msg.full !== false,
+                });
+                lastSeen.set(key, Math.max(lastSeen.get(key) ?? 0, index));
+                scheduleRender();
+            }
+
+            // ---------- Data sources ----------
+
+            async function loadRegistry() {
+                try {
+                    const res = await fetch(REGISTRY_URL);
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const data = await res.json();
+                    registry = new Map();
+                    signingToMaster = new Map();
+                    for (const v of data.validators || []) {
+                        const master = v.master_key || v.validation_public_key;
+                        registry.set(master, v);
+                        if (v.signing_key) signingToMaster.set(v.signing_key, master);
+                    }
+                    registryError = null;
+                } catch (e) {
+                    registryError = `Could not load the validator registry (${e.message}). UNL membership is unknown.`;
+                }
+                applyUnl();
+                render();
+            }
+
+            function applyUnl() {
+                const publisher = UNL_PUBLISHERS[networkId];
+                unl = new Set();
+                if (!publisher) return;
+                for (const [master, v] of registry) if (v.unl === publisher) unl.add(master);
+            }
+
+            let nunlInFlight = false;
+            async function refreshNegativeUnl() {
+                if (nunlInFlight || !ws || ws.readyState !== WebSocket.OPEN) return;
+                nunlInFlight = true;
+                try {
+                    const res = await request({
+                        command: 'ledger_entry',
+                        index: NEGATIVE_UNL_INDEX,
+                        ledger_index: 'validated',
+                    });
+                    // rippled deletes the NegativeUNL object when it becomes empty.
+                    if (res.error === 'entryNotFound') {
+                        // Clio omits ledger_index on errors.
+                        const ledgerIndex = res.ledger_index ?? lastValidated;
+                        nunl = { exists: false, ledgerIndex, disabled: [] };
+                    } else if (res.error) {
+                        nunl = { error: res.error_message || res.error };
+                    } else {
+                        const node = res.result.node;
+                        const disabled = await Promise.all(
+                            (node.DisabledValidators || []).map(async ({ DisabledValidator }) => ({
+                                key: await nodePublicKey(DisabledValidator.PublicKey),
+                                since: DisabledValidator.FirstLedgerSequence,
+                            })),
+                        );
+                        nunl = {
+                            exists: true,
+                            ledgerIndex: res.result.ledger_index,
+                            disabled,
+                            toDisable:
+                                node.ValidatorToDisable &&
+                                (await nodePublicKey(node.ValidatorToDisable)),
+                            toReEnable:
+                                node.ValidatorToReEnable &&
+                                (await nodePublicKey(node.ValidatorToReEnable)),
+                        };
+                    }
+                } finally {
+                    nunlInFlight = false;
+                }
+                scheduleRender();
+            }
+
+            // ---------- Derived values ----------
+
+            function nunlKeys() {
+                return new Set((nunl?.disabled || []).map((d) => d.key));
+            }
+
+            // Quorum as rippled computes it: 80% of the UNL minus the nUNL, but never below 60% of
+            // the full UNL. Used only when the server does not report its own quorum.
+            function quorum() {
+                if (reportedQuorum) return reportedQuorum;
+                if (!unl.size) return null;
+                const effective = unl.size - nunlKeys().size;
+                return Math.max(Math.ceil(effective * 0.8), Math.ceil(unl.size * 0.6));
+            }
+
+            function nextFlagLedger() {
+                if (!lastValidated) return null;
+                return Math.ceil((lastValidated + 1) / FLAG_LEDGER_INTERVAL) * FLAG_LEDGER_INTERVAL;
+            }
+
+            function avgCloseInterval() {
+                const times = [...ledgers.values()]
+                    .filter((l) => l.closeTime != null)
+                    .sort((a, b) => a.index - b.index)
+                    .slice(-11);
+                if (times.length < 2) return null;
+                const first = times[0];
+                const last = times[times.length - 1];
+                return (last.closeTime - first.closeTime) / (last.index - first.index);
+            }
+
+            // Ledgers old enough that late validations have arrived.
+            function settledLedgers() {
+                return [...ledgers.values()].filter((l) => l.hash && l.index < lastValidated);
+            }
+
+            function trustedCount(ledger, hash) {
+                let n = 0;
+                for (const [key, v] of ledger.validations)
+                    if (unl.has(key) && (!hash || v.hash === hash)) n++;
+                return n;
+            }
+
+            function validatorName(key) {
+                return registry.get(key)?.domain || null;
+            }
+
+            function short(key) {
+                return `${key.slice(0, 8)}…${key.slice(-6)}`;
+            }
+
+            function explorerLedger(index) {
+                const base = EXPLORERS[networkId];
+                return base ? `${base}/ledgers/${index}` : null;
+            }
+
+            // ---------- Rendering ----------
+
+            function scheduleRender() {
+                if (renderTimer) return;
+                renderTimer = setTimeout(() => {
+                    renderTimer = null;
+                    render();
+                }, 250);
+            }
+
+            function render() {
+                renderStats();
+                renderNegativeUnl();
+                renderLedgers();
+                renderValidators();
+            }
+
+            function stat(label, value, sub = '', cls = '') {
+                return `<div class="stat">
+                    <div class="stat-label">${label}</div>
+                    <div class="stat-value ${cls}">${value ?? '—'}</div>
+                    <div class="stat-sub">${sub}</div>
+                </div>`;
+            }
+
+            function renderStats() {
+                const q = quorum();
+                const interval = avgCloseInterval();
+                const latest = lastValidated ? ledgers.get(lastValidated) : null;
+                const trusted = latest ? trustedCount(latest, latest.hash) : null;
+                const others = latest
+                    ? [...latest.validations.keys()].filter((k) => !unl.has(k)).length
+                    : null;
+                const nunlCount = nunl?.disabled?.length;
+                const flag = nextFlagLedger();
+
+                document.getElementById('stats').innerHTML = [
+                    stat(
+                        'Validated ledger',
+                        lastValidated?.toLocaleString(),
+                        networkId != null ? `Network ID ${networkId}` : '',
+                    ),
+                    stat(
+                        'Avg close interval',
+                        interval != null ? `${interval.toFixed(2)}s` : null,
+                        'Last 10 ledgers',
+                    ),
+                    stat(
+                        'UNL validations',
+                        trusted != null && unl.size ? `${trusted} / ${unl.size}` : null,
+                        others != null ? `${others} other validators` : '',
+                        trusted != null && q ? (trusted >= q ? 'ok' : 'warn') : '',
+                    ),
+                    stat('Quorum', q, reportedQuorum ? 'Reported by server' : 'Computed from UNL'),
+                    stat(
+                        'Negative UNL',
+                        nunlCount,
+                        nunl?.exists === false ? 'No NegativeUNL object' : '',
+                        nunlCount ? 'warn' : nunlCount === 0 ? 'ok' : '',
+                    ),
+                    stat(
+                        'Next flag ledger',
+                        flag?.toLocaleString(),
+                        flag ? `in ${flag - lastValidated} ledgers` : '',
+                    ),
+                ].join('');
+            }
+
+            function validatorLabel(key) {
+                const name = validatorName(key);
+                return `<b>${escapeHtml(name || 'Unknown domain')}</b>
+                    <span class="mono" title="${escapeHtml(key)}">${escapeHtml(short(key))}</span>`;
+            }
+
+            function renderNegativeUnl() {
+                const el = document.getElementById('nunl');
+                if (!nunl) {
+                    el.innerHTML = '<div>Loading…</div>';
+                    return;
+                }
+                if (nunl.error) {
+                    el.innerHTML = `<div class="nunl-state warn">Unknown</div>
+                        <div class="muted-block">Could not read the NegativeUNL object: ${escapeHtml(nunl.error)}</div>`;
+                    return;
+                }
+                const count = nunl.disabled.length;
+                const max = unl.size ? Math.floor(unl.size * 0.25) : null;
+                const state = count
+                    ? `<div class="nunl-state warn">${count} disabled</div>`
+                    : '<div class="nunl-state ok">Empty</div>';
+                const note = nunl.exists
+                    ? `NegativeUNL object present in validated ledger ${nunl.ledgerIndex?.toLocaleString()}.`
+                    : `No NegativeUNL object in validated ledger ${nunl.ledgerIndex?.toLocaleString() ?? ''}.`;
+                const limit =
+                    max != null
+                        ? ` At most ${max} of ${unl.size} UNL validators can be disabled.`
+                        : '';
+
+                const rows = nunl.disabled.map(
+                    (d) => `<div class="nunl-row">
+                        <div>${validatorLabel(d.key)}</div>
+                        <div>Disabled since ledger <b>${d.since.toLocaleString()}</b></div>
+                    </div>`,
+                );
+                const flag = nextFlagLedger();
+                if (nunl.toDisable)
+                    rows.push(`<div class="nunl-row pending">
+                        <div>${validatorLabel(nunl.toDisable)}</div>
+                        <div>To be disabled at flag ledger <b>${flag?.toLocaleString() ?? ''}</b></div>
+                    </div>`);
+                if (nunl.toReEnable)
+                    rows.push(`<div class="nunl-row pending">
+                        <div>${validatorLabel(nunl.toReEnable)}</div>
+                        <div>To be re-enabled at flag ledger <b>${flag?.toLocaleString() ?? ''}</b></div>
+                    </div>`);
+
+                el.innerHTML = `<div>
+                        ${state}
+                        <div class="nunl-note">${note}${limit}</div>
+                    </div>
+                    <div class="nunl-list">${
+                        rows.length
+                            ? rows.join('')
+                            : '<div class="muted-block">No validators are disabled or scheduled for a change. The NegativeUNL only changes on flag ledgers (every 256 ledgers).</div>'
+                    }</div>`;
+            }
+
+            function renderHash(ledger, hash, validations) {
+                const isValidated = ledger.hash && hash === ledger.hash;
+                const cls = !ledger.hash ? 'pending' : isValidated ? '' : 'other';
+                const sorted = validations.sort(
+                    (a, b) => unl.has(b.key) - unl.has(a.key) || a.key.localeCompare(b.key),
+                );
+                const bars = sorted
+                    .map(({ key, full }) => {
+                        const name = validatorName(key) || key;
+                        const kind = unl.has(key) ? 'trusted' : '';
+                        return `<div class="validation ${kind} ${full ? '' : 'partial'}" title="${escapeHtml(name)}${full ? '' : ' (partial)'}"></div>`;
+                    })
+                    .join('');
+                const trusted = sorted.filter((v) => unl.has(v.key)).length;
+
+                let missed = '';
+                if (isValidated && unl.size) {
+                    const missing = [...unl].filter((k) => !ledger.validations.has(k));
+                    if (missing.length) {
+                        const names = missing.map((k) => validatorName(k) || short(k)).join('\n');
+                        missed = `<span class="missed">Missed <b title="${escapeHtml(names)}">${missing.length}</b></span>`;
+                    }
+                }
+
+                return `<div class="hash ${cls}">
+                    <div class="bar"></div>
+                    <div class="hash-title">
+                        <span class="mono" title="${escapeHtml(hash)}">${escapeHtml(hash.slice(0, 6))}</span>
+                        ${isValidated ? '<span class="check" aria-label="validated">✓</span>' : ''}
+                    </div>
+                    <div class="subtitle">
+                        ${unl.size ? `<span>UNL <b>${trusted}/${unl.size}</b></span>` : ''}
+                        <span>Total <b>${sorted.length}</b></span>
+                        ${missed}
+                    </div>
+                    <div class="validations">${bars}</div>
+                </div>`;
+            }
+
+            function renderLedgers() {
+                const el = document.getElementById('ledgers');
+                const list = [...ledgers.values()]
+                    .sort((a, b) => b.index - a.index)
+                    .slice(0, LEDGERS_SHOWN);
+                if (!list.length) {
+                    el.innerHTML = '<div class="empty">Waiting for ledgers…</div>';
+                    return;
+                }
+                el.innerHTML = list
+                    .map((ledger) => {
+                        const byHash = new Map();
+                        for (const [key, v] of ledger.validations) {
+                            if (!byHash.has(v.hash)) byHash.set(v.hash, []);
+                            byHash.get(v.hash).push({ key, full: v.full });
+                        }
+                        if (ledger.hash && !byHash.has(ledger.hash)) byHash.set(ledger.hash, []);
+                        const hashes = [...byHash.entries()].sort(
+                            ([ha, a], [hb, b]) =>
+                                (hb === ledger.hash) - (ha === ledger.hash) || b.length - a.length,
+                        );
+                        const link = explorerLedger(ledger.index);
+                        const indexText = ledger.index.toLocaleString();
+                        const isFlag = ledger.index % FLAG_LEDGER_INTERVAL === 0;
+                        const closeTime =
+                            ledger.closeTime != null
+                                ? new Date(
+                                      (ledger.closeTime + 946684800) * 1000,
+                                  ).toLocaleTimeString()
+                                : 'Not validated yet';
+                        const isNew = !renderedLedgers.has(ledger.index);
+                        renderedLedgers.add(ledger.index);
+                        return `<div class="ledger ${isNew ? 'new' : ''}">
+                            <div class="ledger-head">
+                                <div class="ledger-index ${isFlag ? 'flag' : ''}">${
+                                    link
+                                        ? `<a href="${link}" target="_blank" rel="noopener">${indexText}</a>`
+                                        : indexText
+                                }</div>
+                                <div>${closeTime}${isFlag ? ' · flag' : ''}</div>
+                                <div class="row"><span>Txns</span><b>${ledger.txnCount ?? '—'}</b></div>
+                            </div>
+                            ${hashes.map(([hash, vals]) => renderHash(ledger, hash, vals)).join('')}
+                        </div>`;
+                    })
+                    .join('');
+            }
+
+            function validatorStatus(key, nunlSet, settled) {
+                if (nunlSet.has(key)) return ['nUNL', 'nunl'];
+                const seen = lastSeen.get(key);
+                if (seen == null) return ['Not seen', 'warn'];
+                if (lastValidated - seen > LAG_THRESHOLD)
+                    return [`${lastValidated - seen} behind`, 'warn'];
+                const recent = settled.slice(-5);
+                if (
+                    recent.some(
+                        (l) => l.validations.has(key) && l.validations.get(key).hash !== l.hash,
+                    )
+                )
+                    return ['Disagreeing', 'warn'];
+                return ['Validating', 'ok'];
+            }
+
+            function renderValidators() {
+                const el = document.getElementById('validators');
+                const title = document.getElementById('validatorsTitle');
+                if (!unl.size) {
+                    const why =
+                        registryError ||
+                        (networkId != null && !UNL_PUBLISHERS[networkId]
+                            ? `No known UNL publisher for network ID ${networkId}.`
+                            : 'Loading the UNL…');
+                    title.textContent = 'UNL validators';
+                    el.innerHTML = `<div class="empty">${escapeHtml(why)}</div>`;
+                    return;
+                }
+                const nunlSet = nunlKeys();
+                const settled = settledLedgers().sort((a, b) => a.index - b.index);
+                const rows = [...unl].map((key) => {
+                    const [label, cls] = validatorStatus(key, nunlSet, settled);
+                    const agreed = settled.filter(
+                        (l) => l.validations.get(key)?.hash === l.hash,
+                    ).length;
+                    const pct = settled.length ? (agreed / settled.length) * 100 : null;
+                    return { key, label, cls, agreed, pct, entry: registry.get(key) };
+                });
+                const rank = { nunl: 0, warn: 1, ok: 2 };
+                rows.sort(
+                    (a, b) =>
+                        rank[a.cls] - rank[b.cls] ||
+                        (a.entry?.domain || '~').localeCompare(b.entry?.domain || '~'),
+                );
+
+                title.textContent = `UNL validators (${unl.size}, from ${UNL_PUBLISHERS[networkId]})`;
+                el.innerHTML = `<table>
+                    <thead><tr>
+                        <th>Validator</th><th>Master key</th><th>Status</th>
+                        <th>Last ledger</th><th>Agreement (${settled.length} ledgers)</th><th>Version</th>
+                    </tr></thead>
+                    <tbody>${rows
+                        .map(
+                            (r) => `<tr>
+                        <td class="domain">${escapeHtml(r.entry?.domain || 'Unknown domain')}</td>
+                        <td class="key mono" title="${escapeHtml(r.key)}">${escapeHtml(r.key)}</td>
+                        <td><span class="badge ${r.cls}">${r.label}</span></td>
+                        <td>${lastSeen.get(r.key)?.toLocaleString() ?? '—'}</td>
+                        <td>${
+                            r.pct == null
+                                ? '—'
+                                : `<div class="agreement"><div class="meter"><div style="width:${r.pct}%"></div></div>${r.agreed}/${settled.length}</div>`
+                        }</td>
+                        <td>${escapeHtml(r.entry?.server_version || '—')}</td>
+                    </tr>`,
+                        )
+                        .join('')}</tbody>
+                </table>${registryError ? `<div class="notice">${escapeHtml(registryError)}</div>` : ''}`;
+            }
+
+            // ---------- Setup ----------
+
+            const networkSelect = document.getElementById('network');
+            const nodeUrl = document.getElementById('nodeUrl');
+
+            function setNodeSuggestions(network) {
+                document.getElementById('nodeList').innerHTML = (NETWORKS[network] || [])
+                    .map((url) => `<option value="${escapeHtml(url)}"></option>`)
+                    .join('');
+            }
+
+            function connectNode(url) {
+                if (!url) return;
+                nodeUrl.value = url;
+                setQueryParam('node', url);
+                connect(url);
+            }
+
+            networkSelect.addEventListener('change', () => {
+                const network = networkSelect.value;
+                setNodeSuggestions(network);
+                if (NETWORKS[network]) {
+                    connectNode(NETWORKS[network][0]);
+                } else {
+                    nodeUrl.value = '';
+                    nodeUrl.focus();
+                }
+            });
+            document
+                .getElementById('connectBtn')
+                .addEventListener('click', () => connectNode(nodeUrl.value.trim()));
+            nodeUrl.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') connectNode(nodeUrl.value.trim());
+            });
+
+            // Shows the network the node actually reports, not the one picked from the menu.
+            function syncNetworkSelect() {
+                const network = NETWORK_IDS[networkId] || 'other';
+                networkSelect.value = network;
+                setNodeSuggestions(network);
+            }
+
+            function initialUrl() {
+                const network = getQueryParam('network');
+                return (
+                    getQueryParam('node') ||
+                    NETWORKS[network]?.[0] ||
+                    Storage.get(URL_KEY) ||
+                    NETWORKS.mainnet[0]
+                );
+            }
+
+            const startUrl = initialUrl();
+            const startNetwork =
+                Object.keys(NETWORKS).find((k) => NETWORKS[k].includes(startUrl)) || 'other';
+            networkSelect.value = startNetwork;
+            setNodeSuggestions(startNetwork);
+            nodeUrl.value = startUrl;
+
+            loadRegistry();
+            connect(startUrl);
+        </script>
+    </body>
+</html>

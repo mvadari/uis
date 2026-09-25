@@ -204,6 +204,23 @@ Validate and inspect AI-generated JSON arrays as tabular data.
 
 ---
 
+### 📡 XRPL Network Monitor
+
+Live view of XRPL consensus health, styled after livenet.xrpl.org.
+
+**Features:**
+
+- Streams validated ledgers and every validation, grouped by ledger hash, with UNL and other validators told apart
+- Flags UNL validators that missed a ledger, lag behind, or validated a different hash
+- Shows whether the Negative UNL is empty, which validators it disables, and any pending disable/re-enable at the next flag ledger
+- Per-validator agreement, last validated ledger, and server version for the whole UNL
+- Mainnet, Testnet and Devnet, with a configurable node so you can compare what different servers report
+- UNL membership and domains come from the data.xrpl.org validator registry
+
+[**Launch XRPL Network Monitor →**](https://mvadari.github.io/uis/monitoring.html)
+
+---
+
 ## Local Development
 
 All tools are self-contained HTML files. To run locally:
