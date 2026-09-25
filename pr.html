@@ -649,6 +649,59 @@
                 padding-left: 22px;
             }
 
+            /* GitHub's rendered ```suggestion block, from bodyHTML */
+            .comment-body .js-suggested-changes-blob {
+                border: 1px solid var(--color-border-default);
+                border-radius: 6px;
+                margin: 8px 0;
+                overflow: hidden;
+            }
+            .comment-body .js-suggested-changes-blob > .border-bottom {
+                background: var(--color-canvas-subtle);
+                border-bottom: 1px solid var(--color-border-default);
+                color: var(--color-fg-muted);
+                font-size: 12px;
+                padding: 6px 10px;
+            }
+            .comment-body .js-suggested-changes-blob table {
+                border-collapse: collapse;
+                font-family:
+                    ui-monospace, SFMono-Regular, 'SF Mono', Consolas, 'Liberation Mono', Menlo,
+                    monospace;
+                font-size: 12px;
+                width: 100%;
+            }
+            .comment-body .js-suggested-changes-blob td {
+                padding: 2px 8px;
+                white-space: pre;
+            }
+            .comment-body .js-suggested-changes-blob .blob-num {
+                color: var(--color-fg-muted);
+                text-align: right;
+                user-select: none;
+                width: 1%;
+            }
+            .comment-body .js-suggested-changes-blob .blob-num::before {
+                content: attr(data-line-number);
+            }
+            .comment-body .blob-num-deletion,
+            .comment-body .blob-code-deletion {
+                background: var(--color-diff-del-bg);
+            }
+            .comment-body .blob-num-addition,
+            .comment-body .blob-code-addition {
+                background: var(--color-diff-add-bg);
+            }
+            .comment-body .blob-code-deletion .x {
+                background: color-mix(in srgb, var(--color-diff-del-fg) 25%, transparent);
+            }
+            .comment-body .blob-code-addition .x {
+                background: color-mix(in srgb, var(--color-diff-add-fg) 25%, transparent);
+            }
+            .diff-comment-suggest-btn {
+                margin-right: auto;
+            }
+
             .thread-actions {
                 border-top: 1px solid var(--color-border-muted);
                 padding: 12px;
@@ -2627,6 +2680,7 @@
                 if (f._lineInfo) return f._lineInfo;
                 const commentable = new Set();
                 const added = new Set();
+                const text = new Map();
                 let newLn = 0;
                 (f.patch || '')
                     .replace(/\n$/, '')
@@ -2642,9 +2696,10 @@
                         if (marker === '\\' || marker === '-') return; // old side only
                         if (marker === '+') added.add(newLn);
                         commentable.add(newLn);
+                        text.set(newLn, line.slice(1));
                         newLn++;
                     });
-                f._lineInfo = { commentable, added };
+                f._lineInfo = { commentable, added, text };
                 return f._lineInfo;
             }
 
@@ -4122,6 +4177,7 @@
                 <div class="diff-comment-form" data-path="${escapeHtml(path)}" data-line="${escapeHtml(line)}" data-side="${escapeHtml(side)}" data-start-line="${isRange ? escapeHtml(startLine) : ''}">
                     <textarea class="reply-input diff-comment-input" placeholder="Leave a comment on ${target}..."></textarea>
                     <div class="thread-buttons">
+                        ${side === 'RIGHT' ? `<button class="btn btn-small diff-comment-suggest-btn" type="button" title="Insert a suggested change for ${target}">Suggest</button>` : ''}
                         <button class="btn btn-small diff-comment-cancel-btn" type="button">Cancel</button>
                         <button class="btn btn-small diff-comment-review-btn" type="button" title="Hold this comment in a pending review instead of publishing it now">${hasPending ? 'Add to review' : 'Start a review'}</button>
                         <button class="btn btn-small btn-primary diff-comment-post-btn" type="button" title="Publish this comment on its own, right now">Comment</button>
@@ -4160,6 +4216,27 @@
                 const textarea = node.querySelector('textarea');
                 textarea.focus();
                 return textarea;
+            }
+
+            // Inserts a suggestion block prefilled with the commented lines, as GitHub does.
+            // GitHub only accepts suggestions on the new side, so LEFT forms have no button.
+            function insertSuggestion(button) {
+                const formEl = button.closest('.diff-comment-form');
+                const textarea = formEl.querySelector('.diff-comment-input');
+                const f = files.find((x) => x.path === formEl.dataset.path);
+                const end = parseInt(formEl.dataset.line, 10);
+                const start = parseInt(formEl.dataset.startLine, 10) || end;
+                const info = patchLineInfo(f);
+                const source = f.rich && f.rich.lines;
+                const lines = [];
+                for (let n = start; n <= end; n++) {
+                    lines.push((source ? source[n - 1] : info.text.get(n)) ?? '');
+                }
+                const { selectionStart: at, selectionEnd, value } = textarea;
+                const before = at > 0 && value[at - 1] !== '\n' ? '\n' : '';
+                const block = `${before}\`\`\`suggestion\n${lines.join('\n')}\n\`\`\`\n`;
+                textarea.setRangeText(block, at, selectionEnd, 'end');
+                textarea.focus();
             }
 
             // mode 'single' publishes the comment on its own; mode 'review' holds it in a pending
@@ -4774,6 +4851,11 @@
                     const addBtn = event.target.closest('.diff-comment-btn');
                     if (addBtn) {
                         openInlineCommentForm(addBtn);
+                        return;
+                    }
+                    const suggestBtn = event.target.closest('.diff-comment-suggest-btn');
+                    if (suggestBtn) {
+                        insertSuggestion(suggestBtn);
                         return;
                     }
                     const cancelBtn = event.target.closest('.diff-comment-cancel-btn');
