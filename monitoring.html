@@ -403,9 +403,18 @@
                 font-size: 11px;
             }
 
+            .vversion.newest {
+                font-weight: 700;
+            }
+
             #validatorsNote .vversion {
                 margin-right: 8px;
                 font-weight: 700;
+            }
+
+            /* The dot shows health; keep green free for the newest version. */
+            .vcell.ok .vstat {
+                color: var(--fg-muted);
             }
 
             .vcell.warn .vstat {
@@ -426,8 +435,9 @@
             #tooltip {
                 position: fixed;
                 z-index: 10;
-                max-width: 340px;
+                max-width: min(480px, calc(100vw - 16px));
                 padding: 8px 10px;
+                overflow-wrap: anywhere;
                 border: 1px solid var(--border-strong);
                 border-radius: 4px;
                 background: var(--surface-raised);
@@ -548,14 +558,15 @@
             const LEDGERS_SHOWN = 12;
             const LAG_THRESHOLD = 3;
             const URL_KEY = 'monitoring_url';
-            // Distinct hues for versions, newest first. Orange is left out: it means a problem here.
+            // Version colors, newest first. The newest is bright (and bold); older ones are muted
+            // but still distinct hues. Orange is left out: it means a problem here.
             const VERSION_COLORS = [
                 '#32e685',
-                '#19a3ff',
-                '#c28cff',
-                '#ffd24d',
-                '#4de0e6',
-                '#ff8fb1',
+                '#7a9cc6',
+                '#a08cc0',
+                '#b3a66e',
+                '#7fadad',
+                '#b88a99',
             ];
             const XRPL_ALPHABET = 'rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz';
 
@@ -1186,8 +1197,9 @@
                         .sort(compareVersions)
                         .map((v, i) => [v, VERSION_COLORS[i] || 'var(--fg-subtle)']),
                 );
+                const newest = colors.keys().next().value;
                 const versionTag = (v, text) =>
-                    `<span class="vversion" style="color: ${colors.get(v)}">${escapeHtml(text)}</span>`;
+                    `<span class="vversion ${v === newest ? 'newest' : ''}" style="color: ${colors.get(v)}">${escapeHtml(text)}</span>`;
 
                 title.textContent = `UNL validators (${unl.size}, from ${UNL_PUBLISHERS[networkId]})`;
                 note.innerHTML = `${[...colors.keys()]
