@@ -362,7 +362,7 @@
             /* Validator grid */
             .validator-grid {
                 display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+                grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
                 gap: 1px;
                 padding: 1px;
             }
@@ -397,9 +397,14 @@
                 color: var(--fg);
             }
 
-            .vstat {
+            .vstat,
+            .vversion {
                 flex-shrink: 0;
                 font-size: 11px;
+            }
+
+            .vversion {
+                color: var(--fg-subtle);
             }
 
             .vcell.warn .vstat {
@@ -1132,6 +1137,7 @@
                             <span class="dot"></span>
                             <span class="vname">${escapeHtml(name)}</span>
                             ${r.onNunl ? '<span class="badge">nUNL</span>' : ''}
+                            <span class="vversion">${escapeHtml(r.entry?.server_version || '')}</span>
                             <span class="vstat">${escapeHtml(value)}</span>
                         </div>`;
                     })
