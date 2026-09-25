@@ -1230,7 +1230,10 @@
 
                 title.textContent = `UNL validators (${unl.size}, from ${UNL_PUBLISHERS[networkId]})`;
                 note.innerHTML = `${[...colors.keys()]
-                    .map((v) => versionTag(v, `${v} ×${counts.get(v)}`))
+                    .map((v) => {
+                        const pct = Math.round((counts.get(v) / health.length) * 100);
+                        return versionTag(v, `${v} ×${counts.get(v)} (${pct}%)`);
+                    })
                     .join(' ')} · Agreement over the last ${settledCount} ledgers`;
                 el.innerHTML = `<div class="validator-grid">${health
                     .map((r) => {
