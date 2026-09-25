@@ -126,6 +126,12 @@
                 cursor: pointer;
             }
 
+            .node-group {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+
             button:hover {
                 border-color: var(--border-strong);
             }
@@ -465,8 +471,26 @@
                     padding: 12px;
                 }
 
-                input[type='text'] {
+                /* Node field and Connect get their own full-width row, below network and status. */
+                .controls {
                     width: 100%;
+                }
+
+                .node-group {
+                    order: 1;
+                    width: 100%;
+                }
+
+                input[type='text'] {
+                    flex: 1;
+                    min-width: 0;
+                    width: auto;
+                }
+
+                /* Below 16px, iOS Safari zooms in on focus. */
+                input[type='text'],
+                select {
+                    font-size: 16px;
                 }
             }
         </style>
@@ -483,10 +507,12 @@
                         <option value="devnet">Devnet</option>
                         <option value="other">Other</option>
                     </select>
-                    <label for="nodeUrl" class="stat-label">Node</label>
-                    <input type="text" id="nodeUrl" placeholder="wss://..." list="nodeList" />
-                    <datalist id="nodeList"></datalist>
-                    <button id="connectBtn">Connect</button>
+                    <div class="node-group">
+                        <label for="nodeUrl" class="stat-label">Node</label>
+                        <input type="text" id="nodeUrl" placeholder="wss://..." list="nodeList" />
+                        <datalist id="nodeList"></datalist>
+                        <button id="connectBtn">Connect</button>
+                    </div>
                     <div class="conn" id="conn" role="status">
                         <span class="dot"></span><span id="connText">Disconnected</span>
                     </div>
@@ -1091,19 +1117,19 @@
                     const tip = trusted.length
                         ? `UNL validators:\n${names(trusted.map((v) => v.key))}`
                         : '';
-                    unlRow = `<span>UNL <b data-tip="${escapeHtml(tip)}">${trusted.length}/${unl.size}</b></span>`;
+                    unlRow = `<span data-tip="${escapeHtml(tip)}">UNL <b>${trusted.length}/${unl.size}</b></span>`;
                 }
                 let partialRow = '';
                 if (partial.length) {
                     const tip = `Partial validations:\n${names(partial.map((v) => v.key))}`;
-                    partialRow = `<span class="partial">Partial <b data-tip="${escapeHtml(tip)}">${partial.length}</b></span>`;
+                    partialRow = `<span class="partial" data-tip="${escapeHtml(tip)}">Partial <b>${partial.length}</b></span>`;
                 }
                 let missedRow = '';
                 if (isValidated && unl.size && ledger.index > firstValidated) {
                     const missing = [...unl].filter((k) => !ledger.validations.has(k));
                     if (missing.length) {
                         const tip = `Missed by:\n${names(missing)}`;
-                        missedRow = `<span class="missed">Missed <b data-tip="${escapeHtml(tip)}">${missing.length}</b></span>`;
+                        missedRow = `<span class="missed" data-tip="${escapeHtml(tip)}">Missed <b>${missing.length}</b></span>`;
                     }
                 }
 
@@ -1235,9 +1261,11 @@
             // ---------- Tooltip ----------
 
             // Sections re-render several times a second, which replaces the hovered element before a
-            // native title tooltip can appear. One tooltip follows the pointer instead.
+            // native title tooltip can appear. One tooltip follows the pointer instead. On touch
+            // screens a tap shows it, and a tap elsewhere or a scroll hides it.
             const tooltip = document.getElementById('tooltip');
             let pointer = null;
+            let fromTouch = false;
 
             function updateTooltip() {
                 const target =
@@ -1259,6 +1287,13 @@
             }
 
             document.addEventListener('mousemove', (e) => {
+                if (fromTouch) return; // browsers emulate a mousemove after a tap
+                pointer = { x: e.clientX, y: e.clientY };
+                updateTooltip();
+            });
+            document.addEventListener('pointerdown', (e) => {
+                fromTouch = e.pointerType !== 'mouse';
+                if (!fromTouch) return;
                 pointer = { x: e.clientX, y: e.clientY };
                 updateTooltip();
             });
@@ -1266,7 +1301,14 @@
                 pointer = null;
                 updateTooltip();
             });
-            window.addEventListener('scroll', updateTooltip, true);
+            window.addEventListener(
+                'scroll',
+                () => {
+                    if (fromTouch) pointer = null;
+                    updateTooltip();
+                },
+                true,
+            );
 
             // ---------- Setup ----------
 
