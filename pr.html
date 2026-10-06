@@ -3959,7 +3959,28 @@
                     els.filesContent.innerHTML = `<div class="empty-state">${msg}</div>`;
                     return;
                 }
+                // The rich view's panes scroll on their own, and rebuilding them would send both
+                // back to the top of the file after every reply, comment or refresh.
+                const paneScroll = new Map();
+                els.filesContent.querySelectorAll('.file-row').forEach((row) => {
+                    const panes = row.querySelectorAll('.md-pane');
+                    if (panes.length) {
+                        paneScroll.set(
+                            row.dataset.filePath,
+                            [...panes].map((p) => p.scrollTop),
+                        );
+                    }
+                });
                 els.filesContent.innerHTML = list.map(renderFileRow).join('');
+                paneScroll.forEach((tops, path) => {
+                    const row = els.filesContent.querySelector(
+                        `.file-row[data-file-path="${CSS.escape(path)}"]`,
+                    );
+                    if (!row) return;
+                    row.querySelectorAll('.md-pane').forEach(
+                        (p, i) => (p.scrollTop = tops[i] || 0),
+                    );
+                });
             }
 
             function updateFilesViewedButton() {
