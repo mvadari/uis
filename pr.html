@@ -1100,6 +1100,14 @@
                 padding: 12px;
             }
 
+            .diff-thread-row td {
+                border-top: 1px solid var(--color-border-muted);
+                font-family:
+                    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial,
+                    sans-serif;
+                font-size: 14px;
+            }
+
             .diff-comment-form .reply-input {
                 width: 100%;
             }
@@ -1954,6 +1962,12 @@
 
             const AUTHOR_FRAGMENT = 'author { login url avatarUrl __typename }';
 
+            const THREAD_FIELDS = `
+                      id isResolved isOutdated path line originalLine diffSide
+                      comments(first:50) {
+                        nodes { id ${AUTHOR_FRAGMENT} bodyHTML body createdAt url diffHunk path state }
+                      }`;
+
             const PR_QUERY = `
             query($owner:String!, $repo:String!, $number:Int!) {
               repository(owner:$owner, name:$repo) {
@@ -1968,12 +1982,7 @@
                   pendingReviews: reviews(first:1, states:[PENDING]) { nodes { id comments { totalCount } } }
                   reviewThreads(first:50) {
                     pageInfo { hasNextPage endCursor }
-                    nodes {
-                      id isResolved isOutdated path line originalLine
-                      comments(first:50) {
-                        nodes { id ${AUTHOR_FRAGMENT} bodyHTML body createdAt url diffHunk path state }
-                      }
-                    }
+                    nodes { ${THREAD_FIELDS} }
                   }
                   comments(first:50) {
                     pageInfo { hasNextPage endCursor }
@@ -1997,12 +2006,7 @@
                 pullRequest(number:$number) {
                   reviewThreads(first:50, after:$cursor) {
                     pageInfo { hasNextPage endCursor }
-                    nodes {
-                      id isResolved isOutdated path line originalLine
-                      comments(first:50) {
-                        nodes { id ${AUTHOR_FRAGMENT} bodyHTML body createdAt url diffHunk path state }
-                      }
-                    }
+                    nodes { ${THREAD_FIELDS} }
                   }
                 }
               }
@@ -2086,23 +2090,27 @@
                 const range = multiLine ? 'startLine:$startLine, startSide:$side, ' : '';
                 const thread = `{path:$path, ${range}line:$line, side:$side, body:$body}`;
                 const args = `$path:String!, $line:Int!, $side:DiffSide!, $body:String!${startArg}`;
+                // addPullRequestReview returns the review, not the thread it created, so read
+                // back the PR's newest thread. A thread someone else adds in the same instant
+                // could be picked up instead; the next refresh corrects it.
+                const newestThread = `id pullRequest { reviewThreads(last:1) { nodes { ${THREAD_FIELDS} } } }`;
                 return {
                     publish: `
                     mutation($prId:ID!, ${args}) {
                       addPullRequestReview(input:{pullRequestId:$prId, event:COMMENT, threads:[${thread}]}) {
-                        pullRequestReview { id }
+                        pullRequestReview { ${newestThread} }
                       }
                     }`,
                     startReview: `
                     mutation($prId:ID!, ${args}) {
                       addPullRequestReview(input:{pullRequestId:$prId, threads:[${thread}]}) {
-                        pullRequestReview { id }
+                        pullRequestReview { ${newestThread} }
                       }
                     }`,
                     addToReview: `
                     mutation($reviewId:ID!, ${args}) {
                       addPullRequestReviewThread(input:{pullRequestReviewId:$reviewId, path:$path, ${range}line:$line, side:$side, body:$body}) {
-                        thread { id }
+                        thread { ${THREAD_FIELDS} }
                       }
                     }`,
                 };
@@ -2270,15 +2278,7 @@
                         ciState: computeCiState(combinedStatus, checkRuns),
                         ciChecks: ciChecksList(combinedStatus, checkRuns),
                     },
-                    threads: threadNodes.map((t) => ({
-                        id: t.id,
-                        isResolved: t.isResolved,
-                        isOutdated: t.isOutdated,
-                        path: t.path,
-                        line: t.line,
-                        originalLine: t.originalLine,
-                        comments: (t.comments.nodes || []).slice().sort(byCreatedAt),
-                    })),
+                    threads: threadNodes.map(threadFrom),
                     comments: commentNodes.slice().sort(byCreatedAt),
                     reviews: reviewNodes
                         .filter((r) => (r.body || '').trim())
@@ -2290,6 +2290,19 @@
 
             function byCreatedAt(a, b) {
                 return new Date(a.createdAt) - new Date(b.createdAt);
+            }
+
+            function threadFrom(t) {
+                return {
+                    id: t.id,
+                    isResolved: t.isResolved,
+                    isOutdated: t.isOutdated,
+                    path: t.path,
+                    line: t.line,
+                    originalLine: t.originalLine,
+                    diffSide: t.diffSide,
+                    comments: (t.comments.nodes || []).slice().sort(byCreatedAt),
+                };
             }
 
             function pendingReviewFrom(p) {
@@ -3806,6 +3819,16 @@
                 let newLn = 0;
                 // Constant for the whole file; escaping it per diff line is pure waste.
                 const escapedPath = escapeHtml(f.path);
+                // Unresolved threads sit under the line they're on, as in the rich view. Outdated
+                // ones have no current line and stay in the Comments tab.
+                const threadsAt = new Map();
+                threads.forEach((t) => {
+                    if (t.path !== f.path || !t.line) return;
+                    if (t.isResolved && !t.resolutionUnknown) return;
+                    const key = `${t.diffSide || 'RIGHT'}:${t.line}`;
+                    if (!threadsAt.has(key)) threadsAt.set(key, []);
+                    threadsAt.get(key).push(t);
+                });
                 const rows = patch
                     .replace(/\n$/, '')
                     .split('\n')
@@ -3844,7 +3867,13 @@
                         const commentBtn = readOnly
                             ? ''
                             : `<button type="button" class="diff-comment-btn" data-path="${escapedPath}" data-line="${side === 'LEFT' ? oldNum : newNum}" data-side="${side}" title="Add a comment on this line">+</button>`;
-                        return `<tr class="diff-row ${cls}"><td class="diff-gutter">${oldNum}</td><td class="diff-gutter">${newNum}</td><td class="diff-code">${commentBtn}${escapeHtml(line) || '&nbsp;'}</td></tr>`;
+                        const lineThreads = threadsAt.get(
+                            `${side}:${side === 'LEFT' ? oldNum : newNum}`,
+                        );
+                        const threadRow = lineThreads
+                            ? `<tr class="diff-thread-row"><td colspan="3">${inlineThreadsHtml(lineThreads)}</td></tr>`
+                            : '';
+                        return `<tr class="diff-row ${cls}"><td class="diff-gutter">${oldNum}</td><td class="diff-gutter">${newNum}</td><td class="diff-code">${commentBtn}${escapeHtml(line) || '&nbsp;'}</td></tr>${threadRow}`;
                     });
                 return `<table class="diff-table"><tbody>${rows.join('')}</tbody></table>`;
             }
@@ -4282,27 +4311,40 @@
                 if (multiLine) vars.startLine = startLine;
                 const mutations = threadMutations(multiLine);
                 try {
+                    let thread;
                     if (mode !== 'review') {
-                        await graphql(mutations.publish, { ...vars, prId: prMeta.id });
+                        const data = await graphql(mutations.publish, {
+                            ...vars,
+                            prId: prMeta.id,
+                        });
+                        thread =
+                            data.addPullRequestReview.pullRequestReview.pullRequest.reviewThreads
+                                .nodes[0];
                     } else if (pending) {
-                        await graphql(mutations.addToReview, {
+                        const data = await graphql(mutations.addToReview, {
                             ...vars,
                             reviewId: pending.id,
                         });
+                        thread = data.addPullRequestReviewThread.thread;
+                        pending.count += 1;
                     } else {
-                        await graphql(mutations.startReview, { ...vars, prId: prMeta.id });
+                        const data = await graphql(mutations.startReview, {
+                            ...vars,
+                            prId: prMeta.id,
+                        });
+                        const review = data.addPullRequestReview.pullRequestReview;
+                        thread = review.pullRequest.reviewThreads.nodes[0];
+                        prMeta.pendingReview = { id: review.id, count: 1 };
                     }
+                    if (thread) threads.push(threadFrom(thread));
                     showToast(
                         mode === 'review' ? 'Added to your review' : 'Comment posted',
                         'success',
                     );
-                    // The reload snapshots open comment boxes so a background refresh can't eat
-                    // what you're typing — which would restore this one, text and all. It's sent;
-                    // drop it first so the posted comment takes its place.
+                    // The re-render snapshots open comment boxes and would restore this one, text
+                    // and all. It's sent; drop it first so the posted comment takes its place.
                     formEl.closest('.diff-comment-host').remove();
-                    // Refetching is the only way to get the new thread's id/isResolved/etc, so
-                    // reload wholesale; loadPR restores the per-file view state it rebuilds.
-                    await loadPR();
+                    renderAllKeepingDrafts();
                 } catch (error) {
                     console.error('Failed to post inline comment:', error);
                     setError(error.message);
@@ -4894,8 +4936,9 @@
                         submitInlineComment(reviewBtn, 'review');
                         return;
                     }
-                    // Clicking inside the open comment form (e.g. the textarea) shouldn't collapse the file.
-                    if (event.target.closest('.diff-comment-host')) return;
+                    // Clicking inside the open comment form (e.g. the textarea) or a thread shouldn't
+                    // collapse the file.
+                    if (event.target.closest('.diff-comment-host, .md-thread')) return;
                     // Nor should reading, selecting, or following a link in the rich view.
                     if (event.target.closest('.md-view')) {
                         commentOnMarkdownClick(event.target) ||
