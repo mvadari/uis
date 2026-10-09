@@ -1,0 +1,2466 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>XRPL Batch Builder</title>
+        <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+        <link rel="stylesheet" href="shared-styles.css" />
+        <style>
+            body {
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+                background: var(--color-canvas-subtle);
+                color: var(--color-fg-default);
+            }
+
+            .mono {
+                font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            }
+
+            .muted {
+                color: var(--color-fg-muted);
+            }
+
+            /* Top bar */
+            .topbar {
+                display: flex;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 10px;
+                padding: 10px 16px;
+                background: var(--color-canvas-default);
+                border-bottom: 1px solid var(--color-border-default);
+            }
+
+            .brand {
+                font-weight: 600;
+                font-size: 16px;
+                margin-right: auto;
+                color: var(--color-fg-default);
+                text-decoration: none;
+            }
+
+            .topbar select,
+            .topbar input {
+                width: auto;
+                padding: 5px 10px;
+                font-size: 13px;
+            }
+
+            #customUrl {
+                width: 280px;
+            }
+
+            .net-status {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                font-size: 13px;
+            }
+
+            .status-dot {
+                width: 9px;
+                height: 9px;
+                border-radius: 50%;
+                background: var(--color-danger-fg);
+            }
+
+            .status-dot.connecting {
+                background: var(--color-attention-fg);
+            }
+
+            .status-dot.connected {
+                background: var(--color-success-fg);
+            }
+
+            .net-meta {
+                font-size: 12px;
+                color: var(--color-fg-muted);
+            }
+
+            /* Three-column layout */
+            .layout {
+                flex: 1;
+                display: grid;
+                grid-template-columns: 250px minmax(0, 1fr) 390px;
+                min-height: 0;
+            }
+
+            .layout > * {
+                overflow-y: auto;
+                min-height: 0;
+            }
+
+            /* Palette */
+            .palette {
+                background: var(--color-canvas-default);
+                border-right: 1px solid var(--color-border-default);
+                padding: 12px;
+            }
+
+            .palette-hint {
+                font-size: 12px;
+                color: var(--color-fg-muted);
+                margin: 6px 0 0;
+            }
+
+            .palette-group h3 {
+                font-size: 11px;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                color: var(--color-fg-muted);
+                margin: 14px 0 6px;
+            }
+
+            .palette-item {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 5px 10px;
+                margin-bottom: 4px;
+                font-size: 13px;
+                border: 1px solid var(--color-border-default);
+                border-left: 4px solid var(--cat);
+                border-radius: 6px;
+                background: var(--color-canvas-default);
+                cursor: grab;
+                user-select: none;
+            }
+
+            .palette-item:hover,
+            .palette-item:focus-visible {
+                border-color: var(--cat);
+                background: var(--color-canvas-subtle);
+                outline: none;
+            }
+
+            /* Canvas */
+            .canvas {
+                padding: 20px 24px 60px;
+            }
+
+            .canvas-inner {
+                max-width: 860px;
+                margin: 0 auto;
+            }
+
+            .canvas-head {
+                display: flex;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 8px;
+                margin-bottom: 14px;
+            }
+
+            .canvas-head h1 {
+                font-size: 20px;
+                margin-right: auto;
+            }
+
+            .batch-card {
+                background: var(--color-canvas-default);
+                border: 1px solid var(--color-border-default);
+                border-top: 4px solid var(--color-done-fg);
+                border-radius: 10px;
+                padding: 14px 16px;
+                display: grid;
+                gap: 12px;
+            }
+
+            .batch-row {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) 150px;
+                gap: 12px;
+            }
+
+            .mode-group {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+            }
+
+            .mode-btn {
+                border: 1px solid var(--color-border-default);
+                background: var(--color-canvas-subtle);
+                color: var(--color-fg-default);
+                border-radius: 999px;
+                padding: 3px 12px;
+                font-size: 13px;
+                cursor: pointer;
+            }
+
+            .mode-btn[aria-pressed='true'] {
+                background: var(--color-done-subtle);
+                border-color: var(--color-done-fg);
+                color: var(--color-done-fg);
+                font-weight: 600;
+            }
+
+            .mode-help {
+                font-size: 12px;
+                color: var(--color-fg-muted);
+                margin-top: 4px;
+            }
+
+            .connector {
+                width: 2px;
+                height: 16px;
+                margin-left: 30px;
+                background: var(--color-border-default);
+            }
+
+            .steps {
+                min-height: 240px;
+                padding-bottom: 40px;
+            }
+
+            .empty-drop {
+                border: 2px dashed var(--color-border-default);
+                border-radius: 10px;
+                padding: 48px 20px;
+                text-align: center;
+                color: var(--color-fg-muted);
+            }
+
+            .steps.drag-active .empty-drop {
+                border-color: var(--color-accent-fg);
+                background: var(--color-accent-subtle);
+            }
+
+            .drop-marker {
+                height: 4px;
+                margin: 6px 0;
+                border-radius: 2px;
+                background: var(--color-accent-fg);
+            }
+
+            .step {
+                background: var(--color-canvas-default);
+                border: 1px solid var(--color-border-default);
+                border-left: 5px solid var(--cat);
+                border-radius: 10px;
+            }
+
+            .step.dragging {
+                opacity: 0.4;
+            }
+
+            .step-head {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 7px 10px;
+            }
+
+            .handle {
+                cursor: grab;
+                color: var(--color-fg-muted);
+                padding: 0 2px;
+                font-size: 16px;
+                user-select: none;
+            }
+
+            .step-num {
+                flex: none;
+                width: 22px;
+                height: 22px;
+                border-radius: 50%;
+                background: var(--cat);
+                color: #fff;
+                font-size: 12px;
+                font-weight: 600;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .step-type {
+                font-weight: 600;
+            }
+
+            .step-summary {
+                flex: 1;
+                min-width: 0;
+                font-size: 13px;
+                color: var(--color-fg-muted);
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .step-badges {
+                display: inline-flex;
+                gap: 4px;
+            }
+
+            .icon-btn {
+                background: none;
+                border: 1px solid transparent;
+                border-radius: 6px;
+                color: var(--color-fg-muted);
+                cursor: pointer;
+                padding: 1px 6px;
+                font-size: 13px;
+                line-height: 1.5;
+            }
+
+            .icon-btn:hover {
+                background: var(--color-canvas-subtle);
+                border-color: var(--color-border-default);
+                color: var(--color-fg-default);
+            }
+
+            .icon-btn:disabled {
+                opacity: 0.4;
+                cursor: default;
+            }
+
+            .step-body {
+                display: grid;
+                gap: 10px;
+                padding: 10px 14px 14px;
+                border-top: 1px solid var(--color-border-muted);
+            }
+
+            .field-label {
+                display: flex;
+                align-items: baseline;
+                gap: 6px;
+                font-size: 12px;
+                font-weight: 600;
+                margin-bottom: 3px;
+            }
+
+            .field-type {
+                font-weight: 400;
+                font-size: 11px;
+                color: var(--color-fg-muted);
+                font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            }
+
+            .field-label .icon-btn {
+                margin-left: auto;
+                font-size: 11px;
+                padding: 0 5px;
+            }
+
+            .required {
+                color: var(--color-danger-fg);
+            }
+
+            .step-body input,
+            .step-body select,
+            .step-body textarea,
+            .batch-card input {
+                font-size: 13px;
+                padding: 5px 8px;
+            }
+
+            .step-body textarea {
+                font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                font-size: 12px;
+                min-height: 64px;
+                resize: vertical;
+            }
+
+            .amount-row {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+            }
+
+            .amount-row > select {
+                flex: 0 0 90px;
+            }
+
+            .amount-row > .a-value {
+                flex: 1 1 120px;
+            }
+
+            .amount-row > .a-currency {
+                flex: 0 1 100px;
+            }
+
+            .amount-row > .a-issuer,
+            .amount-row > .a-mpt {
+                flex: 2 1 220px;
+            }
+
+            .inline-check {
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                font-size: 11px;
+                font-weight: 400;
+                color: var(--color-fg-muted);
+            }
+
+            .inline-check input {
+                width: auto;
+            }
+
+            .flag-list {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 4px 14px;
+                font-size: 13px;
+            }
+
+            .flag-list label {
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+            }
+
+            .flag-list input {
+                width: auto;
+            }
+
+            .invalid {
+                border-color: var(--color-danger-fg) !important;
+            }
+
+            .badge-danger {
+                background-color: var(--color-danger-subtle);
+                color: var(--color-danger-fg);
+            }
+
+            /* Side panel */
+            .side {
+                background: var(--color-canvas-default);
+                border-left: 1px solid var(--color-border-default);
+                padding: 12px;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .panel {
+                border: 1px solid var(--color-border-default);
+                border-radius: 8px;
+                flex: none;
+            }
+
+            .panel-head {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                padding: 8px 12px;
+                font-size: 13px;
+                font-weight: 600;
+                border-bottom: 1px solid var(--color-border-default);
+            }
+
+            .panel-head .spacer {
+                flex: 1;
+            }
+
+            .panel-body {
+                padding: 10px 12px;
+                font-size: 13px;
+            }
+
+            .account-row {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                padding: 6px 0;
+                border-bottom: 1px solid var(--color-border-muted);
+            }
+
+            .account-row:last-child {
+                border-bottom: none;
+            }
+
+            .account-main {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .account-addr {
+                display: block;
+                font-size: 12px;
+                cursor: pointer;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                background: none;
+                border: none;
+                padding: 0;
+                color: var(--color-fg-default);
+                text-align: left;
+                max-width: 100%;
+            }
+
+            .account-meta {
+                font-size: 12px;
+                color: var(--color-fg-muted);
+            }
+
+            pre.json {
+                font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                font-size: 12px;
+                background: var(--color-canvas-subtle);
+                border-radius: 6px;
+                padding: 10px;
+                max-height: 420px;
+                overflow: auto;
+                white-space: pre;
+            }
+
+            .issues {
+                list-style: none;
+                margin-bottom: 10px;
+                font-size: 12.5px;
+                color: var(--color-attention-fg);
+            }
+
+            .issues li::before {
+                content: '• ';
+            }
+
+            .run-result {
+                margin-top: 10px;
+                display: grid;
+                gap: 6px;
+            }
+
+            .run-result table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 12px;
+            }
+
+            .run-result td {
+                padding: 3px 4px;
+                border-top: 1px solid var(--color-border-muted);
+            }
+
+            .run-result a {
+                color: var(--color-accent-fg);
+            }
+
+            .hint {
+                font-size: 12px;
+                color: var(--color-fg-muted);
+                margin-top: 6px;
+            }
+
+            .recipe-row {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 6px 0;
+                border-bottom: 1px solid var(--color-border-muted);
+            }
+
+            .recipe-row .name {
+                flex: 1;
+                font-weight: 500;
+            }
+
+            .modal-content {
+                background: var(--color-canvas-default);
+                color: var(--color-fg-default);
+            }
+
+            .modal-body textarea {
+                font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                font-size: 12px;
+                min-height: 260px;
+            }
+
+            @media (max-width: 1100px) {
+                body {
+                    height: auto;
+                    overflow: auto;
+                }
+
+                .layout {
+                    grid-template-columns: 1fr;
+                }
+
+                .palette {
+                    max-height: 320px;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <header class="topbar">
+            <a class="brand" href="index.html">XRPL Batch Builder</a>
+            <select id="networkSelect" aria-label="Network"></select>
+            <input
+                type="text"
+                id="customUrl"
+                placeholder="wss://your-node:51233"
+                aria-label="Custom WebSocket URL"
+                hidden
+            />
+            <button class="btn btn-small" id="connectBtn">Connect</button>
+            <span class="net-status">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">Disconnected</span>
+            </span>
+            <span class="net-meta" id="netMeta"></span>
+        </header>
+
+        <main class="layout">
+            <aside class="palette" aria-label="Transaction palette">
+                <input type="search" id="paletteSearch" placeholder="Search transactions" />
+                <p class="palette-hint">Drag a block into the recipe, or click it to add.</p>
+                <div id="paletteList"></div>
+            </aside>
+
+            <section class="canvas">
+                <div class="canvas-inner">
+                    <div class="canvas-head">
+                        <h1>Recipe</h1>
+                        <button class="btn btn-small" data-action="open-import">Import JSON</button>
+                        <button class="btn btn-small" data-action="open-recipes">
+                            Saved recipes
+                        </button>
+                        <button class="btn btn-small" data-action="share">Copy link</button>
+                        <button class="btn btn-small" data-action="clear">Clear</button>
+                    </div>
+
+                    <div class="batch-card">
+                        <div class="batch-row">
+                            <div>
+                                <label class="field-label" for="outerAccount"
+                                    >Batch account
+                                    <span class="field-type">submits and pays the fee</span></label
+                                >
+                                <input
+                                    type="text"
+                                    id="outerAccount"
+                                    list="accountOptions"
+                                    class="mono"
+                                    placeholder="r…"
+                                    spellcheck="false"
+                                    autocomplete="off"
+                                />
+                            </div>
+                            <div>
+                                <label class="field-label" for="feeOverride"
+                                    >Fee <span class="field-type">drops</span></label
+                                >
+                                <input
+                                    type="text"
+                                    id="feeOverride"
+                                    placeholder="auto"
+                                    inputmode="numeric"
+                                    autocomplete="off"
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <div class="field-label">Mode</div>
+                            <div
+                                class="mode-group"
+                                id="modeGroup"
+                                role="group"
+                                aria-label="Batch mode"
+                            ></div>
+                            <div class="mode-help" id="modeHelp"></div>
+                        </div>
+                    </div>
+                    <div class="connector"></div>
+
+                    <div class="steps" id="steps"></div>
+                </div>
+            </section>
+
+            <aside class="side">
+                <div class="panel">
+                    <div class="panel-head">
+                        Accounts
+                        <span class="spacer"></span>
+                        <button class="btn btn-small" data-action="generate-wallet">+ New</button>
+                        <button class="btn btn-small" data-action="open-seed">Import seed</button>
+                        <button
+                            class="icon-btn"
+                            data-action="refresh-balances"
+                            aria-label="Refresh balances"
+                            title="Refresh balances"
+                        >
+                            ↻
+                        </button>
+                    </div>
+                    <div class="panel-body" id="accountList"></div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-head">Submit</div>
+                    <div class="panel-body">
+                        <ul class="issues" id="issues"></ul>
+                        <button class="btn btn-primary" id="submitBtn" data-action="submit">
+                            Sign &amp; submit batch
+                        </button>
+                        <div class="run-result" id="runResult"></div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-head">
+                        Batch JSON
+                        <span class="spacer"></span>
+                        <button class="btn btn-small" data-action="copy-json">Copy</button>
+                    </div>
+                    <div class="panel-body">
+                        <pre class="json" id="preview"></pre>
+                        <p class="hint">
+                            Sequence, Fee, SigningPubKey, LastLedgerSequence, NetworkID and
+                            signatures are filled in when you submit.
+                        </p>
+                    </div>
+                </div>
+            </aside>
+        </main>
+
+        <datalist id="accountOptions"></datalist>
+
+        <div id="importModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <span class="modal-title">Import JSON</span>
+                    <button class="modal-close" data-action="close-modal" aria-label="Close">
+                        ×
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p class="hint" style="margin: 0 0 8px">
+                        Paste a Batch transaction, a single transaction, or an array of
+                        transactions. This replaces the current recipe.
+                    </p>
+                    <textarea id="importText" aria-label="Transaction JSON"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn" data-action="close-modal">Cancel</button>
+                    <button class="btn btn-primary" data-action="do-import">Import</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="recipesModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <span class="modal-title">Saved recipes</span>
+                    <button class="modal-close" data-action="close-modal" aria-label="Close">
+                        ×
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div style="display: flex; gap: 8px; margin-bottom: 12px">
+                        <input
+                            type="text"
+                            id="recipeName"
+                            placeholder="Name for the current recipe"
+                            aria-label="Recipe name"
+                        />
+                        <button class="btn btn-primary" data-action="save-recipe">Save</button>
+                    </div>
+                    <div id="recipeList"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="seedModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <span class="modal-title">Import seed</span>
+                    <button class="modal-close" data-action="close-modal" aria-label="Close">
+                        ×
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <input
+                        type="password"
+                        id="seedInput"
+                        class="mono"
+                        placeholder="s…"
+                        autocomplete="off"
+                        aria-label="Seed"
+                    />
+                    <p class="hint">
+                        Seeds are stored in this browser's localStorage. Use test accounts only.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn" data-action="close-modal">Cancel</button>
+                    <button class="btn btn-primary" data-action="do-import-seed">Import</button>
+                </div>
+            </div>
+        </div>
+
+        <script src="shared-utils.js"></script>
+        <script>
+            // Signing uses ripple-binary-codec with the definitions the connected network
+            // reports, so transaction types newer than any xrpl.js release still encode.
+            const CODEC_URL = 'https://esm.sh/ripple-binary-codec@2.11.0?bundle';
+            const KEYPAIRS_URL = 'https://esm.sh/ripple-keypairs@2.1.0?bundle';
+
+            const NETWORKS = [
+                {
+                    label: 'Mainnet',
+                    url: 'wss://s1.ripple.com',
+                    explorer: 'https://livenet.xrpl.org',
+                    live: true,
+                },
+                {
+                    label: 'Testnet',
+                    url: 'wss://s.altnet.rippletest.net:51233',
+                    explorer: 'https://testnet.xrpl.org',
+                    faucet: 'https://faucet.altnet.rippletest.net/accounts',
+                },
+                {
+                    label: 'Devnet',
+                    url: 'wss://s.devnet.rippletest.net:51233',
+                    explorer: 'https://devnet.xrpl.org',
+                    faucet: 'https://faucet.devnet.rippletest.net/accounts',
+                },
+            ];
+
+            const CATEGORIES = [
+                { name: 'Payments', test: /^(Payment|Check|Escrow)/, color: '#3b82f6' },
+                { name: 'DEX', test: /^Offer/, color: '#16a34a' },
+                { name: 'AMM', test: /^AMM/, color: '#0d9488' },
+                { name: 'Trust lines', test: /^(TrustSet|Clawback)$/, color: '#d97706' },
+                { name: 'MPTs', test: /MPT/, color: '#ea580c' },
+                { name: 'NFTs', test: /^NFToken/, color: '#db2777' },
+                {
+                    name: 'Account',
+                    test: /^(Account|SetRegularKey|SignerListSet|TicketCreate|DepositPreauth|DelegateSet)/,
+                    color: '#8b5cf6',
+                },
+                {
+                    name: 'Identity',
+                    test: /^(Credential|DID|PermissionedDomain)/,
+                    color: '#6366f1',
+                },
+                { name: 'Vaults & lending', test: /^(Vault|Loan)/, color: '#0891b2' },
+                { name: 'Oracles', test: /^Oracle/, color: '#65a30d' },
+                { name: 'Sponsorship', test: /^Sponsorship/, color: '#c026d3' },
+                { name: 'Cross-chain', test: /^XChain/, color: '#dc2626' },
+                { name: 'Other', test: /./, color: '#6b7280' },
+            ];
+
+            const TF_INNER_BATCH = 0x40000000;
+            const MAX_STEPS = 8;
+            // Pseudo-transactions are validator-only, and a Batch cannot nest a Batch.
+            const EXCLUDED_TYPES = new Set(['Batch', 'EnableAmendment', 'SetFee', 'UNLModify']);
+            // Filled in at submit time or shown elsewhere in the step block.
+            const AUTO_FIELDS = new Set([
+                'TransactionType',
+                'Account',
+                'Fee',
+                'Sequence',
+                'SigningPubKey',
+                'TxnSignature',
+                'Signers',
+                'NetworkID',
+                'LastLedgerSequence',
+                'Flags',
+            ]);
+            const HIDDEN_OPTIONAL = new Set([
+                'AccountTxnID',
+                'PreviousTxnID',
+                'OperationLimit',
+                'RawTransactions',
+                'BatchSigners',
+            ]);
+            // Mirrors xrpl.js autofill: these types cost one owner reserve instead of the base fee.
+            const RESERVE_FEE_TYPES = new Set(['AccountDelete', 'AMMCreate', 'VaultCreate']);
+            const FALLBACK_MODES = {
+                tfAllOrNothing: 0x10000,
+                tfOnlyOne: 0x20000,
+                tfUntilFailure: 0x40000,
+                tfIndependent: 0x80000,
+            };
+            const MODE_HELP = {
+                tfAllOrNothing: 'All inner transactions must succeed, or none of them apply.',
+                tfOnlyOne:
+                    'The first inner transaction that succeeds applies. The rest are skipped.',
+                tfUntilFailure: 'Inner transactions apply in order until one fails.',
+                tfIndependent: 'All inner transactions apply. A failure does not stop the others.',
+            };
+            const KEYS = {
+                wallets: 'xrpl_batch_wallets', // same key as the old batch-testing-ui.html
+                recipe: 'batch_recipe',
+                recipes: 'batch_recipes',
+                network: 'batch_network',
+                definitions: 'batch_definitions_by_url',
+            };
+
+            let codec = null;
+            let keypairs = null;
+            let defs = null;
+            let codecDefs = null;
+            let fieldInfo = {};
+            let defsSource = '';
+            let conn = null;
+            let validatedLedger = null;
+            let wallets = Storage.get(KEYS.wallets, []);
+            const balances = {};
+            let state = normalizeRecipe(Storage.get(KEYS.recipe));
+            let submitting = false;
+            let runHtml = '';
+
+            const $ = (id) => document.getElementById(id);
+
+            // ---------- Small helpers ----------
+
+            function newId() {
+                return Math.random().toString(36).slice(2, 10);
+            }
+
+            function isAddress(value) {
+                return /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(value || '');
+            }
+
+            function shortAddr(address) {
+                return address && address.length > 12
+                    ? `${address.slice(0, 6)}…${address.slice(-4)}`
+                    : address || '';
+            }
+
+            function walletFor(address) {
+                return wallets.find((w) => w.address === address) || null;
+            }
+
+            function accountName(address) {
+                const i = wallets.findIndex((w) => w.address === address);
+                return i >= 0 ? wallets[i].label || `Account ${i + 1}` : shortAddr(address);
+            }
+
+            function xrpToDrops(text) {
+                const m = /^(\d*)(?:\.(\d{0,6}))?$/.exec(text.trim());
+                if (!m || text.trim() === '' || text.trim() === '.') return null;
+                const whole = BigInt(m[1] || '0') * 1000000n;
+                return (whole + BigInt((m[2] || '').padEnd(6, '0'))).toString();
+            }
+
+            function dropsToXrp(drops) {
+                if (!/^\d+$/.test(String(drops))) return String(drops ?? '');
+                const n = BigInt(drops);
+                const frac = (n % 1000000n).toString().padStart(6, '0').replace(/0+$/, '');
+                return frac ? `${n / 1000000n}.${frac}` : `${n / 1000000n}`;
+            }
+
+            function hexToBytes(hex) {
+                return new Uint8Array((hex.match(/../g) || []).map((b) => parseInt(b, 16)));
+            }
+
+            function bytesToHex(bytes) {
+                return [...bytes]
+                    .map((b) => b.toString(16).padStart(2, '0'))
+                    .join('')
+                    .toUpperCase();
+            }
+
+            function utf8ToHex(text) {
+                return bytesToHex(new TextEncoder().encode(text));
+            }
+
+            function hexToUtf8(hex) {
+                try {
+                    return new TextDecoder('utf-8', { fatal: true }).decode(hexToBytes(hex));
+                } catch {
+                    return null;
+                }
+            }
+
+            // Transaction ID: SHA-512Half of the "TXN\0" prefix plus the serialized transaction.
+            async function txHash(blob) {
+                const digest = await crypto.subtle.digest('SHA-512', hexToBytes('54584E00' + blob));
+                return bytesToHex(new Uint8Array(digest).slice(0, 32));
+            }
+
+            function isEmpty(v) {
+                if (v == null || v === '') return true;
+                if (Array.isArray(v)) return false;
+                if (typeof v === 'object') return Object.values(v).every(isEmpty);
+                return false;
+            }
+
+            // Drop blank leaves from objects so half-filled amounts don't reach the codec.
+            function clean(v) {
+                if (Array.isArray(v) || v == null || typeof v !== 'object') return v;
+                const out = {};
+                for (const [k, x] of Object.entries(v)) {
+                    const c = clean(x);
+                    if (!isEmpty(c)) out[k] = c;
+                }
+                return out;
+            }
+
+            function categoryFor(type) {
+                return CATEGORIES.find((c) => c.test.test(type));
+            }
+
+            function base64UrlEncode(text) {
+                let bin = '';
+                new TextEncoder().encode(text).forEach((b) => (bin += String.fromCharCode(b)));
+                return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+            }
+
+            function base64UrlDecode(text) {
+                const bin = atob(text.replace(/-/g, '+').replace(/_/g, '/'));
+                return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+            }
+
+            // ---------- Recipe state ----------
+
+            function normalizeRecipe(r) {
+                return {
+                    mode: r?.mode || 'tfAllOrNothing',
+                    account: r?.account || '',
+                    fee: r?.fee || '',
+                    steps: (r?.steps || []).map((s) => newStep(s.tx || s, s.collapsed)),
+                };
+            }
+
+            function newStep(tx, collapsed = false) {
+                return {
+                    id: newId(),
+                    tx: { ...tx },
+                    collapsed,
+                    raw: {},
+                    utf8: {},
+                    invalid: new Set(),
+                };
+            }
+
+            function serializeRecipe() {
+                return {
+                    mode: state.mode,
+                    account: state.account,
+                    fee: state.fee,
+                    steps: state.steps.map((s) => ({ tx: s.tx, collapsed: s.collapsed })),
+                };
+            }
+
+            const saveRecipe = debounce(() => Storage.set(KEYS.recipe, serializeRecipe()), 300);
+
+            function stepById(id) {
+                return state.steps.find((s) => s.id === id);
+            }
+
+            // ---------- Definitions ----------
+
+            function applyDefinitions(d, source) {
+                defs = d;
+                fieldInfo = Object.fromEntries(d.FIELDS || []);
+                codecDefs = null;
+                defsSource = source;
+                renderPalette();
+                renderAll();
+            }
+
+            function getCodecDefs() {
+                if (!codecDefs && codec && defs) codecDefs = new codec.XrplDefinitions(defs);
+                return codecDefs;
+            }
+
+            function txTypes() {
+                if (!defs) return [];
+                const formats = defs.TRANSACTION_FORMATS;
+                return Object.entries(defs.TRANSACTION_TYPES)
+                    .filter(([name, code]) => code >= 0 && !EXCLUDED_TYPES.has(name))
+                    .filter(([name]) => !formats || formats[name])
+                    .map(([name]) => name)
+                    .sort();
+            }
+
+            function fieldLists(type) {
+                const fmt = defs?.TRANSACTION_FORMATS?.[type];
+                if (!fmt) return { required: [], optional: [], known: false };
+                const all = [...fmt, ...(defs.TRANSACTION_FORMATS.common || [])];
+                return {
+                    required: all
+                        .filter((f) => f.optionality === 0 && !AUTO_FIELDS.has(f.name))
+                        .map((f) => f.name),
+                    optional: all
+                        .filter(
+                            (f) =>
+                                f.optionality !== 0 &&
+                                !AUTO_FIELDS.has(f.name) &&
+                                !HIDDEN_OPTIONAL.has(f.name),
+                        )
+                        .map((f) => f.name),
+                    known: true,
+                };
+            }
+
+            function modeFlags() {
+                return defs?.TRANSACTION_FLAGS?.Batch || FALLBACK_MODES;
+            }
+
+            // ---------- Network ----------
+
+            function currentNetwork() {
+                return NETWORKS.find((n) => n.url === conn?.url) || null;
+            }
+
+            function faucetFor(url) {
+                const known = NETWORKS.find((n) => n.url === url);
+                if (known) return known.faucet || null;
+                if (/altnet|testnet/.test(url)) return NETWORKS[1].faucet;
+                if (/devnet/.test(url)) return NETWORKS[2].faucet;
+                return null;
+            }
+
+            function setStatus(kind, text) {
+                $('statusDot').className = `status-dot ${kind}`;
+                $('statusText').textContent = text;
+                renderNetMeta();
+                renderDerived();
+            }
+
+            function renderNetMeta() {
+                const parts = [];
+                if (validatedLedger) parts.push(`ledger ${validatedLedger}`);
+                if (defs) parts.push(`definitions: ${defsSource}`);
+                $('netMeta').textContent = parts.join(' · ');
+            }
+
+            function isConnected() {
+                return conn && conn.ws.readyState === WebSocket.OPEN;
+            }
+
+            function connect(url) {
+                if (conn) {
+                    conn.ws.onclose = null;
+                    conn.ws.close();
+                    conn.pending.forEach((p) => p.reject(new Error('Disconnected')));
+                }
+                validatedLedger = null;
+                for (const a in balances) delete balances[a];
+                Storage.set(KEYS.network, url);
+                let ws;
+                try {
+                    ws = new WebSocket(url);
+                } catch (error) {
+                    conn = null;
+                    setStatus('', 'Invalid URL');
+                    return;
+                }
+                const c = { url, ws, pending: new Map(), nextId: 0 };
+                conn = c;
+                setStatus('connecting', 'Connecting…');
+                ws.onopen = async () => {
+                    if (conn !== c) return;
+                    setStatus('connected', 'Connected');
+                    try {
+                        // With a known hash the server sends only the hash when nothing changed.
+                        const cache = Storage.get(KEYS.definitions, {});
+                        const cached = cache[url];
+                        const d = await rpc(
+                            'server_definitions',
+                            cached ? { hash: cached.hash } : {},
+                        );
+                        if (d.FIELDS) {
+                            delete d.status;
+                            cache[url] = d;
+                            Storage.set(KEYS.definitions, cache);
+                        }
+                        if (conn !== c) return;
+                        applyDefinitions(d.FIELDS ? d : cached, 'network');
+                        const sub = await rpc('subscribe', { streams: ['ledger'] });
+                        validatedLedger = sub.ledger_index;
+                        renderNetMeta();
+                    } catch (error) {
+                        showToast(`Could not load definitions: ${error.message}`, 'error');
+                    }
+                    refreshBalances();
+                };
+                ws.onmessage = (event) => {
+                    const msg = JSON.parse(event.data);
+                    if (msg.type === 'ledgerClosed') {
+                        validatedLedger = msg.ledger_index;
+                        renderNetMeta();
+                        return;
+                    }
+                    const p = c.pending.get(msg.id);
+                    if (!p) return;
+                    c.pending.delete(msg.id);
+                    if (msg.status === 'success') p.resolve(msg.result);
+                    else {
+                        const err = new Error(msg.error_message || msg.error || 'Request failed');
+                        err.code = msg.error;
+                        p.reject(err);
+                    }
+                };
+                ws.onclose = () => {
+                    if (conn !== c) return;
+                    c.pending.forEach((p) => p.reject(new Error('Disconnected')));
+                    c.pending.clear();
+                    setStatus('', 'Disconnected');
+                };
+            }
+
+            function rpc(command, params = {}) {
+                if (!isConnected()) return Promise.reject(new Error('Not connected'));
+                const c = conn;
+                return new Promise((resolve, reject) => {
+                    const id = ++c.nextId;
+                    c.pending.set(id, { resolve, reject });
+                    c.ws.send(JSON.stringify({ id, command, api_version: 2, ...params }));
+                    setTimeout(() => {
+                        if (c.pending.delete(id)) reject(new Error(`${command} timed out`));
+                    }, 20000);
+                });
+            }
+
+            // ---------- Wallets ----------
+
+            function saveWallets() {
+                Storage.set(KEYS.wallets, wallets);
+            }
+
+            function addWallet(seed) {
+                const pair = keypairs.deriveKeypair(seed);
+                const address = keypairs.deriveAddress(pair.publicKey);
+                if (walletFor(address)) {
+                    showToast('That account is already in the list', 'warning');
+                    return null;
+                }
+                wallets.push({ address, seed, label: `Account ${wallets.length + 1}` });
+                saveWallets();
+                if (!state.account) state.account = address;
+                renderAll();
+                refreshBalances();
+                return address;
+            }
+
+            async function refreshBalances() {
+                if (!isConnected()) return renderAccounts();
+                await Promise.all(
+                    wallets.map(async (w) => {
+                        try {
+                            const r = await rpc('account_info', {
+                                account: w.address,
+                                ledger_index: 'validated',
+                            });
+                            balances[w.address] = r.account_data.Balance;
+                        } catch (error) {
+                            balances[w.address] =
+                                error.code === 'actNotFound' ? 'unfunded' : error.code || '?';
+                        }
+                    }),
+                );
+                renderAccounts();
+            }
+
+            async function fundWallet(address, button) {
+                const faucet = faucetFor(conn?.url || '');
+                if (!faucet) return;
+                button.disabled = true;
+                button.textContent = 'Funding…';
+                try {
+                    const res = await fetch(faucet, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ destination: address }),
+                    });
+                    if (!res.ok) throw new Error(`faucet returned ${res.status}`);
+                    showToast(`Funded ${shortAddr(address)}`, 'success');
+                    // The faucet returns before its payment validates, so poll for ~20 s.
+                    const before = balances[address];
+                    for (let i = 0; i < 10 && balances[address] === before; i++) {
+                        await sleep(2000);
+                        await refreshBalances();
+                    }
+                } catch (error) {
+                    showToast(`Funding failed: ${error.message}`, 'error');
+                    button.disabled = false;
+                    button.textContent = 'Fund';
+                }
+            }
+
+            // ---------- Building the transaction ----------
+
+            function buildInner(step) {
+                const tx = {
+                    TransactionType: step.tx.TransactionType,
+                    Account: step.tx.Account || state.account,
+                };
+                for (const [k, v] of Object.entries(step.tx)) {
+                    if (k === 'TransactionType' || k === 'Account' || k === 'Flags') continue;
+                    const c = clean(v);
+                    if (!isEmpty(c)) tx[k] = c;
+                }
+                tx.Flags = ((Number(step.tx.Flags) || 0) | TF_INNER_BATCH) >>> 0;
+                return tx;
+            }
+
+            function buildBatch() {
+                const tx = {
+                    TransactionType: 'Batch',
+                    Account: state.account,
+                    Flags: modeFlags()[state.mode] ?? FALLBACK_MODES.tfAllOrNothing,
+                    RawTransactions: state.steps.map((s) => ({ RawTransaction: buildInner(s) })),
+                };
+                if (state.fee) tx.Fee = state.fee;
+                return tx;
+            }
+
+            // Accounts other than the batch account that must add a BatchSigner.
+            function batchSignerAccounts(batch) {
+                const accounts = new Set();
+                for (const { RawTransaction: t } of batch.RawTransactions) {
+                    accounts.add(t.Delegate || t.Account);
+                    if (typeof t.Counterparty === 'string') accounts.add(t.Counterparty);
+                }
+                accounts.delete(batch.Account);
+                return [...accounts];
+            }
+
+            function stepIssues(step) {
+                const issues = [];
+                const type = step.tx.TransactionType;
+                if (defs && !(type in defs.TRANSACTION_TYPES)) {
+                    return ['type is unknown on this network'];
+                }
+                const account = step.tx.Account || state.account;
+                if (!isAddress(account)) issues.push('missing or invalid Account');
+                for (const name of fieldLists(type).required) {
+                    if (isEmpty(step.tx[name])) issues.push(`missing ${name}`);
+                }
+                for (const name of step.invalid) issues.push(`invalid ${name}`);
+                for (const [name, v] of Object.entries(step.tx)) {
+                    const t = fieldInfo[name]?.type;
+                    if (t === 'AccountID' && name !== 'Account' && v && !isAddress(v)) {
+                        issues.push(`invalid address in ${name}`);
+                    }
+                    if ((t === 'Amount' || t === 'Issue') && v && typeof v === 'object') {
+                        const blank = Object.values(v).some((x) => x === '');
+                        if (blank && !isEmpty(v)) issues.push(`incomplete ${name}`);
+                    }
+                }
+                return issues;
+            }
+
+            function collectIssues() {
+                const issues = [];
+                if (!isConnected()) issues.push('Connect to a network.');
+                if (!codec) issues.push('Signing libraries are still loading.');
+                if (!isAddress(state.account)) issues.push('Pick the batch account.');
+                if (state.steps.length < 2) issues.push('A batch needs at least 2 transactions.');
+                if (state.steps.length > MAX_STEPS) {
+                    issues.push(`A batch holds at most ${MAX_STEPS} transactions.`);
+                }
+                if (state.fee && !/^\d+$/.test(state.fee)) issues.push('Fee must be whole drops.');
+                state.steps.forEach((s, i) => {
+                    for (const issue of stepIssues(s)) issues.push(`Step ${i + 1}: ${issue}.`);
+                });
+                if (isAddress(state.account)) {
+                    const batch = buildBatch();
+                    for (const a of [state.account, ...batchSignerAccounts(batch)]) {
+                        if (isAddress(a) && !walletFor(a)) {
+                            issues.push(`No seed for ${shortAddr(a)}. Import it under Accounts.`);
+                        }
+                    }
+                }
+                return issues;
+            }
+
+            // ---------- Rendering ----------
+
+            function renderAll() {
+                renderBatchCard();
+                renderSteps();
+                renderAccounts();
+                renderDerived();
+            }
+
+            function renderPalette() {
+                const query = $('paletteSearch').value.trim().toLowerCase();
+                const types = txTypes().filter((t) => t.toLowerCase().includes(query));
+                if (!defs) {
+                    $('paletteList').innerHTML =
+                        '<p class="palette-hint">Connect to a network to load transaction types.</p>';
+                    return;
+                }
+                const groups = CATEGORIES.map((c) => ({
+                    ...c,
+                    types: types.filter((t) => categoryFor(t) === c),
+                })).filter((g) => g.types.length);
+                $('paletteList').innerHTML =
+                    groups
+                        .map(
+                            (g) =>
+                                `<div class="palette-group"><h3>${escapeHtml(g.name)}</h3>${g.types
+                                    .map((t) => {
+                                        const req = fieldLists(t).required.join(', ') || 'none';
+                                        return `<div class="palette-item" draggable="true" tabindex="0" role="button" data-type="${escapeHtml(t)}" style="--cat:${g.color}" title="Required: ${escapeHtml(req)}">${escapeHtml(t)}</div>`;
+                                    })
+                                    .join('')}</div>`,
+                        )
+                        .join('') || '<p class="palette-hint">No matches.</p>';
+            }
+
+            function renderBatchCard() {
+                if (document.activeElement !== $('outerAccount')) {
+                    $('outerAccount').value = state.account;
+                }
+                if (document.activeElement !== $('feeOverride')) $('feeOverride').value = state.fee;
+                const modes = modeFlags();
+                if (!(state.mode in modes)) state.mode = Object.keys(modes)[0];
+                $('modeGroup').innerHTML = Object.keys(modes)
+                    .map(
+                        (m) =>
+                            `<button class="mode-btn" data-action="mode" data-mode="${escapeHtml(m)}" aria-pressed="${m === state.mode}">${escapeHtml(m.replace(/^tf/, '').replace(/([a-z])([A-Z])/g, '$1 $2'))}</button>`,
+                    )
+                    .join('');
+                $('modeHelp').textContent = MODE_HELP[state.mode] || '';
+            }
+
+            function renderSteps() {
+                const el = $('steps');
+                if (!state.steps.length) {
+                    el.innerHTML =
+                        '<div class="empty-drop">Drag transactions here from the palette.<br>A batch holds 2 to 8 transactions.</div>';
+                    return;
+                }
+                el.innerHTML = state.steps
+                    .map((s, i) => stepHtml(s, i))
+                    .join('<div class="connector"></div>');
+            }
+
+            function stepHtml(step, i) {
+                const type = step.tx.TransactionType;
+                const color = categoryFor(type).color;
+                const last = state.steps.length - 1;
+                const head = `<header class="step-head">
+                    <span class="handle" title="Drag to reorder" aria-hidden="true">⠿</span>
+                    <span class="step-num">${i + 1}</span>
+                    <span class="step-type">${escapeHtml(type)}</span>
+                    <span class="step-summary" data-summary></span>
+                    <span class="step-badges" data-badges></span>
+                    <button class="icon-btn" data-action="move-up" aria-label="Move up" ${i === 0 ? 'disabled' : ''}>↑</button>
+                    <button class="icon-btn" data-action="move-down" aria-label="Move down" ${i === last ? 'disabled' : ''}>↓</button>
+                    <button class="icon-btn" data-action="duplicate" aria-label="Duplicate" title="Duplicate">⧉</button>
+                    <button class="icon-btn" data-action="toggle" aria-label="${step.collapsed ? 'Expand' : 'Collapse'}" aria-expanded="${!step.collapsed}">${step.collapsed ? '▸' : '▾'}</button>
+                    <button class="icon-btn" data-action="remove" aria-label="Remove">✕</button>
+                </header>`;
+                const body = step.collapsed
+                    ? ''
+                    : `<div class="step-body">${stepBodyHtml(step)}</div>`;
+                return `<article class="step" data-id="${step.id}" style="--cat:${color}">${head}${body}</article>`;
+            }
+
+            function stepBodyHtml(step) {
+                const type = step.tx.TransactionType;
+                const { required, optional, known } = fieldLists(type);
+                const shownOptional = Object.keys(step.tx).filter(
+                    (k) => !AUTO_FIELDS.has(k) && !required.includes(k),
+                );
+                const addable = optional.filter((n) => !(n in step.tx));
+                let html = `<div class="field"><label class="field-label">Account <span class="field-type">AccountID</span></label>
+                    <input type="text" list="accountOptions" class="mono" data-field="Account" aria-label="Account" value="${escapeHtml(step.tx.Account || '')}" placeholder="Batch account" spellcheck="false" autocomplete="off"></div>`;
+                html += required.map((n) => fieldHtml(step, n, true)).join('');
+                html += shownOptional.map((n) => fieldHtml(step, n, false)).join('');
+                html += flagsHtml(step);
+                if (!known && defs) {
+                    html +=
+                        '<p class="hint">This network does not report a format for this type. Use the JSON view below.</p>';
+                }
+                if (addable.length) {
+                    html += `<select data-action="add-field" aria-label="Add optional field"><option value="">+ Add optional field…</option>${addable
+                        .map(
+                            (n) =>
+                                `<option value="${escapeHtml(n)}">${escapeHtml(n)} (${escapeHtml(fieldInfo[n]?.type || '?')})</option>`,
+                        )
+                        .join('')}</select>`;
+                }
+                html += `<details data-json-details><summary class="hint" style="cursor:pointer">Edit as JSON</summary>
+                    <textarea data-step-json aria-label="Step JSON">${escapeHtml(JSON.stringify(step.tx, null, 2))}</textarea></details>`;
+                return html;
+            }
+
+            function fieldHtml(step, name, required) {
+                const type = fieldInfo[name]?.type || 'Unknown';
+                const remove = required
+                    ? ''
+                    : `<button class="icon-btn" data-action="remove-field" data-field="${escapeHtml(name)}" aria-label="Remove ${escapeHtml(name)}">remove</button>`;
+                let extra = '';
+                if (type === 'Blob') {
+                    extra = `<label class="inline-check"><input type="checkbox" data-action="utf8" data-target="${escapeHtml(name)}" ${step.utf8[name] ? 'checked' : ''}> text</label>`;
+                }
+                return `<div class="field"><label class="field-label">${escapeHtml(name)}${required ? '<span class="required" aria-label="required">*</span>' : ''} <span class="field-type">${escapeHtml(type)}</span>${extra}${remove}</label>${editorHtml(step, name, type)}</div>`;
+            }
+
+            function editorHtml(step, name, type) {
+                const v = step.tx[name];
+                const f = `data-field="${escapeHtml(name)}" aria-label="${escapeHtml(name)}"`;
+                const invalid = step.invalid.has(name) ? ' invalid' : '';
+                const asfFlags = defs?.ACCOUNT_SET_FLAGS;
+                if (
+                    asfFlags &&
+                    step.tx.TransactionType === 'AccountSet' &&
+                    (name === 'SetFlag' || name === 'ClearFlag')
+                ) {
+                    return `<select ${f}><option value=""></option>${Object.entries(asfFlags)
+                        .sort((a, b) => a[1] - b[1])
+                        .map(
+                            ([k, n]) =>
+                                `<option value="${n}" ${v === n ? 'selected' : ''}>${escapeHtml(k)} (${n})</option>`,
+                        )
+                        .join('')}</select>`;
+                }
+                switch (type) {
+                    case 'AccountID':
+                        return `<input type="text" list="accountOptions" class="mono${invalid}" ${f} value="${escapeHtml(v ?? '')}" placeholder="r…" spellcheck="false" autocomplete="off">`;
+                    case 'Amount':
+                    case 'Issue':
+                        return amountHtml(step, name, type === 'Issue');
+                    case 'UInt8':
+                    case 'UInt16':
+                    case 'UInt32':
+                    case 'Int32':
+                        return `<input type="number" step="1" ${f} value="${escapeHtml(v ?? '')}">`;
+                    case 'Blob': {
+                        const shown = step.utf8[name] ? (hexToUtf8(v || '') ?? '') : (v ?? '');
+                        return `<input type="text" class="mono" ${f} value="${escapeHtml(shown)}" placeholder="${step.utf8[name] ? 'text' : 'hex'}" spellcheck="false">`;
+                    }
+                    case 'Vector256':
+                        return `<textarea ${f} placeholder="One 64-character hash per line">${escapeHtml(step.raw[name] ?? (v || []).join('\n'))}</textarea>`;
+                    case 'STArray':
+                    case 'STObject':
+                    case 'PathSet':
+                    case 'XChainBridge':
+                    case 'Unknown': {
+                        const text =
+                            step.raw[name] ??
+                            (v === undefined || v === '' ? '' : JSON.stringify(v, null, 2));
+                        return `<textarea class="${invalid}" ${f} placeholder="${escapeHtml(jsonPlaceholder(name, type))}">${escapeHtml(text)}</textarea>`;
+                    }
+                    default:
+                        return `<input type="text" class="mono" ${f} value="${escapeHtml(v ?? '')}" spellcheck="false" autocomplete="off">`;
+                }
+            }
+
+            function jsonPlaceholder(name, type) {
+                if (name === 'Memos') return '[{"Memo": {"MemoData": "48656C6C6F"}}]';
+                if (type === 'PathSet') return '[[{"currency": "USD", "issuer": "r…"}]]';
+                if (type === 'XChainBridge') {
+                    return '{"LockingChainDoor": "r…", "LockingChainIssue": {"currency": "XRP"}, "IssuingChainDoor": "r…", "IssuingChainIssue": {"currency": "XRP"}}';
+                }
+                if (type === 'STArray') {
+                    const singular = name.replace(/ies$/, 'y').replace(/s$/, '');
+                    if (fieldInfo[singular]?.type === 'STObject') return `[{"${singular}": {}}]`;
+                    return '[]';
+                }
+                return '{}';
+            }
+
+            function amountKind(v, isIssue) {
+                if (v && typeof v === 'object') {
+                    if ('mpt_issuance_id' in v) return 'mpt';
+                    if (isIssue && v.currency === 'XRP') return 'xrp';
+                    return 'token';
+                }
+                return 'xrp';
+            }
+
+            function amountHtml(step, name, isIssue) {
+                const v = step.tx[name];
+                const kind = amountKind(v, isIssue);
+                const f = `data-field="${escapeHtml(name)}"`;
+                const invalid = step.invalid.has(name) ? ' invalid' : '';
+                const kinds = { xrp: 'XRP', token: 'Token', mpt: 'MPT' };
+                let html = `<div class="amount-row"><select ${f} data-part="kind" aria-label="${escapeHtml(name)} asset">${Object.entries(
+                    kinds,
+                )
+                    .map(
+                        ([k, label]) =>
+                            `<option value="${k}" ${k === kind ? 'selected' : ''}>${label}</option>`,
+                    )
+                    .join('')}</select>`;
+                const input = (part, cls, value, placeholder) =>
+                    `<input type="text" class="${cls}" ${f} data-part="${part}" value="${escapeHtml(value ?? '')}" placeholder="${placeholder}" aria-label="${escapeHtml(name)} ${placeholder}" spellcheck="false" autocomplete="off">`;
+                if (!isIssue) {
+                    const value =
+                        kind === 'xrp' ? (step.raw[name] ?? (v ? dropsToXrp(v) : '')) : v?.value;
+                    html += input(
+                        'value',
+                        `a-value${invalid}`,
+                        value,
+                        kind === 'xrp' ? 'XRP' : 'value',
+                    );
+                }
+                if (kind === 'token') {
+                    html += input('currency', 'a-currency mono', v?.currency, 'currency');
+                    html += input('issuer', 'a-issuer mono', v?.issuer, 'issuer').replace(
+                        '<input',
+                        '<input list="accountOptions"',
+                    );
+                }
+                if (kind === 'mpt') {
+                    html += input(
+                        'mpt_issuance_id',
+                        'a-mpt mono',
+                        v?.mpt_issuance_id,
+                        'MPT issuance ID',
+                    );
+                }
+                return html + '</div>';
+            }
+
+            function flagsHtml(step) {
+                const flags = defs?.TRANSACTION_FLAGS?.[step.tx.TransactionType];
+                const value = Number(step.tx.Flags) || 0;
+                if (!flags || !Object.keys(flags).length) {
+                    if (defs?.TRANSACTION_FLAGS) return '';
+                    return `<div class="field"><label class="field-label">Flags <span class="field-type">UInt32</span></label><input type="number" data-field="Flags" value="${value || ''}"></div>`;
+                }
+                return `<div class="field"><div class="field-label">Flags</div><div class="flag-list">${Object.entries(
+                    flags,
+                )
+                    .sort((a, b) => a[1] - b[1])
+                    .map(
+                        ([k, bit]) =>
+                            `<label><input type="checkbox" data-action="flag" data-bit="${bit}" ${(value & bit) >>> 0 === bit ? 'checked' : ''}>${escapeHtml(k.replace(/^tf/, ''))}</label>`,
+                    )
+                    .join('')}</div></div>`;
+            }
+
+            function summarize(step) {
+                const names = fieldLists(step.tx.TransactionType).required;
+                return names
+                    .map((n) => formatValue(n, step.tx[n]))
+                    .filter(Boolean)
+                    .slice(0, 3)
+                    .join(' · ');
+            }
+
+            function formatValue(name, v) {
+                if (isEmpty(v)) return '';
+                const type = fieldInfo[name]?.type;
+                if (type === 'Amount') {
+                    if (typeof v === 'string') return `${dropsToXrp(v)} XRP`;
+                    if (v.mpt_issuance_id) return `${v.value || '?'} MPT`;
+                    return `${v.value || '?'} ${v.currency || ''}`;
+                }
+                if (type === 'Issue') return v.currency || 'MPT';
+                if (type === 'AccountID')
+                    return `${name === 'Destination' ? '→ ' : ''}${accountName(v)}`;
+                if (typeof v === 'object') return '';
+                const s = String(v);
+                return s.length > 18 ? `${s.slice(0, 16)}…` : s;
+            }
+
+            // Cheap updates that run on every keystroke, without rebuilding the step forms.
+            function renderDerived() {
+                const steps = $('steps');
+                for (const step of state.steps) {
+                    const el = steps.querySelector(`.step[data-id="${step.id}"]`);
+                    if (!el) continue;
+                    const account = step.tx.Account || state.account;
+                    const summary = [account ? accountName(account) : '', summarize(step)]
+                        .filter(Boolean)
+                        .join(' · ');
+                    el.querySelector('[data-summary]').textContent = summary;
+                    const issues = stepIssues(step);
+                    let badges = '';
+                    if (issues.length) {
+                        badges += `<span class="badge badge-warning" title="${escapeHtml(issues.join('\n'))}">${issues.length} issue${issues.length > 1 ? 's' : ''}</span>`;
+                    }
+                    if (step.result) {
+                        const ok = step.result === 'tesSUCCESS';
+                        badges += `<span class="badge ${ok ? 'badge-success' : 'badge-danger'}">${escapeHtml(step.result)}</span>`;
+                    }
+                    el.querySelector('[data-badges]').innerHTML = badges;
+                }
+                $('preview').textContent = JSON.stringify(buildBatch(), null, 2);
+                const issues = collectIssues();
+                $('issues').innerHTML = issues.map((i) => `<li>${escapeHtml(i)}</li>`).join('');
+                $('submitBtn').disabled = submitting || issues.length > 0;
+                $('runResult').innerHTML = runHtml;
+            }
+
+            function renderAccounts() {
+                $('accountOptions').innerHTML = wallets
+                    .map(
+                        (w, i) =>
+                            `<option value="${w.address}">${escapeHtml(w.label || `Account ${i + 1}`)}</option>`,
+                    )
+                    .join('');
+                if (!wallets.length) {
+                    $('accountList').innerHTML =
+                        '<p class="muted">No accounts yet. Create one or import a seed.</p>';
+                    return;
+                }
+                const faucet = faucetFor(conn?.url || '');
+                $('accountList').innerHTML = wallets
+                    .map((w, i) => {
+                        const bal = balances[w.address];
+                        const balText =
+                            bal === undefined
+                                ? ''
+                                : /^\d+$/.test(bal)
+                                  ? `${dropsToXrp(bal)} XRP`
+                                  : bal;
+                        const isBatch = w.address === state.account;
+                        return `<div class="account-row" data-address="${w.address}">
+                            <div class="account-main">
+                                <div><strong>${escapeHtml(w.label || `Account ${i + 1}`)}</strong>${isBatch ? ' <span class="badge badge-info">batch</span>' : ''}</div>
+                                <button class="account-addr mono" data-action="copy-address" title="Copy address">${w.address}</button>
+                                <div class="account-meta">${escapeHtml(balText)}</div>
+                            </div>
+                            ${isBatch ? '' : '<button class="btn btn-small" data-action="use-account">Use</button>'}
+                            ${faucet ? '<button class="btn btn-small" data-action="fund">Fund</button>' : ''}
+                            <button class="icon-btn" data-action="remove-wallet" aria-label="Remove account">✕</button>
+                        </div>`;
+                    })
+                    .join('');
+            }
+
+            // ---------- Mutations ----------
+
+            function changed({ structure = false } = {}) {
+                if (structure) renderSteps();
+                renderDerived();
+                saveRecipe();
+            }
+
+            function addStep(type, index = state.steps.length) {
+                if (state.steps.length >= MAX_STEPS) {
+                    showToast(`A batch holds at most ${MAX_STEPS} transactions`, 'warning');
+                    return;
+                }
+                const step = newStep({ TransactionType: type });
+                for (const n of fieldLists(type).required) step.tx[n] = '';
+                state.steps.splice(index, 0, step);
+                changed({ structure: true });
+            }
+
+            function moveStep(from, to) {
+                if (to > from) to--;
+                if (to === from) return;
+                const [s] = state.steps.splice(from, 1);
+                state.steps.splice(to, 0, s);
+                changed({ structure: true });
+            }
+
+            function rerenderStep(step) {
+                const el = $('steps').querySelector(`.step[data-id="${step.id}"]`);
+                const i = state.steps.indexOf(step);
+                el.outerHTML = stepHtml(step, i);
+                renderDerived();
+                saveRecipe();
+            }
+
+            function updateField(step, el) {
+                const name = el.dataset.field;
+                const part = el.dataset.part;
+                const type = name === 'Account' ? 'AccountID' : fieldInfo[name]?.type || 'Unknown';
+                const value = el.value;
+                step.invalid.delete(name);
+                delete step.raw[name];
+                if (part) return updateAmountPart(step, name, type === 'Issue', part, el);
+                if (name === 'SetFlag' || name === 'ClearFlag') {
+                    step.tx[name] = value === '' ? '' : Number(value);
+                    return;
+                }
+                switch (type) {
+                    case 'UInt8':
+                    case 'UInt16':
+                    case 'UInt32':
+                    case 'Int32':
+                        step.tx[name] = value === '' ? '' : Number(value);
+                        break;
+                    case 'Blob':
+                        step.tx[name] = step.utf8[name] ? utf8ToHex(value) : value.trim();
+                        break;
+                    case 'Vector256':
+                        step.raw[name] = value;
+                        step.tx[name] = value.split(/\s+/).filter(Boolean);
+                        break;
+                    case 'STArray':
+                    case 'STObject':
+                    case 'PathSet':
+                    case 'XChainBridge':
+                    case 'Unknown':
+                        step.raw[name] = value;
+                        if (!value.trim()) step.tx[name] = '';
+                        else {
+                            try {
+                                step.tx[name] = JSON.parse(value);
+                            } catch {
+                                step.invalid.add(name);
+                            }
+                        }
+                        break;
+                    default:
+                        step.tx[name] = value.trim();
+                }
+                el.classList.toggle('invalid', step.invalid.has(name));
+            }
+
+            function updateAmountPart(step, name, isIssue, part, el) {
+                const v = step.tx[name];
+                const kind = amountKind(v, isIssue);
+                if (part === 'kind') {
+                    const defaults = isIssue
+                        ? {
+                              xrp: { currency: 'XRP' },
+                              token: { currency: '', issuer: '' },
+                              mpt: { mpt_issuance_id: '' },
+                          }
+                        : {
+                              xrp: '',
+                              token: { currency: '', issuer: '', value: '' },
+                              mpt: { mpt_issuance_id: '', value: '' },
+                          };
+                    step.tx[name] = defaults[el.value];
+                    rerenderStep(step);
+                    return;
+                }
+                if (part === 'value' && kind === 'xrp') {
+                    const drops = xrpToDrops(el.value);
+                    if (drops === null && el.value.trim() !== '') {
+                        step.raw[name] = el.value;
+                        step.invalid.add(name);
+                    }
+                    step.tx[name] = drops ?? '';
+                } else {
+                    step.tx[name] = { ...v, [part]: el.value.trim() };
+                }
+                el.classList.toggle('invalid', step.invalid.has(name));
+            }
+
+            // ---------- Import / export ----------
+
+            function importJson(text) {
+                let data = JSON.parse(text);
+                if (data.tx_json) data = data.tx_json;
+                let txs;
+                if (Array.isArray(data)) txs = data;
+                else if (data.TransactionType === 'Batch') {
+                    txs = (data.RawTransactions || []).map((r) => r.RawTransaction);
+                    state.account = data.Account || state.account;
+                    const mode = Object.entries(modeFlags()).find(
+                        ([, bit]) => ((data.Flags || 0) & bit) === bit,
+                    );
+                    if (mode) state.mode = mode[0];
+                } else txs = [data];
+                state.steps = txs.map((t) => {
+                    const tx = { ...t };
+                    for (const k of [
+                        'Fee',
+                        'Sequence',
+                        'SigningPubKey',
+                        'TxnSignature',
+                        'Signers',
+                        'NetworkID',
+                        'LastLedgerSequence',
+                    ]) {
+                        delete tx[k];
+                    }
+                    const flags = ((Number(tx.Flags) || 0) & ~TF_INNER_BATCH) >>> 0;
+                    if (flags) tx.Flags = flags;
+                    else delete tx.Flags;
+                    return newStep(tx);
+                });
+                runHtml = '';
+                renderAll();
+                saveRecipe();
+            }
+
+            function renderRecipeList() {
+                const recipes = Storage.get(KEYS.recipes, {});
+                const names = Object.keys(recipes).sort();
+                $('recipeList').innerHTML = names.length
+                    ? names
+                          .map(
+                              (n) => `<div class="recipe-row" data-name="${escapeHtml(n)}">
+                                <span class="name">${escapeHtml(n)}</span>
+                                <span class="muted">${recipes[n].steps.length} steps</span>
+                                <button class="btn btn-small" data-action="load-recipe">Load</button>
+                                <button class="icon-btn" data-action="delete-recipe" aria-label="Delete recipe">✕</button>
+                            </div>`,
+                          )
+                          .join('')
+                    : '<p class="muted">No saved recipes.</p>';
+            }
+
+            // ---------- Submit ----------
+
+            function setRun(html) {
+                runHtml = html;
+                $('runResult').innerHTML = html;
+            }
+
+            function resultBadge(code) {
+                const cls =
+                    code === 'tesSUCCESS'
+                        ? 'badge-success'
+                        : /^tec/.test(code)
+                          ? 'badge-warning'
+                          : 'badge-danger';
+                return `<span class="badge ${cls}">${escapeHtml(code)}</span>`;
+            }
+
+            function txLink(hash) {
+                const net = currentNetwork();
+                const short = `${hash.slice(0, 10)}…`;
+                return net
+                    ? `<a class="mono" href="${net.explorer}/transactions/${hash}" target="_blank" rel="noopener">${short}</a>`
+                    : `<span class="mono" title="${hash}">${short}</span>`;
+            }
+
+            function signWith(tx, pair) {
+                const out = { ...tx, SigningPubKey: pair.publicKey };
+                out.TxnSignature = keypairs.sign(
+                    codec.encodeForSigning(out, getCodecDefs()),
+                    pair.privateKey,
+                );
+                return codec.encode(out, getCodecDefs());
+            }
+
+            const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+            async function submitBatch() {
+                if (collectIssues().length) return;
+                const net = currentNetwork();
+                if (net?.live && !confirm('Submit this batch to Mainnet? It moves real funds.'))
+                    return;
+                submitting = true;
+                state.steps.forEach((s) => delete s.result);
+                renderDerived();
+                try {
+                    setRun('<p class="muted">Reading account sequences and fees…</p>');
+                    const batch = buildBatch();
+                    const inner = batch.RawTransactions.map((r) => r.RawTransaction);
+                    const signers = batchSignerAccounts(batch);
+                    const accounts = [...new Set([batch.Account, ...inner.map((t) => t.Account)])];
+                    const [fee, serverState, ...infos] = await Promise.all([
+                        rpc('fee'),
+                        rpc('server_state'),
+                        ...accounts.map((a) =>
+                            rpc('account_info', { account: a, ledger_index: 'current' }).catch(
+                                (e) => {
+                                    throw new Error(
+                                        e.code === 'actNotFound'
+                                            ? `${shortAddr(a)} is not funded`
+                                            : e.message,
+                                    );
+                                },
+                            ),
+                        ),
+                    ]);
+                    const sequences = Object.fromEntries(
+                        accounts.map((a, i) => [a, infos[i].account_data.Sequence]),
+                    );
+                    const networkId = serverState.state.network_id;
+
+                    // The batch takes the account's next sequence; its own inner
+                    // transactions follow it.
+                    batch.Sequence = sequences[batch.Account];
+                    const next = { [batch.Account]: batch.Sequence + 1 };
+                    for (const t of inner) {
+                        if (t.TicketSequence != null) t.Sequence = 0;
+                        else {
+                            next[t.Account] ??= sequences[t.Account];
+                            t.Sequence = next[t.Account]++;
+                        }
+                        t.Fee = '0';
+                        t.SigningPubKey = '';
+                        if (networkId > 1024) t.NetworkID = networkId;
+                    }
+                    if (networkId > 1024) batch.NetworkID = networkId;
+                    batch.LastLedgerSequence = fee.ledger_current_index + 20;
+
+                    if (!batch.Fee) {
+                        const base = Math.max(
+                            Number(fee.drops.base_fee),
+                            Number(fee.drops.open_ledger_fee),
+                        );
+                        const reserve = Number(
+                            serverState.state.validated_ledger?.reserve_inc ?? base,
+                        );
+                        const innerFees = inner.reduce((sum, t) => {
+                            if (RESERVE_FEE_TYPES.has(t.TransactionType)) return sum + reserve;
+                            if (t.TransactionType === 'EscrowFinish' && t.Fulfillment) {
+                                return sum + Math.ceil(base * (33 + t.Fulfillment.length / 2 / 16));
+                            }
+                            return sum + base;
+                        }, 0);
+                        batch.Fee = String(base * 2 + innerFees + base * signers.length);
+                    }
+
+                    setRun('<p class="muted">Signing…</p>');
+                    const defsForCodec = getCodecDefs();
+                    const innerHashes = await Promise.all(
+                        inner.map((t) => txHash(codec.encode(t, defsForCodec))),
+                    );
+                    const pairOf = (a) => keypairs.deriveKeypair(walletFor(a).seed);
+                    if (signers.length) {
+                        const accountHex = (a) => codec.coreTypes.AccountID.from(a).toHex();
+                        batch.BatchSigners = signers
+                            .sort((a, b) => (accountHex(a) < accountHex(b) ? -1 : 1))
+                            .map((a) => {
+                                const pair = pairOf(a);
+                                const data = codec.encodeForSigningBatch({
+                                    account: batch.Account,
+                                    sequence: batch.Sequence,
+                                    flags: batch.Flags,
+                                    txIDs: innerHashes,
+                                    batchAccount: a,
+                                });
+                                return {
+                                    BatchSigner: {
+                                        Account: a,
+                                        SigningPubKey: pair.publicKey,
+                                        TxnSignature: keypairs.sign(data, pair.privateKey),
+                                    },
+                                };
+                            });
+                    }
+                    const blob = signWith(batch, pairOf(batch.Account));
+                    const hash = await txHash(blob);
+
+                    setRun(
+                        `<p class="muted">Submitted ${txLink(hash)}. Waiting for validation…</p>`,
+                    );
+                    const sub = await rpc('submit', { tx_blob: blob });
+                    if (/^(tem|tef|tel)/.test(sub.engine_result)) {
+                        throw new Error(`${sub.engine_result}: ${sub.engine_result_message}`);
+                    }
+
+                    let outer = null;
+                    while (!outer) {
+                        await sleep(1000);
+                        try {
+                            const r = await rpc('tx', { transaction: hash });
+                            if (r.validated) outer = r;
+                        } catch (error) {
+                            if (error.code !== 'txnNotFound') throw error;
+                        }
+                        if (!outer && validatedLedger > batch.LastLedgerSequence) {
+                            throw new Error(
+                                `Not validated by ledger ${batch.LastLedgerSequence} (preliminary ${sub.engine_result})`,
+                            );
+                        }
+                    }
+
+                    const innerResults = await Promise.all(
+                        innerHashes.map((h) =>
+                            rpc('tx', { transaction: h })
+                                .then((r) => r.meta?.TransactionResult || 'unknown')
+                                .catch(() => 'not applied'),
+                        ),
+                    );
+                    state.steps.forEach((s, i) => (s.result = innerResults[i]));
+                    const rows = state.steps
+                        .map(
+                            (s, i) =>
+                                `<tr><td>${i + 1}</td><td>${escapeHtml(s.tx.TransactionType)}</td><td>${resultBadge(innerResults[i])}</td><td>${txLink(innerHashes[i])}</td></tr>`,
+                        )
+                        .join('');
+                    setRun(`<div>Batch ${resultBadge(outer.meta.TransactionResult)} in ledger ${outer.ledger_index} · ${txLink(hash)}</div>
+                        <table>${rows}</table>
+                        <details><summary class="hint" style="cursor:pointer">Signed transaction</summary><pre class="json">${escapeHtml(JSON.stringify({ ...batch, hash }, null, 2))}</pre></details>`);
+                    refreshBalances();
+                } catch (error) {
+                    console.error(error);
+                    setRun(
+                        `<p><span class="badge badge-danger">Failed</span> ${escapeHtml(error.message)}</p>`,
+                    );
+                } finally {
+                    submitting = false;
+                    renderDerived();
+                }
+            }
+
+            // ---------- Events ----------
+
+            function openModal(id) {
+                Modal.open(id);
+            }
+
+            document.addEventListener('click', async (e) => {
+                const target = e.target.closest('[data-action]');
+                if (!target || target.tagName === 'SELECT' || target.type === 'checkbox') return;
+                const action = target.dataset.action;
+                const stepEl = target.closest('.step');
+                const step = stepEl && stepById(stepEl.dataset.id);
+                const index = step ? state.steps.indexOf(step) : -1;
+                const address = target.closest('[data-address]')?.dataset.address;
+                switch (action) {
+                    case 'mode':
+                        state.mode = target.dataset.mode;
+                        renderBatchCard();
+                        changed();
+                        break;
+                    case 'move-up':
+                        moveStep(index, index - 1);
+                        break;
+                    case 'move-down':
+                        moveStep(index, index + 2);
+                        break;
+                    case 'duplicate':
+                        if (state.steps.length >= MAX_STEPS) {
+                            showToast(`A batch holds at most ${MAX_STEPS} transactions`, 'warning');
+                            break;
+                        }
+                        state.steps.splice(index + 1, 0, newStep(structuredClone(step.tx)));
+                        changed({ structure: true });
+                        break;
+                    case 'toggle':
+                        step.collapsed = !step.collapsed;
+                        rerenderStep(step);
+                        break;
+                    case 'remove':
+                        state.steps.splice(index, 1);
+                        changed({ structure: true });
+                        break;
+                    case 'remove-field':
+                        delete step.tx[target.dataset.field];
+                        step.invalid.delete(target.dataset.field);
+                        rerenderStep(step);
+                        break;
+                    case 'clear':
+                        if (
+                            state.steps.length &&
+                            !confirm('Remove all transactions from the recipe?')
+                        )
+                            break;
+                        state.steps = [];
+                        runHtml = '';
+                        changed({ structure: true });
+                        break;
+                    case 'share': {
+                        const url = new URL(location.href);
+                        url.hash = `recipe=${base64UrlEncode(JSON.stringify(serializeRecipe()))}`;
+                        copyToClipboard(url.toString());
+                        break;
+                    }
+                    case 'copy-json':
+                        copyToClipboard(JSON.stringify(buildBatch(), null, 2));
+                        break;
+                    case 'open-import':
+                        $('importText').value = '';
+                        openModal('importModal');
+                        break;
+                    case 'do-import':
+                        try {
+                            importJson($('importText').value);
+                            Modal.close('importModal');
+                        } catch (error) {
+                            showToast(`Invalid JSON: ${error.message}`, 'error');
+                        }
+                        break;
+                    case 'open-recipes':
+                        renderRecipeList();
+                        openModal('recipesModal');
+                        break;
+                    case 'save-recipe': {
+                        const name = $('recipeName').value.trim();
+                        if (!name) return showToast('Enter a name', 'warning');
+                        const recipes = Storage.get(KEYS.recipes, {});
+                        recipes[name] = serializeRecipe();
+                        Storage.set(KEYS.recipes, recipes);
+                        $('recipeName').value = '';
+                        renderRecipeList();
+                        showToast(`Saved "${name}"`, 'success');
+                        break;
+                    }
+                    case 'load-recipe': {
+                        const name = target.closest('[data-name]').dataset.name;
+                        state = normalizeRecipe(Storage.get(KEYS.recipes, {})[name]);
+                        runHtml = '';
+                        renderAll();
+                        saveRecipe();
+                        Modal.close('recipesModal');
+                        break;
+                    }
+                    case 'delete-recipe': {
+                        const name = target.closest('[data-name]').dataset.name;
+                        const recipes = Storage.get(KEYS.recipes, {});
+                        delete recipes[name];
+                        Storage.set(KEYS.recipes, recipes);
+                        renderRecipeList();
+                        break;
+                    }
+                    case 'close-modal':
+                        Modal.closeAll();
+                        break;
+                    case 'generate-wallet':
+                        if (!keypairs)
+                            return showToast('Signing libraries are still loading', 'warning');
+                        addWallet(keypairs.generateSeed({ algorithm: 'ed25519' }));
+                        break;
+                    case 'open-seed':
+                        $('seedInput').value = '';
+                        openModal('seedModal');
+                        break;
+                    case 'do-import-seed':
+                        try {
+                            if (addWallet($('seedInput').value.trim()) !== undefined)
+                                Modal.close('seedModal');
+                        } catch (error) {
+                            showToast(`Invalid seed: ${error.message}`, 'error');
+                        }
+                        break;
+                    case 'refresh-balances':
+                        refreshBalances();
+                        break;
+                    case 'copy-address':
+                        copyToClipboard(address);
+                        break;
+                    case 'use-account':
+                        state.account = address;
+                        renderAll();
+                        saveRecipe();
+                        break;
+                    case 'fund':
+                        fundWallet(address, target);
+                        break;
+                    case 'remove-wallet':
+                        if (!confirm(`Remove ${address}? Its seed is deleted from this browser.`))
+                            break;
+                        wallets = wallets.filter((w) => w.address !== address);
+                        saveWallets();
+                        renderAll();
+                        break;
+                    case 'submit':
+                        submitBatch();
+                        break;
+                }
+            });
+
+            $('steps').addEventListener('input', (e) => {
+                const step = stepById(e.target.closest('.step')?.dataset.id);
+                if (!step) return;
+                if (e.target.matches('[data-step-json]')) {
+                    try {
+                        const tx = JSON.parse(e.target.value);
+                        if (!tx.TransactionType) throw new Error('missing TransactionType');
+                        step.tx = tx;
+                        step.raw = {};
+                        step.invalid.clear();
+                        e.target.classList.remove('invalid');
+                    } catch {
+                        e.target.classList.add('invalid');
+                        return;
+                    }
+                } else if (
+                    e.target.dataset.field &&
+                    !e.target.dataset.action &&
+                    e.target.dataset.part !== 'kind'
+                ) {
+                    updateField(step, e.target);
+                } else return;
+                renderDerived();
+                saveRecipe();
+            });
+
+            $('steps').addEventListener('change', (e) => {
+                const step = stepById(e.target.closest('.step')?.dataset.id);
+                if (!step) return;
+                const t = e.target;
+                if (t.matches('[data-step-json]')) {
+                    // Rebuild the form from the edited JSON once the user leaves the box.
+                    if (!t.classList.contains('invalid')) rerenderStep(step);
+                } else if (t.dataset.action === 'add-field') {
+                    if (!t.value) return;
+                    const type = fieldInfo[t.value]?.type;
+                    step.tx[t.value] = type === 'Issue' ? { currency: 'XRP' } : '';
+                    rerenderStep(step);
+                } else if (t.dataset.action === 'flag') {
+                    const bit = Number(t.dataset.bit);
+                    const flags = Number(step.tx.Flags) || 0;
+                    const next = (t.checked ? flags | bit : flags & ~bit) >>> 0;
+                    if (next) step.tx.Flags = next;
+                    else delete step.tx.Flags;
+                    changed();
+                } else if (t.dataset.action === 'utf8') {
+                    step.utf8[t.dataset.target] = t.checked;
+                    rerenderStep(step);
+                } else if (t.dataset.part === 'kind') {
+                    updateField(step, t);
+                } else if (t.tagName === 'SELECT' && t.dataset.field) {
+                    updateField(step, t);
+                    changed();
+                }
+            });
+
+            $('outerAccount').addEventListener('input', (e) => {
+                state.account = e.target.value.trim();
+                renderAccounts();
+                changed();
+            });
+
+            $('feeOverride').addEventListener('input', (e) => {
+                state.fee = e.target.value.trim();
+                changed();
+            });
+
+            $('paletteSearch').addEventListener('input', renderPalette);
+
+            $('paletteList').addEventListener('click', (e) => {
+                const item = e.target.closest('.palette-item');
+                if (item) addStep(item.dataset.type);
+            });
+
+            $('paletteList').addEventListener('keydown', (e) => {
+                const item = e.target.closest('.palette-item');
+                if (item && (e.key === 'Enter' || e.key === ' ')) {
+                    e.preventDefault();
+                    addStep(item.dataset.type);
+                }
+            });
+
+            // ---------- Drag and drop ----------
+
+            const TYPE_MIME = 'application/x-batch-type';
+            const STEP_MIME = 'application/x-batch-step';
+            const marker = document.createElement('div');
+            marker.className = 'drop-marker';
+
+            $('paletteList').addEventListener('dragstart', (e) => {
+                const item = e.target.closest('.palette-item');
+                if (!item) return;
+                e.dataTransfer.setData(TYPE_MIME, item.dataset.type);
+                e.dataTransfer.effectAllowed = 'copy';
+            });
+
+            // Only the handle starts a reorder drag, so text in the inputs stays selectable.
+            $('steps').addEventListener('mousedown', (e) => {
+                const step = e.target.closest('.step');
+                if (step && e.target.closest('.handle')) step.draggable = true;
+            });
+
+            $('steps').addEventListener('dragstart', (e) => {
+                const step = e.target.closest('.step');
+                if (!step) return;
+                e.dataTransfer.setData(STEP_MIME, step.dataset.id);
+                e.dataTransfer.effectAllowed = 'move';
+                step.classList.add('dragging');
+            });
+
+            function clearDrag() {
+                marker.remove();
+                $('steps').classList.remove('drag-active');
+                $('steps')
+                    .querySelectorAll('.step')
+                    .forEach((s) => {
+                        s.classList.remove('dragging');
+                        s.draggable = false;
+                    });
+            }
+
+            document.addEventListener('dragend', clearDrag);
+            document.addEventListener('mouseup', () =>
+                $('steps')
+                    .querySelectorAll('.step[draggable="true"]:not(.dragging)')
+                    .forEach((s) => (s.draggable = false)),
+            );
+
+            function dropIndex(y) {
+                const steps = [...$('steps').querySelectorAll('.step')];
+                const i = steps.findIndex((s) => {
+                    const r = s.getBoundingClientRect();
+                    return y < r.top + r.height / 2;
+                });
+                return i === -1 ? steps.length : i;
+            }
+
+            const canvas = document.querySelector('.canvas');
+            canvas.addEventListener('dragover', (e) => {
+                const types = e.dataTransfer.types;
+                if (!types.includes(TYPE_MIME) && !types.includes(STEP_MIME)) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = types.includes(STEP_MIME) ? 'move' : 'copy';
+                const el = $('steps');
+                el.classList.add('drag-active');
+                const steps = el.querySelectorAll('.step');
+                if (!steps.length) return;
+                const i = dropIndex(e.clientY);
+                if (i < steps.length) el.insertBefore(marker, steps[i]);
+                else el.appendChild(marker);
+            });
+
+            canvas.addEventListener('dragleave', (e) => {
+                if (!canvas.contains(e.relatedTarget)) clearDrag();
+            });
+
+            canvas.addEventListener('drop', (e) => {
+                const type = e.dataTransfer.getData(TYPE_MIME);
+                const stepId = e.dataTransfer.getData(STEP_MIME);
+                if (!type && !stepId) return;
+                e.preventDefault();
+                const i = dropIndex(e.clientY);
+                clearDrag();
+                if (type) addStep(type, i);
+                else moveStep(state.steps.indexOf(stepById(stepId)), i);
+            });
+
+            // ---------- Startup ----------
+
+            function setupNetworkPicker() {
+                const saved = Storage.get(KEYS.network) || NETWORKS[2].url;
+                const custom = !NETWORKS.some((n) => n.url === saved);
+                $('networkSelect').innerHTML =
+                    NETWORKS.map((n) => `<option value="${n.url}">${n.label}</option>`).join('') +
+                    '<option value="custom">Custom…</option>';
+                $('networkSelect').value = custom ? 'custom' : saved;
+                $('customUrl').hidden = !custom;
+                if (custom) $('customUrl').value = saved;
+                $('networkSelect').addEventListener('change', (e) => {
+                    const isCustom = e.target.value === 'custom';
+                    $('customUrl').hidden = !isCustom;
+                    if (isCustom) $('customUrl').focus();
+                    else connect(e.target.value);
+                });
+                const connectSelected = () => {
+                    const url =
+                        $('networkSelect').value === 'custom'
+                            ? $('customUrl').value.trim()
+                            : $('networkSelect').value;
+                    if (url) connect(url);
+                };
+                $('connectBtn').addEventListener('click', connectSelected);
+                $('customUrl').addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') connectSelected();
+                });
+                connect(saved);
+            }
+
+            async function init() {
+                const hash = location.hash.match(/^#recipe=(.+)$/);
+                if (hash) {
+                    try {
+                        state = normalizeRecipe(JSON.parse(base64UrlDecode(hash[1])));
+                        saveRecipe();
+                    } catch (error) {
+                        showToast('Could not read the shared recipe', 'error');
+                    }
+                    history.replaceState(null, '', location.pathname + location.search);
+                }
+                const cache = Storage.get(KEYS.definitions, {});
+                const cached = cache[Storage.get(KEYS.network)] || Object.values(cache)[0];
+                if (cached) applyDefinitions(cached, 'cached');
+                else renderAll();
+                renderPalette();
+                setupNetworkPicker();
+                try {
+                    [codec, keypairs] = await Promise.all([
+                        import(CODEC_URL),
+                        import(KEYPAIRS_URL),
+                    ]);
+                } catch (error) {
+                    showToast('Could not load the signing libraries', 'error', 8000);
+                }
+                renderDerived();
+            }
+
+            init();
+        </script>
+    </body>
+</html>

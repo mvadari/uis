@@ -22,19 +22,22 @@ Comprehensive interface for interacting with the XRP Ledger blockchain.
 
 ---
 
-### 🧪 XRPL Batch Testing UI
+### 🧪 XRPL Batch Builder
 
-Specialized testing tool for XRPL Batch transactions.
+Drag-and-drop builder for XRPL Batch transactions.
 
 **Features:**
 
-- Create and manage test wallets
-- Build test cases with transaction templates
-- Multi-account batch transaction support
-- Run tests and generate reports
-- Pre-built templates for common patterns
+- Drag transaction blocks from a palette into a recipe, then reorder them by dragging
+- Forms, flags and field types come from the network's `server_definitions`, so every
+  transaction type the network knows is available
+- Connect to Mainnet, Testnet, Devnet or a custom WebSocket URL
+- Pick the batch mode: all or nothing, only one, until failure, or independent
+- Create, import and fund test accounts; multi-account batches are signed automatically
+- Submit and see the result of the batch and of each inner transaction
+- Import Batch JSON, save named recipes, and share a recipe as a link
 
-[**Launch Batch Testing UI →**](https://mvadari.github.io/uis/batch-testing-ui.html)
+[**Launch Batch Builder →**](https://mvadari.github.io/uis/batch.html)
 
 ---
 
@@ -238,7 +241,7 @@ All tools are self-contained HTML files. To run locally:
     open index.html
     # or
     open ui.html
-    open batch-testing-ui.html
+    open batch.html
     open github.html
     open smart-escrow-prs.html
     open xrpld.html

@@ -120,4 +120,5 @@ Clipboard writes fail in an unfocused browser pane (`Document is not focused`) â
 - The README is user-facing and lists each tool's features as bullets; update the relevant section
   when adding a user-visible feature.
 - Keep tools dependency-free where possible. The only external scripts are CDN loads in the XRPL
-  tools (`xrpl.js`, CodeMirror) and `marked` in `xrpld.html`.
+  tools (`xrpl.js`, CodeMirror; `batch.html` loads `ripple-binary-codec` and `ripple-keypairs` from
+  esm.sh) and `marked` in `xrpld.html`.
