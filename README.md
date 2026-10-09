@@ -36,6 +36,7 @@ Drag-and-drop builder for XRPL Batch transactions.
 - Create, import and fund test accounts; multi-account batches are signed automatically
 - Submit and see the result of the batch and of each inner transaction
 - Import Batch JSON, save named recipes, and share a recipe as a link
+- Ships a `server_definitions.json` snapshot, so the palette loads before (or without) a connection
 
 [**Launch Batch Builder →**](https://mvadari.github.io/uis/batch.html)
 

@@ -10,9 +10,14 @@ A collection of standalone browser tools, each a single self-contained HTML file
 `index.html` is the launcher that links to all of them. Pushing to `main` deploys the repo root
 verbatim to GitHub Pages via `.github/workflows/deploy.yml`.
 
-`chrome-extension/` is the one exception to the single-file rule: an unpacked MV3 extension that
+`chrome-extension/` is the main exception to the single-file rule: an unpacked MV3 extension that
 opens the current GitHub PR in `pr.html`. It has its own README covering install and Firefox/AMO
 signing.
+
+`server_definitions.json` is a snapshot of rippled's `server_definitions` response. `batch.html`
+uses it before the first connection, and fills in any top-level key a network's own response
+omits. To refresh it, save the `result` of a `server_definitions` request to a Devnet node (drop
+`status`) and run prettier on the file.
 
 ## Commands
 

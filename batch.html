@@ -900,6 +900,7 @@
             let codecDefs = null;
             let fieldInfo = {};
             let defsSource = '';
+            let localDefs = null;
             let conn = null;
             let validatedLedger = null;
             let wallets = Storage.get(KEYS.wallets, []);
@@ -1050,6 +1051,25 @@
 
             // ---------- Definitions ----------
 
+            // server_definitions.json is a snapshot used before the first connection. A network's
+            // own definitions win; any top-level key it leaves out (an older rippled has no
+            // TRANSACTION_FORMATS, for example) comes from the snapshot.
+            async function loadLocalDefinitions() {
+                try {
+                    const res = await fetch('server_definitions.json');
+                    if (res.ok) localDefs = await res.json();
+                } catch (error) {
+                    console.warn('Could not load server_definitions.json', error);
+                }
+            }
+
+            function withLocalFallback(d) {
+                const missing = Object.keys(localDefs || {}).filter((k) => !(k in d));
+                return missing.length
+                    ? { defs: { ...localDefs, ...d }, note: ` + local ${missing.join(', ')}` }
+                    : { defs: d, note: '' };
+            }
+
             function applyDefinitions(d, source) {
                 defs = d;
                 fieldInfo = Object.fromEntries(d.FIELDS || []);
@@ -1167,7 +1187,8 @@
                             Storage.set(KEYS.definitions, cache);
                         }
                         if (conn !== c) return;
-                        applyDefinitions(d.FIELDS ? d : cached, 'network');
+                        const merged = withLocalFallback(d.FIELDS ? d : cached);
+                        applyDefinitions(merged.defs, `network${merged.note}`);
                         const sub = await rpc('subscribe', { streams: ['ledger'] });
                         validatedLedger = sub.ledger_index;
                         renderNetMeta();
@@ -2443,9 +2464,10 @@
                     }
                     history.replaceState(null, '', location.pathname + location.search);
                 }
-                const cache = Storage.get(KEYS.definitions, {});
-                const cached = cache[Storage.get(KEYS.network)] || Object.values(cache)[0];
-                if (cached) applyDefinitions(cached, 'cached');
+                await loadLocalDefinitions();
+                const cached = Storage.get(KEYS.definitions, {})[Storage.get(KEYS.network)];
+                if (cached) applyDefinitions(withLocalFallback(cached).defs, 'cached');
+                else if (localDefs) applyDefinitions(localDefs, 'local file');
                 else renderAll();
                 renderPalette();
                 setupNetworkPicker();
