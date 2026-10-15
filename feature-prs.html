@@ -805,7 +805,8 @@
 
                 updateTokenStatus();
                 updateMyPRsButton();
-                if ((loadIdentity || tokenChanged) && token) loadViewerLogin();
+                // Window focus lands here too, so only ask GitHub who we are when we don't know yet.
+                if ((loadIdentity || tokenChanged) && token && !viewerLogin) loadViewerLogin();
                 if (tokenChanged) renderPRs();
             }
 
@@ -885,9 +886,9 @@
                 renderPRs();
             }
 
-            async function searchPullRequestNumbers(repoSlug, branch, state) {
+            async function searchPullRequestIds(repoSlug, branch, state) {
                 const query = buildSearchQuery(repoSlug, branch, state);
-                const numbers = [];
+                const ids = [];
                 const seen = new Set();
 
                 for (let page = 1; page <= 10; page++) {
@@ -896,160 +897,216 @@
                     for (const item of data.items || []) {
                         if (!seen.has(item.number)) {
                             seen.add(item.number);
-                            numbers.push(item.number);
+                            ids.push(item.node_id);
                         }
                     }
                     if (!data.items || data.items.length < 100) break;
                 }
 
-                return numbers;
+                return ids;
             }
 
-            async function fetchPullRequest(owner, repo, number) {
-                let pr = null;
-                for (let attempt = 0; attempt < 4; attempt++) {
-                    pr = await githubRequest(`${API_BASE}/repos/${owner}/${repo}/pulls/${number}`);
-                    if (pr.mergeable !== null && pr.mergeable_state !== 'unknown') break;
-                    if (attempt < 3) await sleep(700);
+            // One GraphQL request covers PR_CHUNK PRs with their reviews and CI, about 1 point.
+            // The REST equivalent was 4-7 calls per PR.
+            const PR_CHUNK = 20;
+            const PR_QUERY = `
+                query($ids: [ID!]!) {
+                    nodes(ids: $ids) {
+                        ... on PullRequest {
+                            id
+                            number
+                            title
+                            url
+                            isDraft
+                            updatedAt
+                            mergeable
+                            mergeStateStatus
+                            author { login url __typename }
+                            headRefName
+                            headRefOid
+                            headRepository { url }
+                            baseRefName
+                            baseRepository { url }
+                            reviewRequests(first: 50) {
+                                nodes {
+                                    requestedReviewer {
+                                        __typename
+                                        ... on User { login }
+                                        ... on Bot { login }
+                                        ... on Mannequin { login }
+                                        ... on Team { slug }
+                                    }
+                                }
+                            }
+                            reviews(last: 100) {
+                                nodes { state submittedAt author { login __typename } }
+                            }
+                            commits(last: 1) {
+                                nodes {
+                                    commit {
+                                        statusCheckRollup {
+                                            contexts(first: 100) {
+                                                totalCount
+                                                nodes {
+                                                    __typename
+                                                    ... on CheckRun { name status conclusion detailsUrl }
+                                                    ... on StatusContext { context state targetUrl }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
-                return pr;
+            `;
+
+            async function graphqlRequest(query, variables) {
+                const payload = await githubRequest(`${API_BASE}/graphql`, {
+                    method: 'POST',
+                    body: JSON.stringify({ query, variables }),
+                });
+                if (payload.errors?.length) {
+                    throw new Error(payload.errors.map((error) => error.message).join('; '));
+                }
+                return payload.data;
             }
 
-            async function fetchReviews(owner, repo, number) {
-                const reviews = [];
-                for (let page = 1; page <= 5; page++) {
-                    const data = await githubRequest(
-                        `${API_BASE}/repos/${owner}/${repo}/pulls/${number}/reviews?per_page=100&page=${page}`,
-                    );
-                    reviews.push(...data);
-                    if (data.length < 100) break;
-                }
+            async function fetchPRNodes(ids) {
+                const chunks = [];
+                for (let i = 0; i < ids.length; i += PR_CHUNK)
+                    chunks.push(ids.slice(i, i + PR_CHUNK));
+                const results = await mapWithConcurrency(chunks, 3, (chunk) =>
+                    graphqlRequest(PR_QUERY, { ids: chunk }),
+                );
+                return results.flatMap((data) => data.nodes || []).filter(Boolean);
+            }
 
+            // GitHub computes mergeability lazily, so a PR can come back UNKNOWN. Ask again for
+            // just those PRs, up to 3 more times.
+            async function fetchPRNodesWithMergeability(ids) {
+                const isUnknown = (node) =>
+                    node.mergeable === 'UNKNOWN' || node.mergeStateStatus === 'UNKNOWN';
+                let nodes = await fetchPRNodes(ids);
+                for (let attempt = 0; attempt < 3; attempt++) {
+                    const unknown = nodes.filter(isUnknown).map((node) => node.id);
+                    if (unknown.length === 0) break;
+                    await sleep(700);
+                    const retried = new Map((await fetchPRNodes(unknown)).map((n) => [n.id, n]));
+                    nodes = nodes.map((node) => retried.get(node.id) || node);
+                }
+                return nodes;
+            }
+
+            function toUser(actor) {
+                if (!actor?.login) return null;
+                return { login: actor.login, html_url: actor.url, type: actor.__typename };
+            }
+
+            function latestReviews(node) {
                 const latestStates = new Map();
-                reviews.forEach((review) => {
-                    if (!review.user || review.state === 'PENDING') return;
-                    if (isBotReviewer(review.user)) return;
-                    latestStates.set(review.user.login, {
-                        user: review.user.login,
+                (node.reviews?.nodes || []).forEach((review) => {
+                    const user = toUser(review.author);
+                    if (!user || review.state === 'PENDING' || isBotReviewer(user)) return;
+                    latestStates.set(user.login, {
+                        user: user.login,
                         state: review.state,
-                        submittedAt: review.submitted_at,
+                        submittedAt: review.submittedAt,
                     });
                 });
-
                 return [...latestStates.values()].sort((a, b) => a.user.localeCompare(b.user));
             }
 
-            async function fetchCIStatus(owner, repo, sha) {
-                if (!sha) {
-                    return {
-                        state: 'unknown',
-                        label: 'CI unknown',
-                        totalCount: 0,
-                        failedChecks: [],
-                    };
+            const CI_SUCCESS = ['SUCCESS', 'SKIPPED', 'NEUTRAL'];
+            const CI_FAILURE = [
+                'FAILURE',
+                'ERROR',
+                'TIMED_OUT',
+                'CANCELLED',
+                'ACTION_REQUIRED',
+                'STARTUP_FAILURE',
+            ];
+
+            function summarizeCI(rollup) {
+                const totalCount = rollup?.contexts?.totalCount || 0;
+                let successCount = 0;
+                let failureCount = 0;
+                let pendingCount = 0;
+                const failedChecks = [];
+
+                (rollup?.contexts?.nodes || []).forEach((context) => {
+                    const isCheckRun = context.__typename === 'CheckRun';
+                    const outcome = isCheckRun
+                        ? context.status === 'COMPLETED'
+                            ? context.conclusion
+                            : 'PENDING'
+                        : context.state;
+                    if (CI_SUCCESS.includes(outcome)) {
+                        successCount++;
+                    } else if (CI_FAILURE.includes(outcome)) {
+                        failureCount++;
+                        failedChecks.push({
+                            name: isCheckRun ? context.name : context.context,
+                            url: isCheckRun ? context.detailsUrl : context.targetUrl,
+                        });
+                    } else if (outcome === 'PENDING' || outcome === 'EXPECTED') {
+                        pendingCount++;
+                    }
+                });
+
+                const counts = {
+                    totalCount,
+                    successCount,
+                    failureCount,
+                    pendingCount,
+                    failedChecks,
+                };
+                if (totalCount === 0) return { state: 'none', label: 'No CI', ...counts };
+                if (failureCount > 0) {
+                    return { state: 'failure', label: `${failureCount} failing`, ...counts };
                 }
-
-                try {
-                    const [checksData, statusData] = await Promise.all([
-                        githubRequest(
-                            `${API_BASE}/repos/${owner}/${repo}/commits/${sha}/check-runs?per_page=100`,
-                        ),
-                        githubRequest(`${API_BASE}/repos/${owner}/${repo}/commits/${sha}/status`),
-                    ]);
-
-                    let successCount = 0;
-                    let failureCount = 0;
-                    let pendingCount = 0;
-                    const failedChecks = [];
-
-                    (checksData.check_runs || []).forEach((check) => {
-                        if (
-                            check.conclusion === 'success' ||
-                            check.conclusion === 'skipped' ||
-                            check.conclusion === 'neutral'
-                        ) {
-                            successCount++;
-                        } else if (
-                            ['failure', 'timed_out', 'cancelled', 'action_required'].includes(
-                                check.conclusion,
-                            )
-                        ) {
-                            failureCount++;
-                            failedChecks.push({ name: check.name, url: check.html_url });
-                        } else if (
-                            ['in_progress', 'queued', 'waiting', 'requested'].includes(check.status)
-                        ) {
-                            pendingCount++;
-                        }
-                    });
-
-                    (statusData.statuses || []).forEach((status) => {
-                        if (status.state === 'success') {
-                            successCount++;
-                        } else if (status.state === 'failure' || status.state === 'error') {
-                            failureCount++;
-                            failedChecks.push({
-                                name: status.context,
-                                url: status.target_url || statusData.target_url,
-                            });
-                        } else if (status.state === 'pending') {
-                            pendingCount++;
-                        }
-                    });
-
-                    const totalCount =
-                        (checksData.total_count || 0) + (statusData.statuses || []).length;
-                    if (totalCount === 0) {
-                        return {
-                            state: 'none',
-                            label: 'No CI',
-                            totalCount,
-                            successCount,
-                            failureCount,
-                            pendingCount,
-                            failedChecks,
-                        };
-                    }
-                    if (failureCount > 0) {
-                        return {
-                            state: 'failure',
-                            label: `${failureCount} failing`,
-                            totalCount,
-                            successCount,
-                            failureCount,
-                            pendingCount,
-                            failedChecks,
-                        };
-                    }
-                    if (pendingCount > 0) {
-                        return {
-                            state: 'pending',
-                            label: `${pendingCount} pending`,
-                            totalCount,
-                            successCount,
-                            failureCount,
-                            pendingCount,
-                            failedChecks,
-                        };
-                    }
-                    return {
-                        state: 'success',
-                        label: 'CI passing',
-                        totalCount,
-                        successCount,
-                        failureCount,
-                        pendingCount,
-                        failedChecks,
-                    };
-                } catch (error) {
-                    console.error('Error fetching CI status:', error);
-                    return {
-                        state: 'unknown',
-                        label: 'CI unavailable',
-                        totalCount: 0,
-                        failedChecks: [],
-                    };
+                if (pendingCount > 0) {
+                    return { state: 'pending', label: `${pendingCount} pending`, ...counts };
                 }
+                return { state: 'success', label: 'CI passing', ...counts };
+            }
+
+            // A PR_QUERY node in the REST pulls shape the rest of the page (and the cache) reads.
+            function toPR(node) {
+                const requested = (node.reviewRequests?.nodes || [])
+                    .map((request) => request.requestedReviewer)
+                    .filter(Boolean);
+                const pr = {
+                    number: node.number,
+                    title: node.title,
+                    html_url: node.url,
+                    draft: node.isDraft,
+                    updated_at: node.updatedAt,
+                    mergeable: { MERGEABLE: true, CONFLICTING: false }[node.mergeable] ?? null,
+                    mergeable_state: (node.mergeStateStatus || 'unknown').toLowerCase(),
+                    user: toUser(node.author),
+                    head: {
+                        ref: node.headRefName,
+                        sha: node.headRefOid,
+                        repo: node.headRepository ? { html_url: node.headRepository.url } : null,
+                    },
+                    base: {
+                        ref: node.baseRefName,
+                        repo: node.baseRepository ? { html_url: node.baseRepository.url } : null,
+                    },
+                    requested_reviewers: requested
+                        .filter((reviewer) => reviewer.__typename !== 'Team')
+                        .map(toUser)
+                        .filter(Boolean),
+                    requested_teams: requested
+                        .filter((reviewer) => reviewer.__typename === 'Team')
+                        .map((team) => ({ slug: team.slug })),
+                };
+                pr.reviewRows = mergeReviewRows(pr, latestReviews(node));
+                pr.mergeDisplay = mergeState(pr);
+                pr.ciStatus = summarizeCI(node.commits?.nodes?.[0]?.commit?.statusCheckRollup);
+                return pr;
             }
 
             function mergeReviewRows(pr, reviews) {
@@ -1294,17 +1351,6 @@
                 }
             }
 
-            async function fetchPRData(repoInfo, number) {
-                const [pr, reviews] = await Promise.all([
-                    fetchPullRequest(repoInfo.owner, repoInfo.repo, number),
-                    fetchReviews(repoInfo.owner, repoInfo.repo, number),
-                ]);
-                pr.reviewRows = mergeReviewRows(pr, reviews);
-                pr.mergeDisplay = mergeState(pr);
-                pr.ciStatus = await fetchCIStatus(repoInfo.owner, repoInfo.repo, pr.head?.sha);
-                return pr;
-            }
-
             async function loadPRs() {
                 if (loading) return;
 
@@ -1332,8 +1378,8 @@
                 renderLoading();
 
                 try {
-                    const numbers = await searchPullRequestNumbers(repoInfo.slug, branch, state);
-                    if (numbers.length === 0) {
+                    const ids = await searchPullRequestIds(repoInfo.slug, branch, state);
+                    if (ids.length === 0) {
                         pullRequests = [];
                         renderPRs();
                         savePRsToCache();
@@ -1341,9 +1387,7 @@
                         return;
                     }
 
-                    pullRequests = await mapWithConcurrency(numbers, 6, (number) =>
-                        fetchPRData(repoInfo, number),
-                    );
+                    pullRequests = (await fetchPRNodesWithMergeability(ids)).map(toPR);
                     sortPullRequests();
                     els.lastUpdated.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
                     renderPRs();
