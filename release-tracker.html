@@ -753,7 +753,6 @@
             let repoOwner = '';
             let repoName = '';
             let releaseName = getReleaseFromHash() || localStorage.getItem(RELEASE_KEY) || '';
-            let releaseCounts = null;
 
             function repoSlug() {
                 return `${repoOwner}/${repoName}`;
@@ -871,6 +870,14 @@
                 }
             }
 
+            function readCachedPRs() {
+                try {
+                    return JSON.parse(localStorage.getItem(cacheKey()) || '[]');
+                } catch {
+                    return [];
+                }
+            }
+
             function loadPRsFromCache() {
                 const cached = localStorage.getItem(cacheKey());
                 if (!cached) return false;
@@ -892,18 +899,13 @@
                 return `repo:${repoSlug()} is:pr is:${state} milestone:"${release.replace(/"/g, '\\"')}"`;
             }
 
-            // Matches the API-side count, which is scoped to open PRs (buildLabelQuery(..., 'open')),
-            // so the summary tile's number and the list it filters to always agree.
+            // Scoped to open PRs, so the summary tile's number and the list it filters to agree.
             function isReadyToMerge(pr) {
                 return (
                     pr.state === 'open' &&
                     !pr.merged_at &&
                     (pr.labels || []).some((label) => label.name === READY_LABEL)
                 );
-            }
-
-            function buildLabelQuery(release, label, state = 'open') {
-                return `${buildQuery(release, state)} label:"${label.replace(/"/g, '\\"')}"`;
             }
 
             function updateQueryPreview() {
@@ -1008,27 +1010,9 @@
                     searchPRNumbers(release, 'open'),
                     searchPRNumbers(release, 'closed'),
                 ]);
-                return [...new Set([...open, ...closed])].sort((a, b) => b - a);
-            }
-
-            async function searchCount(query) {
-                const url = `${API_BASE}/search/issues?q=${encodeURIComponent(query)}&per_page=1`;
-                const data = await githubRequest(url);
-                return data.total_count || 0;
-            }
-
-            async function fetchReleaseCounts(release) {
-                const [open, closed, merged, readyToMerge] = await Promise.all([
-                    searchCount(buildQuery(release, 'open')),
-                    searchCount(buildQuery(release, 'closed')),
-                    searchCount(`${buildQuery(release, 'closed')} is:merged`),
-                    searchCount(buildLabelQuery(release, READY_LABEL, 'open')),
-                ]);
                 return {
-                    total: open + closed,
-                    open,
-                    merged,
-                    readyToMerge,
+                    numbers: [...new Set([...open, ...closed])].sort((a, b) => b - a),
+                    closed: new Set(closed),
                 };
             }
 
@@ -1257,11 +1241,7 @@
                         '<div class="loading">Loading release PRs...</div>';
 
                 try {
-                    const [numbers, counts] = await Promise.all([
-                        searchPRNumbersForRelease(releaseName),
-                        fetchReleaseCounts(releaseName),
-                    ]);
-                    releaseCounts = counts;
+                    const { numbers, closed } = await searchPRNumbersForRelease(releaseName);
                     if (numbers.length === 0) {
                         prs = [];
                         savePRsToCache();
@@ -1271,8 +1251,19 @@
                         return;
                     }
 
-                    prs = await mapWithConcurrency(numbers, FETCH_CONCURRENCY, async (number) =>
-                        enrichPR(await fetchPR(number)),
+                    // A closed PR's data no longer changes, so reuse its cached copy instead of
+                    // refetching it on every refresh.
+                    const cachedClosed = new Map(
+                        readCachedPRs()
+                            .filter((pr) => pr.state === 'closed')
+                            .map((pr) => [pr.number, pr]),
+                    );
+                    prs = await mapWithConcurrency(
+                        numbers,
+                        FETCH_CONCURRENCY,
+                        async (number) =>
+                            (closed.has(number) && cachedClosed.get(number)) ||
+                            enrichPR(await fetchPR(number)),
                     );
                     savePRsToCache();
                     document.getElementById('lastUpdated').textContent =
@@ -1501,11 +1492,10 @@
             }
 
             function renderSummary() {
-                const total = releaseCounts?.total ?? prs.length;
-                const open = releaseCounts?.open ?? prs.filter((pr) => pr.state === 'open').length;
-                const merged = releaseCounts?.merged ?? prs.filter((pr) => pr.merged_at).length;
-                const readyToMerge =
-                    releaseCounts?.readyToMerge ?? prs.filter(isReadyToMerge).length;
+                const total = prs.length;
+                const open = prs.filter((pr) => pr.state === 'open').length;
+                const merged = prs.filter((pr) => pr.merged_at).length;
+                const readyToMerge = prs.filter(isReadyToMerge).length;
                 const attention = prs.filter(needsAttention).length;
 
                 document.getElementById('totalCount').textContent = total;
@@ -1729,7 +1719,6 @@
                 // Milestones and PRs belong to the previous repo — reset everything.
                 prs = [];
                 milestones = [];
-                releaseCounts = null;
                 releaseName = '';
                 localStorage.removeItem(RELEASE_KEY);
                 setReleaseHash('');
