@@ -122,6 +122,11 @@ Clipboard writes fail in an unfocused browser pane (`Document is not focused`) â
 
 - Commit messages are `<file>: <what changed>`, e.g. `github.html: add milestone editing`. Commits
   go directly to `main`.
+- Commit as you go: one commit for each self-contained change (a feature, a fix, a doc update),
+  after you verify it in the browser. Don't save a whole session's work for one large commit.
+- Push to `origin main` after every commit. Pushing deploys to GitHub Pages, and testing on the
+  live site is the easiest check. No separate confirmation is needed. Fetch first, and stop and
+  ask if `main` has diverged from `origin/main`.
 - The README is user-facing and lists each tool's features as bullets; update the relevant section
   when adding a user-visible feature.
 - Keep tools dependency-free where possible. The only external scripts are CDN loads in the XRPL
