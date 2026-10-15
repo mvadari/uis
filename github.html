@@ -4960,10 +4960,7 @@
             // Setup auto-refresh
             function setupAutoRefresh() {
                 const checkbox = document.getElementById('autoRefreshSetting');
-                // Skip ticks while the tab is hidden: every open tab shares one rate limit.
-                setAutoRefresh(Boolean(checkbox && checkbox.checked), () => {
-                    if (!document.hidden) fetchPRs(true);
-                });
+                setAutoRefresh(Boolean(checkbox && checkbox.checked), () => fetchPRs(true));
             }
 
             // Unified Settings Modal Functions

@@ -103,15 +103,33 @@ function parseRepo(value) {
 const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000;
 
 // The page's one background-refresh timer. Always clears the previous timer, so
-// toggling the setting repeatedly can't stack duplicates.
+// toggling the setting repeatedly can't stack duplicates. Every open tab shares one GitHub
+// rate limit, so a hidden tab skips its ticks and refreshes once when it is shown again.
 const setAutoRefresh = (() => {
     let timer = null;
+    let onVisible = null;
     return function setAutoRefresh(enabled, callback, intervalMs = AUTO_REFRESH_INTERVAL) {
         if (timer) {
             clearInterval(timer);
             timer = null;
         }
-        if (enabled) timer = setInterval(callback, intervalMs);
+        if (onVisible) {
+            document.removeEventListener('visibilitychange', onVisible);
+            onVisible = null;
+        }
+        if (!enabled) return;
+
+        let missed = false;
+        timer = setInterval(() => {
+            if (document.hidden) missed = true;
+            else callback();
+        }, intervalMs);
+        onVisible = () => {
+            if (document.hidden || !missed) return;
+            missed = false;
+            callback();
+        };
+        document.addEventListener('visibilitychange', onVisible);
     };
 })();
 
