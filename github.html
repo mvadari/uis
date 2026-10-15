@@ -2537,7 +2537,7 @@
                 manuallyToggledColumns: [MANUALLY_TOGGLED_KEY, []],
             };
 
-            // Keyed by the ciStatus values fetchPRDetails produces; anything else renders no icon.
+            // Keyed by the ciStatus values applyPRDetails produces; anything else renders no icon.
             const CI_ICONS = {
                 success: {
                     className: 'ci-success',
@@ -2670,7 +2670,7 @@
             let currentMilestoneFilter = ''; // Track current milestone filter
             let currentUser = null; // Cache current user login
             let currentView = localStorage.getItem(VIEW_KEY) || 'board'; // 'board' | 'queue'
-            let reviewMetadataError = ''; // Last enrichReviewMetadata failure, shown in queue view
+            let reviewMetadataError = ''; // Last enrichPRDetails failure, shown in queue view
             let tempLabels = []; // Temporary labels for editing
             let tempQueries = []; // Temporary queries for editing
             let draggedQueryIndex = null; // Index of query row being dragged in the editor
@@ -3090,118 +3090,14 @@
                 document.getElementById('lastUpdated').textContent = timeString;
             }
 
-            // Fetch PR details including CI status
-            async function fetchPRDetails(pr, headers) {
-                try {
-                    // Extract owner and repo from pull_request.url
-                    const prUrl = pr.pull_request.url;
-                    const prResponse = await fetch(prUrl, { headers });
-                    const prData = await prResponse.json();
-
-                    let ciStatus = 'none';
-
-                    // Get the head commit SHA
-                    const headSha = prData.head.sha;
-                    const repoUrl = prData.base.repo.url;
-
-                    // Try to get check runs (GitHub Actions, etc.)
-                    try {
-                        const checkRunsUrl = `${repoUrl}/commits/${headSha}/check-runs`;
-                        const checkRunsResponse = await fetch(checkRunsUrl, { headers });
-
-                        if (checkRunsResponse.ok) {
-                            const checkRunsData = await checkRunsResponse.json();
-
-                            if (checkRunsData.total_count > 0) {
-                                const runs = checkRunsData.check_runs;
-                                const hasFailure = runs.some(
-                                    (run) =>
-                                        run.conclusion === 'failure' ||
-                                        run.conclusion === 'cancelled' ||
-                                        run.conclusion === 'timed_out',
-                                );
-                                const hasPending = runs.some(
-                                    (run) =>
-                                        run.status === 'queued' || run.status === 'in_progress',
-                                );
-                                const allSuccess = runs.every(
-                                    (run) =>
-                                        run.conclusion === 'success' ||
-                                        run.conclusion === 'skipped' ||
-                                        run.conclusion === 'neutral',
-                                );
-
-                                if (hasFailure) {
-                                    ciStatus = 'failure';
-                                } else if (hasPending) {
-                                    ciStatus = 'pending';
-                                } else if (allSuccess && runs.length > 0) {
-                                    ciStatus = 'success';
-                                }
-                            }
-                        }
-                    } catch (e) {
-                        // Check runs not available; fall through to legacy commit status
-                    }
-
-                    // If no check runs, try commit status (legacy CI)
-                    if (ciStatus === 'none') {
-                        try {
-                            const statusUrl = `${repoUrl}/commits/${headSha}/status`;
-                            const statusResponse = await fetch(statusUrl, { headers });
-
-                            if (statusResponse.ok) {
-                                const statusData = await statusResponse.json();
-
-                                if (statusData.state) {
-                                    if (statusData.state === 'success') ciStatus = 'success';
-                                    else if (
-                                        statusData.state === 'failure' ||
-                                        statusData.state === 'error'
-                                    )
-                                        ciStatus = 'failure';
-                                    else if (statusData.state === 'pending') ciStatus = 'pending';
-                                }
-                            }
-                        } catch (e) {
-                            // Commit status not available
-                        }
-                    }
-
-                    return {
-                        ...pr,
-                        ciStatus: ciStatus,
-                        mergeable_state: prData.mergeable_state,
-                        hasConflicts: prData.mergeable === false,
-                        draft: prData.draft,
-                        auto_merge: prData.auto_merge,
-                        headRef: prData.head?.ref,
-                        baseRef: prData.base?.ref,
-                        additions: prData.additions,
-                        deletions: prData.deletions,
-                        changed_files: prData.changed_files,
-                    };
-                } catch (error) {
-                    console.error('Error fetching PR details:', error);
-                    return {
-                        ...pr,
-                        ciStatus: 'none',
-                        mergeable_state: null,
-                        hasConflicts: false,
-                        draft: pr.draft || false,
-                        headRef: null,
-                        baseRef: null,
-                    };
-                }
-            }
-
-            // ---------- Review Queue metadata ----------
+            // ---------- PR details and Review Queue metadata ----------
             //
-            // REST search tells us which PRs are on the board but not what's blocked on whom:
-            // there is no REST field for "review requested at", and stale-review detection needs
-            // the last commit date next to my last review. One GraphQL pass over the PRs already
-            // fetched fills that in. Results land on pr._review, which is cached with the PR, so
-            // the queue renders from cache with no token round-trip.
+            // REST search tells us which PRs are on the board but not their CI or merge state, nor
+            // what's blocked on whom: there is no REST field for "review requested at", and
+            // stale-review detection needs the last commit date next to my last review. One
+            // GraphQL pass over the PRs already fetched fills all of that in, ~20 PRs per request
+            // instead of 2-3 REST calls per PR. Results land on the PR (and pr._review), which is
+            // cached, so both views render from cache with no token round-trip.
 
             async function graphqlRequest(query, variables) {
                 const response = await fetch(GRAPHQL_URL, {
@@ -3227,12 +3123,24 @@
                 return payload.data;
             }
 
-            const REVIEW_METADATA_QUERY = `
+            const PR_DETAILS_QUERY = `
                 query($ids: [ID!]!) {
                     nodes(ids: $ids) {
                         ... on PullRequest {
                             id
-                            commits(last: 1) { nodes { commit { committedDate } } }
+                            isDraft
+                            isInMergeQueue
+                            mergeable
+                            mergeStateStatus
+                            autoMergeRequest { enabledAt }
+                            headRefName
+                            baseRefName
+                            additions
+                            deletions
+                            changedFiles
+                            commits(last: 1) {
+                                nodes { commit { committedDate statusCheckRollup { state } } }
+                            }
                             reviewRequests(first: 25) {
                                 nodes { requestedReviewer { __typename ... on User { login } } }
                             }
@@ -3266,6 +3174,33 @@
             // 20 PRs x 50 reviews x 50 threads keeps each request well under GitHub's GraphQL
             // node limit. Raise only alongside a smaller reviews/reviewThreads page size.
             const REVIEW_METADATA_CHUNK = 20;
+
+            // statusCheckRollup.state -> the ciStatus keys of CI_ICONS. The rollup already
+            // combines check runs and legacy commit statuses.
+            const CI_STATUS_BY_ROLLUP = {
+                SUCCESS: 'success',
+                FAILURE: 'failure',
+                ERROR: 'failure',
+                PENDING: 'pending',
+                EXPECTED: 'pending',
+            };
+
+            // Board fields off a PR_DETAILS_QUERY node, under the names the REST pulls API used.
+            function applyPRDetails(pr, node) {
+                const rollup = node.commits?.nodes?.[0]?.commit?.statusCheckRollup;
+                pr.ciStatus = CI_STATUS_BY_ROLLUP[rollup?.state] || 'none';
+                pr.mergeable_state = node.isInMergeQueue
+                    ? 'queued'
+                    : node.mergeStateStatus?.toLowerCase() || null;
+                pr.hasConflicts = node.mergeable === 'CONFLICTING';
+                pr.draft = node.isDraft;
+                pr.auto_merge = node.autoMergeRequest;
+                pr.headRef = node.headRefName;
+                pr.baseRef = node.baseRefName;
+                pr.additions = node.additions;
+                pr.deletions = node.deletions;
+                pr.changed_files = node.changedFiles;
+            }
 
             function isBotAuthor(author) {
                 if (!author) return true;
@@ -3380,9 +3315,9 @@
                 return meta;
             }
 
-            // Attaches pr._review to every PR in place. A failure here is not fatal: the board
-            // works without it, so the queue just reports that it has no data yet.
-            async function enrichReviewMetadata(prs) {
+            // Attaches the board details and pr._review to every PR in place. A failure here is
+            // not fatal: the cards keep their last known details and the queue reports the error.
+            async function enrichPRDetails(prs) {
                 if (prs.length === 0) return;
                 if (!currentUser) {
                     const result = await validateToken(getGitHubToken());
@@ -3408,7 +3343,7 @@
                 }
 
                 const results = await mapWithConcurrency(chunks, 3, (chunk) =>
-                    graphqlRequest(REVIEW_METADATA_QUERY, { ids: chunk }),
+                    graphqlRequest(PR_DETAILS_QUERY, { ids: chunk }),
                 );
 
                 results.forEach((data) => {
@@ -3419,6 +3354,7 @@
                         const requestedByQuery = (pr._sourceQueries || []).some((queryId) =>
                             requestQueryIds.has(queryId),
                         );
+                        applyPRDetails(pr, node);
                         pr._review = buildReviewMetadata(pr, node, me, requestedByQuery);
                     });
                 });
@@ -3697,15 +3633,17 @@
                         });
                     });
 
-                    let newPRs = Array.from(prMap.values());
+                    // Start each PR from its last known details, so a failed GraphQL pass leaves
+                    // the cards as they were instead of blanking CI and conflict state.
+                    const previous = new Map(allPRs.map((pr) => [pr.id, pr]));
+                    const newPRs = Array.from(prMap.values()).map((pr) => ({
+                        ...previous.get(pr.id),
+                        ...pr,
+                    }));
 
-                    // Fetch detailed info for each PR (CI status, conflicts) in parallel
-                    newPRs = await Promise.all(newPRs.map((pr) => fetchPRDetails(pr, headers)));
-
-                    // Review Queue metadata. Non-fatal: the board is fine without it, so a
-                    // failure only costs the queue view its data.
+                    // CI, merge state and Review Queue metadata, in one GraphQL pass. Non-fatal.
                     try {
-                        await enrichReviewMetadata(newPRs);
+                        await enrichPRDetails(newPRs);
                         reviewMetadataError = '';
                     } catch (error) {
                         reviewMetadataError = error.message;
@@ -5022,7 +4960,10 @@
             // Setup auto-refresh
             function setupAutoRefresh() {
                 const checkbox = document.getElementById('autoRefreshSetting');
-                setAutoRefresh(Boolean(checkbox && checkbox.checked), () => fetchPRs(true));
+                // Skip ticks while the tab is hidden: every open tab shares one rate limit.
+                setAutoRefresh(Boolean(checkbox && checkbox.checked), () => {
+                    if (!document.hidden) fetchPRs(true);
+                });
             }
 
             // Unified Settings Modal Functions
