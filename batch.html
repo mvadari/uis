@@ -172,7 +172,7 @@
 
             .batch-row {
                 display: grid;
-                grid-template-columns: minmax(0, 1fr) 150px;
+                grid-template-columns: minmax(0, 1fr) 130px 130px;
                 gap: 12px;
             }
 
@@ -644,6 +644,20 @@
                                 />
                             </div>
                             <div>
+                                <label class="field-label" for="batchTicket"
+                                    >Ticket <span class="field-type">optional</span></label
+                                >
+                                <input
+                                    type="number"
+                                    id="batchTicket"
+                                    list="tickets-batch"
+                                    placeholder="use Sequence"
+                                    data-ticket-for="batch"
+                                    autocomplete="off"
+                                />
+                                <datalist id="tickets-batch"></datalist>
+                            </div>
+                            <div>
                                 <label class="field-label" for="feeOverride"
                                     >Fee <span class="field-type">drops</span></label
                                 >
@@ -666,6 +680,7 @@
                             ></div>
                             <div class="mode-help" id="modeHelp"></div>
                         </div>
+                        <div class="mode-help" data-ticket-hint="batch"></div>
                     </div>
                     <div class="connector"></div>
 
@@ -905,6 +920,9 @@
             let validatedLedger = null;
             let wallets = Storage.get(KEYS.wallets, []);
             const balances = {};
+            // address -> sorted ticket sequences from the validated ledger; absent = not loaded.
+            const tickets = {};
+            const ticketsLoading = new Set();
             let state = normalizeRecipe(Storage.get(KEYS.recipe));
             let submitting = false;
             let runHtml = '';
@@ -1019,6 +1037,7 @@
                     mode: r?.mode || 'tfAllOrNothing',
                     account: r?.account || '',
                     fee: r?.fee || '',
+                    ticket: r?.ticket || '',
                     steps: (r?.steps || []).map((s) => newStep(s.tx || s, s.collapsed)),
                 };
             }
@@ -1039,6 +1058,7 @@
                     mode: state.mode,
                     account: state.account,
                     fee: state.fee,
+                    ticket: state.ticket,
                     steps: state.steps.map((s) => ({ tx: s.tx, collapsed: s.collapsed })),
                 };
             }
@@ -1158,6 +1178,7 @@
                 }
                 validatedLedger = null;
                 for (const a in balances) delete balances[a];
+                for (const a in tickets) delete tickets[a];
                 Storage.set(KEYS.network, url);
                 let ws;
                 try {
@@ -1256,8 +1277,52 @@
                 return address;
             }
 
+            async function loadTickets(address) {
+                ticketsLoading.add(address);
+                const found = [];
+                try {
+                    let marker;
+                    do {
+                        const r = await rpc('account_objects', {
+                            account: address,
+                            type: 'ticket',
+                            ledger_index: 'validated',
+                            limit: 400,
+                            ...(marker ? { marker } : {}),
+                        });
+                        found.push(...r.account_objects.map((o) => o.TicketSequence));
+                        marker = r.marker;
+                    } while (marker);
+                    tickets[address] = found.sort((a, b) => a - b);
+                } catch (error) {
+                    // An unfunded account has no tickets. Any other error leaves them unknown
+                    // (null, so we don't retry in a loop) until the next refresh.
+                    tickets[address] = error.code === 'actNotFound' ? [] : null;
+                } finally {
+                    ticketsLoading.delete(address);
+                }
+                renderAccounts();
+                renderDerived();
+            }
+
+            function recipeAccounts() {
+                const accounts = new Set([state.account, ...wallets.map((w) => w.address)]);
+                state.steps.forEach((s) => accounts.add(s.tx.Account || state.account));
+                return [...accounts].filter(isAddress);
+            }
+
+            // Loads tickets for any account in the recipe that we haven't looked up yet.
+            function ensureTickets() {
+                if (!isConnected()) return;
+                for (const a of recipeAccounts()) {
+                    if (!(a in tickets) && !ticketsLoading.has(a)) loadTickets(a);
+                }
+            }
+
             async function refreshBalances() {
                 if (!isConnected()) return renderAccounts();
+                for (const a in tickets) delete tickets[a];
+                ensureTickets();
                 await Promise.all(
                     wallets.map(async (w) => {
                         try {
@@ -1325,6 +1390,7 @@
                     RawTransactions: state.steps.map((s) => ({ RawTransaction: buildInner(s) })),
                 };
                 if (state.fee) tx.Fee = state.fee;
+                if (state.ticket) tx.TicketSequence = Number(state.ticket);
                 return tx;
             }
 
@@ -1351,6 +1417,12 @@
                     if (isEmpty(step.tx[name])) issues.push(`missing ${name}`);
                 }
                 for (const name of step.invalid) issues.push(`invalid ${name}`);
+                const ticket = ticketIssue(
+                    account,
+                    step.tx.TicketSequence,
+                    state.steps.indexOf(step),
+                );
+                if (ticket) issues.push(ticket);
                 for (const [name, v] of Object.entries(step.tx)) {
                     const t = fieldInfo[name]?.type;
                     if (t === 'AccountID' && name !== 'Account' && v && !isAddress(v)) {
@@ -1364,6 +1436,39 @@
                 return issues;
             }
 
+            // Every ticket the recipe uses, keyed by "account:ticket", with where it is used.
+            function ticketUses() {
+                const uses = new Map();
+                const add = (account, ticket, where) => {
+                    if (!isAddress(account) || ticket === '' || ticket == null) return;
+                    const key = `${account}:${Number(ticket)}`;
+                    uses.set(key, [...(uses.get(key) || []), where]);
+                };
+                add(state.account, state.ticket, 'batch');
+                state.steps.forEach((s, i) =>
+                    add(s.tx.Account || state.account, s.tx.TicketSequence, `step ${i + 1}`),
+                );
+                return uses;
+            }
+
+            // A TicketCreate earlier in the batch can create tickets we can't see yet.
+            function mayCreateTickets(account, beforeIndex) {
+                return state.steps
+                    .slice(0, beforeIndex)
+                    .some(
+                        (s) =>
+                            s.tx.TransactionType === 'TicketCreate' &&
+                            (s.tx.Account || state.account) === account,
+                    );
+            }
+
+            function ticketIssue(account, ticket, stepIndex) {
+                if (ticket === '' || ticket == null || !tickets[account]) return null;
+                if (tickets[account].includes(Number(ticket))) return null;
+                if (stepIndex >= 0 && mayCreateTickets(account, stepIndex)) return null;
+                return `${accountName(account)} has no ticket ${ticket}`;
+            }
+
             function collectIssues() {
                 const issues = [];
                 if (!isConnected()) issues.push('Connect to a network.');
@@ -1374,6 +1479,18 @@
                     issues.push(`A batch holds at most ${MAX_STEPS} transactions.`);
                 }
                 if (state.fee && !/^\d+$/.test(state.fee)) issues.push('Fee must be whole drops.');
+                if (state.ticket && !/^\d+$/.test(state.ticket)) {
+                    issues.push('Ticket must be a whole number.');
+                }
+                const batchTicket = ticketIssue(state.account, state.ticket, -1);
+                if (batchTicket) issues.push(`Batch: ${batchTicket}.`);
+                for (const [key, where] of ticketUses()) {
+                    if (where.length < 2) continue;
+                    const [account, ticket] = key.split(':');
+                    issues.push(
+                        `Ticket ${ticket} of ${accountName(account)} is used more than once (${where.join(', ')}).`,
+                    );
+                }
                 state.steps.forEach((s, i) => {
                     for (const issue of stepIssues(s)) issues.push(`Step ${i + 1}: ${issue}.`);
                 });
@@ -1428,6 +1545,9 @@
                     $('outerAccount').value = state.account;
                 }
                 if (document.activeElement !== $('feeOverride')) $('feeOverride').value = state.fee;
+                if (document.activeElement !== $('batchTicket')) {
+                    $('batchTicket').value = state.ticket;
+                }
                 const modes = modeFlags();
                 if (!(state.mode in modes)) state.mode = Object.keys(modes)[0];
                 $('modeGroup').innerHTML = Object.keys(modes)
@@ -1531,6 +1651,11 @@
                                 `<option value="${n}" ${v === n ? 'selected' : ''}>${escapeHtml(k)} (${n})</option>`,
                         )
                         .join('')}</select>`;
+                }
+                if (name === 'TicketSequence') {
+                    return `<input type="number" step="1" min="1" class="${invalid}" ${f} list="tickets-${step.id}" data-ticket-for="${step.id}" value="${escapeHtml(v ?? '')}" placeholder="Pick a ticket" autocomplete="off">
+                        <datalist id="tickets-${step.id}"></datalist>
+                        <div class="hint" data-ticket-hint="${step.id}"></div>`;
                 }
                 switch (type) {
                     case 'AccountID':
@@ -1696,11 +1821,62 @@
                     }
                     el.querySelector('[data-badges]').innerHTML = badges;
                 }
+                renderTicketLists();
                 $('preview').textContent = JSON.stringify(buildBatch(), null, 2);
                 const issues = collectIssues();
                 $('issues').innerHTML = issues.map((i) => `<li>${escapeHtml(i)}</li>`).join('');
                 $('submitBtn').disabled = submitting || issues.length > 0;
                 $('runResult').innerHTML = runHtml;
+            }
+
+            // Fills each ticket dropdown with the account's tickets that nothing else in the
+            // recipe uses yet, and says what is available.
+            function renderTicketLists() {
+                ensureTickets();
+                const uses = ticketUses();
+                for (const input of document.querySelectorAll('[data-ticket-for]')) {
+                    const owner = input.dataset.ticketFor;
+                    const step = owner === 'batch' ? null : stepById(owner);
+                    if (owner !== 'batch' && !step) continue;
+                    const account =
+                        owner === 'batch' ? state.account : step.tx.Account || state.account;
+                    const where =
+                        owner === 'batch' ? 'batch' : `step ${state.steps.indexOf(step) + 1}`;
+                    const list = tickets[account];
+                    const free = (list || []).filter((t) => {
+                        const users = uses.get(`${account}:${t}`) || [];
+                        return users.every((u) => u === where);
+                    });
+                    document.getElementById(`tickets-${owner}`).innerHTML = free
+                        .map((t) => `<option value="${t}"></option>`)
+                        .join('');
+                    let hint = '';
+                    if (!isAddress(account)) hint = '';
+                    else if (!list) hint = isConnected() ? 'Loading tickets…' : '';
+                    else if (!list.length) {
+                        hint = `${accountName(account)} has no tickets. A TicketCreate transaction makes some.`;
+                    } else {
+                        const shown = free.slice(0, 8).join(', ') + (free.length > 8 ? ', …' : '');
+                        hint = free.length
+                            ? `${free.length} free ticket${free.length > 1 ? 's' : ''} for ${accountName(account)}: ${shown}`
+                            : `All of ${accountName(account)}'s tickets are already used in this recipe.`;
+                    }
+                    // The batch hint only matters once a ticket is being entered.
+                    if (owner === 'batch' && !state.ticket && document.activeElement !== input)
+                        hint = '';
+                    document.querySelector(`[data-ticket-hint="${owner}"]`).textContent = hint;
+                    const issue =
+                        owner === 'batch'
+                            ? ticketIssue(account, state.ticket, -1)
+                            : ticketIssue(
+                                  account,
+                                  step.tx.TicketSequence,
+                                  state.steps.indexOf(step),
+                              );
+                    const duplicate =
+                        (uses.get(`${account}:${Number(input.value)}`) || []).length > 1;
+                    input.classList.toggle('invalid', Boolean(issue) || duplicate);
+                }
             }
 
             function renderAccounts() {
@@ -1725,12 +1901,16 @@
                                 : /^\d+$/.test(bal)
                                   ? `${dropsToXrp(bal)} XRP`
                                   : bal;
+                        const owned = tickets[w.address];
+                        const ticketText = owned?.length
+                            ? ` · ${owned.length} ticket${owned.length > 1 ? 's' : ''}`
+                            : '';
                         const isBatch = w.address === state.account;
                         return `<div class="account-row" data-address="${w.address}">
                             <div class="account-main">
                                 <div><strong>${escapeHtml(w.label || `Account ${i + 1}`)}</strong>${isBatch ? ' <span class="badge badge-info">batch</span>' : ''}</div>
                                 <button class="account-addr mono" data-action="copy-address" title="Copy address">${w.address}</button>
-                                <div class="account-meta">${escapeHtml(balText)}</div>
+                                <div class="account-meta" title="${escapeHtml(owned?.length ? `Tickets: ${owned.join(', ')}` : '')}">${escapeHtml(balText + ticketText)}</div>
                             </div>
                             ${isBatch ? '' : '<button class="btn btn-small" data-action="use-account">Use</button>'}
                             ${faucet ? '<button class="btn btn-small" data-action="fund">Fund</button>' : ''}
@@ -1981,8 +2161,10 @@
 
                     // The batch takes the account's next sequence; its own inner
                     // transactions follow it.
-                    batch.Sequence = sequences[batch.Account];
-                    const next = { [batch.Account]: batch.Sequence + 1 };
+                    batch.Sequence = batch.TicketSequence ? 0 : sequences[batch.Account];
+                    const next = {
+                        [batch.Account]: sequences[batch.Account] + (batch.TicketSequence ? 0 : 1),
+                    };
                     for (const t of inner) {
                         if (t.TicketSequence != null) t.Sequence = 0;
                         else {
@@ -2028,7 +2210,7 @@
                                 const pair = pairOf(a);
                                 const data = codec.encodeForSigningBatch({
                                     account: batch.Account,
-                                    sequence: batch.Sequence,
+                                    sequence: batch.Sequence || batch.TicketSequence,
                                     flags: batch.Flags,
                                     txIDs: innerHashes,
                                     batchAccount: a,
@@ -2314,6 +2496,13 @@
             $('outerAccount').addEventListener('input', (e) => {
                 state.account = e.target.value.trim();
                 renderAccounts();
+                changed();
+            });
+
+            $('batchTicket').addEventListener('focus', renderTicketLists);
+            $('batchTicket').addEventListener('blur', renderTicketLists);
+            $('batchTicket').addEventListener('input', (e) => {
+                state.ticket = e.target.value.trim();
                 changed();
             });
 

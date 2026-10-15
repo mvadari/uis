@@ -34,6 +34,8 @@ Drag-and-drop builder for XRPL Batch transactions.
 - Connect to Mainnet, Testnet, Devnet or a custom WebSocket URL
 - Pick the batch mode: all or nothing, only one, until failure, or independent
 - Create, import and fund test accounts; multi-account batches are signed automatically
+- Ticket support: TicketSequence fields offer the account's unused tickets, the batch itself can
+  use a ticket, and reused or missing tickets are flagged before you submit
 - Submit and see the result of the batch and of each inner transaction
 - Import Batch JSON, save named recipes, and share a recipe as a link
 - Ships a `server_definitions.json` snapshot, so the palette loads before (or without) a connection
