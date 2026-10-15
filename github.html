@@ -512,6 +512,12 @@
                 background-color: var(--color-danger-subtle-hover);
             }
 
+            .pr-item.selected,
+            .pr-item.selected:hover {
+                background-color: var(--color-accent-subtle);
+                box-shadow: inset 0 0 0 2px var(--color-accent-emphasis);
+            }
+
             .pr-icon {
                 color: var(--color-success-fg);
                 flex-shrink: 0;
@@ -2667,6 +2673,7 @@
             let columnItemCounts = {}; // Track last-known item count per column, to detect zero-crossings
             let currentRepoFilter = ''; // Track current repository filter
             let currentQueryFilters = new Set(); // Track currently selected query filters (empty = all queries)
+            const selectedPRIds = new Set(); // Card IDs picked with ⌘/Ctrl-click, moved as a group
             let currentMilestoneFilter = ''; // Track current milestone filter
             let currentUser = null; // Cache current user login
             let currentView = localStorage.getItem(VIEW_KEY) || 'board'; // 'board' | 'queue'
@@ -2713,18 +2720,60 @@
                 return labelId === '' || labelId === undefined ? 'unlabeled' : labelId;
             }
 
-            // The single way a PR changes column. Everything that moves a card (drag and drop,
+            // The single way PRs change column. Everything that moves cards (drag and drop,
             // the right-click menu) goes through here and lets renderPRs() rebuild the board,
             // so the board can't drift from the render rules - which columns are hidden when
             // empty, which auto-collapse, header counts, empty states.
-            function movePRToColumn(prId, newLabelId) {
-                const currentLabelId = normalizeLabelId(getLabels()[prId]);
-                if (currentLabelId === newLabelId) return false;
+            function movePRsToColumn(prIds, newLabelId) {
+                const labels = getLabels();
+                const moving = prIds.filter(
+                    (prId) => normalizeLabelId(labels[prId]) !== newLabelId,
+                );
+                if (moving.length === 0) return false;
 
-                saveLabel(prId, newLabelId === 'unlabeled' ? '' : newLabelId);
+                moving.forEach((prId) =>
+                    saveLabel(prId, newLabelId === 'unlabeled' ? '' : newLabelId),
+                );
                 renderPRs();
                 return true;
             }
+
+            // The cards an action on prId applies to: every visible selected card when prId is
+            // one of them (which uses up the selection), otherwise just prId.
+            function takeSelection(prId) {
+                if (!selectedPRIds.has(prId)) return [prId];
+                const prIds = [...selectedPRIds].filter((id) =>
+                    document.querySelector(`.pr-item[data-pr-id="${id}"]`),
+                );
+                selectedPRIds.clear();
+                return prIds;
+            }
+
+            function clearPRSelection() {
+                selectedPRIds.clear();
+                document
+                    .querySelectorAll('.pr-item.selected')
+                    .forEach((item) => item.classList.remove('selected'));
+            }
+
+            // ⌘/Ctrl-click a card to add it to or remove it from the selection. A plain click
+            // outside the cards, or Escape, clears it.
+            document.addEventListener('click', (e) => {
+                const item = e.target.closest('.pr-item');
+                if (e.metaKey || e.ctrlKey) {
+                    if (!item || e.target.closest('a, button, input, [onclick]')) return;
+                    e.preventDefault();
+                    const prId = item.dataset.prId;
+                    if (!selectedPRIds.delete(prId)) selectedPRIds.add(prId);
+                    item.classList.toggle('selected', selectedPRIds.has(prId));
+                } else if (!item && !e.target.closest('.context-menu')) {
+                    clearPRSelection();
+                }
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') clearPRSelection();
+            });
 
             // PR Notes functions
             let notesCache = null;
@@ -3818,7 +3867,7 @@
                    </svg>`;
 
                 return `
-                <div class="pr-item ${isFlagged ? 'flagged' : ''}" draggable="true" data-pr-id="${pr.id}">
+                <div class="pr-item ${isFlagged ? 'flagged' : ''} ${selectedPRIds.has(String(pr.id)) ? 'selected' : ''}" draggable="true" data-pr-id="${pr.id}">
                     <div class="pr-icon ${pr.draft ? 'draft' : inMergeQueue ? 'queued' : ''}">
                         ${prIcon}
                     </div>
@@ -4652,8 +4701,12 @@
                                     return;
                                 }
 
-                                // Save the new label if it changed, and re-render
-                                movePRToColumn(prId, newLabel);
+                                // Save the new label if it changed, and re-render. Dragging a
+                                // selected card moves the whole selection.
+                                const prIds = takeSelection(prId);
+                                if (!movePRsToColumn(prIds, newLabel) && prIds.length > 1) {
+                                    renderPRs();
+                                }
                             }
                         }
                     });
@@ -4742,6 +4795,9 @@
                     if (prItem) {
                         e.preventDefault();
                         currentPRId = prItem.dataset.prId;
+                        const groupSize = selectedPRIds.has(currentPRId) ? selectedPRIds.size : 1;
+                        contextMenu.querySelector('.context-menu-header').textContent =
+                            groupSize > 1 ? `Move ${groupSize} PRs to Column` : 'Move to Column';
 
                         // Get current label for this PR
                         const currentLabel = getLabels()[currentPRId] || '';
@@ -4767,7 +4823,10 @@
                 contextMenu.addEventListener('click', (e) => {
                     const menuItem = e.target.closest('.context-menu-item');
                     if (menuItem && currentPRId) {
-                        movePRToColumn(currentPRId, menuItem.dataset.label);
+                        const prIds = takeSelection(currentPRId);
+                        if (!movePRsToColumn(prIds, menuItem.dataset.label) && prIds.length > 1) {
+                            renderPRs();
+                        }
 
                         // Close menu
                         contextMenu.classList.remove('show');
