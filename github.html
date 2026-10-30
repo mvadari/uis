@@ -3685,6 +3685,11 @@
                     const results = await Promise.all(
                         queries.map((query) => fetchAllPages(query, headers)),
                     );
+                    // Search allows 30 requests per minute; this shows what a refresh costs.
+                    console.info(
+                        `Search requests this refresh: ${results.reduce((sum, items) => sum + Math.floor(items.length / 100) + 1, 0)}`,
+                        results.map((items) => items.length),
+                    );
 
                     // Combine and deduplicate PRs, tracking which queries returned each PR
                     const prMap = new Map();
