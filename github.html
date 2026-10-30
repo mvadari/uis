@@ -3437,7 +3437,9 @@
                     const data = await response.json();
 
                     if (data.message) {
-                        throw new Error(data.message);
+                        const error = new Error(data.message);
+                        error.request = `GET /search/issues?q=${decodeURIComponent(query.replace(/\+/g, ' '))}&page=${page}`;
+                        throw error;
                     }
 
                     if (!data.items || data.items.length === 0) {
@@ -3746,7 +3748,10 @@
                     // Provide helpful error messages
                     if (error.message.includes('rate limit')) {
                         errorMessage =
-                            '🚫 <strong>API Rate Limit Exceeded</strong><br>Please wait a few minutes before trying again. With a valid token, you get 5,000 requests per hour.';
+                            '🚫 <strong>API Rate Limit Exceeded</strong><br>Please wait a few minutes before trying again. With a valid token, you get 5,000 requests per hour.' +
+                            (error.request
+                                ? `<br><br>Failed request: <code>${escapeHtml(error.request)}</code>`
+                                : '');
                     } else if (
                         error.message.includes('401') ||
                         error.message.includes('Bad credentials')
