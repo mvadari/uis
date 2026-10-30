@@ -2519,6 +2519,7 @@
             const MINIMIZED_KEY = 'github_pr_minimized';
             const MANUALLY_TOGGLED_KEY = 'github_pr_manually_toggled';
             const CACHE_KEY = 'github_pr_cache';
+            const SEARCH_BLOCKED_KEY = 'github_search_blocked_until';
             const CACHE_TIMESTAMP_KEY = 'github_pr_cache_timestamp';
             const NOTES_KEY = 'github_pr_notes';
             const FLAGGED_KEY = 'github_pr_flagged';
@@ -3447,6 +3448,9 @@
                                 ? new Date(reset * 1000).toLocaleTimeString()
                                 : '?';
                             error.request += ` [${resource} limit, resets ${resets}]`;
+                            // Shared by every tab and reload: stop sending requests until it resets.
+                            if (resource === 'search' && reset)
+                                localStorage.setItem(SEARCH_BLOCKED_KEY, String(reset * 1000));
                         }
                         throw error;
                     }
@@ -3610,6 +3614,14 @@
                     return;
                 }
 
+                const blockedUntil = Number(localStorage.getItem(SEARCH_BLOCKED_KEY));
+                if (blockedUntil > Date.now()) {
+                    // Each refresh sends one search request per query, so retrying now only fails.
+                    document.getElementById('error').innerHTML =
+                        `<div class="error">🚫 <strong>Search limit reached</strong><br>GitHub allows 30 search requests per minute, and each refresh sends one per query. Showing cached PRs; refresh again after ${new Date(blockedUntil).toLocaleTimeString()}.</div>`;
+                    return;
+                }
+
                 const headers = githubHeaders();
 
                 try {
@@ -3760,7 +3772,7 @@
                     // Provide helpful error messages
                     if (error.message.includes('rate limit')) {
                         errorMessage =
-                            '🚫 <strong>API Rate Limit Exceeded</strong><br>Please wait a few minutes before trying again. With a valid token, you get 5,000 requests per hour.' +
+                            '🚫 <strong>API Rate Limit Exceeded</strong><br>Please wait a few minutes before trying again. With a valid token, you get 5,000 requests per hour (search: 30 per minute).' +
                             (error.request
                                 ? `<br><br>Failed request: <code>${escapeHtml(error.request)}</code>`
                                 : '');
