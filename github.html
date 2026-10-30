@@ -830,6 +830,21 @@
                 flex-wrap: wrap;
             }
 
+            .filter-bar {
+                margin-top: 8px;
+            }
+
+            .search-warning {
+                margin-top: 8px;
+                padding: 6px 10px;
+                font-size: 12px;
+                line-height: 1.5;
+                border-radius: 6px;
+                background-color: var(--color-attention-subtle);
+                border: 1px solid var(--color-attention-border);
+                color: var(--color-attention-fg);
+            }
+
             .last-updated {
                 display: flex;
                 align-items: center;
@@ -2126,10 +2141,9 @@
                             <span>Total PRs:</span>
                             <span id="totalPRCount">0</span>
                         </div>
-                        <div class="flagged-filter">
-                            <input type="checkbox" id="showOnlyFlagged" />
-                            <label for="showOnlyFlagged">Show only flagged</label>
-                        </div>
+                    </div>
+
+                    <div class="status-bar filter-bar">
                         <div class="repo-filter">
                             <label for="repoFilter">Filter by repo:</label>
                             <select id="repoFilter">
@@ -2157,7 +2171,21 @@
                                 <option value="">All milestones</option>
                             </select>
                         </div>
+                        <div class="repo-filter">
+                            <label for="draftFilter">Filter by draft:</label>
+                            <select id="draftFilter">
+                                <option value="">All PRs</option>
+                                <option value="draft">Draft</option>
+                                <option value="ready">Not draft</option>
+                            </select>
+                        </div>
+                        <div class="flagged-filter">
+                            <input type="checkbox" id="showOnlyFlagged" />
+                            <label for="showOnlyFlagged">Show only flagged</label>
+                        </div>
                     </div>
+
+                    <div id="searchWarning" class="search-warning" hidden></div>
 
                     <div id="error"></div>
                 </div>
@@ -2675,6 +2703,7 @@
             let currentRepoFilter = ''; // Track current repository filter
             let currentQueryFilters = new Set(); // Track currently selected query filters (empty = all queries)
             const selectedPRIds = new Set(); // Card IDs picked with ⌘/Ctrl-click, moved as a group
+            let currentDraftFilter = ''; // '' | 'draft' | 'ready'
             let currentMilestoneFilter = ''; // Track current milestone filter
             let currentUser = null; // Cache current user login
             let currentView = localStorage.getItem(VIEW_KEY) || 'board'; // 'board' | 'queue'
@@ -3424,6 +3453,35 @@
                 );
             }
 
+            // GitHub allows 30 search requests per minute. Warn, without blocking anything, when a
+            // refresh uses half of that or when a query needs extra pages (100 results per page).
+            const SEARCH_WARN_REQUESTS = 15;
+
+            function updateSearchWarning(results, queryNames) {
+                const requests = results.reduce(
+                    (sum, items) => sum + Math.floor(items.length / 100) + 1,
+                    0,
+                );
+                const paged = queryNames.filter((_, i) => results[i].length >= 100);
+                console.info(
+                    `Search requests this refresh: ${requests}`,
+                    results.map((items) => items.length),
+                );
+
+                const warning = document.getElementById('searchWarning');
+                warning.hidden = requests < SEARCH_WARN_REQUESTS && paged.length === 0;
+                if (warning.hidden) return;
+
+                warning.innerHTML =
+                    `⚠️ Each refresh sends ${requests} search requests; GitHub allows 30 per minute.` +
+                    (requests >= SEARCH_WARN_REQUESTS
+                        ? ' Refreshing a few times in a row may hit the limit.'
+                        : '') +
+                    (paged.length
+                        ? ` Queries with 100 or more results need extra requests: ${paged.map(escapeHtml).join(', ')}. Narrowing them (a label, a date) saves requests.`
+                        : '');
+            }
+
             // Helper function to fetch all pages of search results
             async function fetchAllPages(query, headers) {
                 let allItems = [];
@@ -3689,10 +3747,9 @@
                     const results = await Promise.all(
                         queries.map((query) => fetchAllPages(query, headers)),
                     );
-                    // Search allows 30 requests per minute; this shows what a refresh costs.
-                    console.info(
-                        `Search requests this refresh: ${results.reduce((sum, items) => sum + Math.floor(items.length / 100) + 1, 0)}`,
-                        results.map((items) => items.length),
+                    updateSearchWarning(
+                        results,
+                        enabledQueries.map((q) => q.name),
                     );
 
                     // Combine and deduplicate PRs, tracking which queries returned each PR
@@ -4339,6 +4396,13 @@
                         }
                         return pr.milestone && pr.milestone.title === currentMilestoneFilter;
                     });
+                }
+
+                // Filter PRs by draft state
+                if (currentDraftFilter) {
+                    filteredPRs = filteredPRs.filter(
+                        (pr) => Boolean(pr.draft) === (currentDraftFilter === 'draft'),
+                    );
                 }
 
                 // Filter PRs by flagged status if checkbox is checked
@@ -5740,6 +5804,12 @@
             // Milestone filter event listener
             document.getElementById('milestoneFilter').addEventListener('change', (e) => {
                 currentMilestoneFilter = e.target.value;
+                renderPRs();
+            });
+
+            // Draft filter event listener
+            document.getElementById('draftFilter').addEventListener('change', (e) => {
+                currentDraftFilter = e.target.value;
                 renderPRs();
             });
 

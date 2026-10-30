@@ -54,7 +54,9 @@ Kanban-style dashboard for managing GitHub pull requests.
 - ⌘/Ctrl-click cards to select several, then drag or right-click one to move them all
 - Track CI status and merge conflicts
 - Add notes and flags to PRs
-- Filter by repository
+- Filter by repository, query, milestone, or draft state
+- Warns when your queries send many search requests or need extra pages, since GitHub allows 30
+  search requests per minute
 - Auto-refresh every 5 minutes
 - Update PR branches directly
 
