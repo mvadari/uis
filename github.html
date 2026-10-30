@@ -3745,6 +3745,9 @@
                 } catch (error) {
                     let errorMessage = 'Error: ';
 
+                    // The on-screen message is replaced by the next refresh, so keep a record.
+                    console.error('Load failed:', error.message, error.request || '');
+
                     // Provide helpful error messages
                     if (error.message.includes('rate limit')) {
                         errorMessage =
