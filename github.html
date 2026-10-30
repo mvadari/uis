@@ -3438,12 +3438,16 @@
                     const data = await response.json();
 
                     if (data.message) {
-                        const error = new Error(data.message);
+                        // 422 "Validation Failed" explains itself in data.errors.
+                        const detail = (data.errors || []).map((e) => e.message).join('; ');
+                        const error = new Error(
+                            detail ? `${data.message}: ${detail}` : data.message,
+                        );
                         error.request = `GET /search/issues?q=${decodeURIComponent(query.replace(/\+/g, ' '))}&page=${page}`;
                         // Which limit was hit (search is 30/min, core is 5,000/hr) and when it resets.
                         const resource = response.headers.get('x-ratelimit-resource');
                         const reset = Number(response.headers.get('x-ratelimit-reset'));
-                        if (resource) {
+                        if (resource && (response.status === 403 || response.status === 429)) {
                             const resets = reset
                                 ? new Date(reset * 1000).toLocaleTimeString()
                                 : '?';
