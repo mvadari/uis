@@ -14,6 +14,14 @@ verbatim to GitHub Pages via `.github/workflows/deploy.yml`.
 opens the current GitHub PR in `pr.html`. It has its own README covering install and Firefox/AMO
 signing.
 
+`mcp/github-board.mjs` is the other exception: a dependency-free Node MCP server that lets Claude
+read and move cards on the `github.html` board. Board state lives in the browser, so the server
+relays each tool call to an open `github.html` tab over `127.0.0.1:8765` (server-sent events out,
+`POST /result` back). The page connects only when Settings → Preferences → "Connect to the local
+MCP bridge" is on. The port is set in two places (`PORT` in the server, `MCP_BRIDGE_URL` in
+`github.html`); change both together. The server accepts only the origins in `ALLOWED_ORIGINS`.
+If the `github-board` tools are loaded, `list_prs` is a quick way to read the live board.
+
 `server_definitions.json` is a snapshot of rippled's `server_definitions` response. `batch.html`
 uses it before the first connection, and fills in any top-level key a network's own response
 omits. To refresh it, save the `result` of a `server_definitions` request to a Devnet node (drop

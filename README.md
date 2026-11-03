@@ -284,6 +284,10 @@ Tools: `list_columns`, `list_prs` (optionally one column), `move_prs`, `set_note
 For GitHub actions (comment, review, merge), Claude uses `gh` with the `owner/repo#number` refs
 that `list_prs` returns. Only the deployed page and `localhost` may connect to the bridge.
 
+If several dashboard tabs are open, the newest one gets every call; when it closes, the next newest
+takes over. Only one Claude session can run the bridge at a time, because it needs port 8765. Tool
+calls in other sessions fail with an error that says so.
+
 ## Chrome Extension
 
 [`chrome-extension/`](chrome-extension/) is an unpacked Chrome extension that opens the GitHub
