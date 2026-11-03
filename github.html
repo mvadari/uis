@@ -2873,11 +2873,23 @@
                 renderPRs();
             }
 
-            // Local MCP bridge (mcp/github-board.mjs): the server relays Claude's tool calls
-            // here over server-sent events, and each answer goes back as a POST.
+            // Another tab changed the cards (a drag there, or a command from Claude). Drop this
+            // tab's copies and redraw, or its next save would undo that change.
+            window.addEventListener('storage', (event) => {
+                if (![STORAGE_KEY, NOTES_KEY, FLAGGED_KEY].includes(event.key)) return;
+                labelsCache = null;
+                notesCache = null;
+                flaggedPRsCache = null;
+                renderPRs();
+            });
+
+            // Local MCP bridge (mcp/github-board.mjs). Each poll sends the board and waits up
+            // to 25s for Claude's write commands. Every poll is a fresh request, so a server
+            // restart or a sleeping tab recovers on the next one.
             const MCP_BRIDGE_KEY = 'github_mcp_bridge';
             const MCP_BRIDGE_URL = 'http://127.0.0.1:8765';
-            let mcpBridgeSource = null;
+            let mcpBridgeLoop = 0; // bumped to stop the running poll loop
+            let mcpBridgePoll = null; // AbortController for the poll in flight
 
             function findColumn(name) {
                 const wanted = String(name).trim().toLowerCase();
@@ -2913,34 +2925,31 @@
                 return LABELS.find((label) => label.id === labelId) || findColumn('unlabeled');
             }
 
-            const MCP_HANDLERS = {
-                list_columns: () =>
-                    LABELS.map((label) => ({
-                        id: label.id,
-                        name: label.name,
-                        count: allPRs.filter((pr) => columnOf(pr).id === label.id).length,
+            // What the server answers list_columns and list_prs from.
+            function boardSnapshot() {
+                return {
+                    columns: LABELS.map(({ id, name }) => ({ id, name })),
+                    prs: allPRs.map((pr) => ({
+                        id: pr.id,
+                        ref: prRef(pr),
+                        url: pr.html_url,
+                        title: pr.title,
+                        author: pr.user?.login,
+                        column: columnOf(pr).name,
+                        draft: Boolean(pr.draft),
+                        ci: pr.ciStatus,
+                        conflicts: Boolean(pr.hasConflicts),
+                        labels: (pr.labels || []).map((label) => label.name),
+                        milestone: pr.milestone?.title || null,
+                        note: getPRNote(pr.id),
+                        flagged: isPRFlagged(pr.id),
+                        updated: pr.updated_at,
                     })),
-                list_prs: ({ column }) => {
-                    const columnId = column ? findColumn(column).id : null;
-                    return allPRs
-                        .filter((pr) => !columnId || columnOf(pr).id === columnId)
-                        .map((pr) => ({
-                            id: pr.id,
-                            ref: prRef(pr),
-                            url: pr.html_url,
-                            title: pr.title,
-                            author: pr.user?.login,
-                            column: columnOf(pr).name,
-                            draft: Boolean(pr.draft),
-                            ci: pr.ciStatus,
-                            conflicts: Boolean(pr.hasConflicts),
-                            labels: (pr.labels || []).map((label) => label.name),
-                            milestone: pr.milestone?.title || null,
-                            note: getPRNote(pr.id),
-                            flagged: isPRFlagged(pr.id),
-                            updated: pr.updated_at,
-                        }));
-                },
+                };
+            }
+
+            // Every open tab runs each command, so each must be safe to apply twice.
+            const MCP_HANDLERS = {
                 move_prs: ({ prs, column }) => {
                     const target = findColumn(column);
                     const ids = prs.map((ref) => String(findPR(ref).id));
@@ -2960,29 +2969,60 @@
                 },
             };
 
-            // EventSource reconnects on its own when the server restarts.
-            function setMCPBridge(enabled) {
-                if (mcpBridgeSource) mcpBridgeSource.close();
-                mcpBridgeSource = null;
-                if (!enabled) return;
-                mcpBridgeSource = new EventSource(`${MCP_BRIDGE_URL}/events`);
-                mcpBridgeSource.onmessage = async (event) => {
-                    const { id, method, params } = JSON.parse(event.data);
-                    let reply;
+            function runMCPCommand({ seq, method, params }) {
+                let reply;
+                try {
+                    const handler = MCP_HANDLERS[method];
+                    if (!handler) throw new Error(`Unknown tool ${method}`);
+                    reply = { seq, result: handler(params) };
+                } catch (error) {
+                    reply = { seq, error: error.message };
+                }
+                // text/plain keeps these simple requests, with no CORS preflight.
+                fetch(`${MCP_BRIDGE_URL}/result`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(reply),
+                }).catch(() => {});
+            }
+
+            async function pollMCPBridge(loop) {
+                let boot = null;
+                let after = 0;
+                while (loop === mcpBridgeLoop) {
+                    mcpBridgePoll = new AbortController();
                     try {
-                        const handler = MCP_HANDLERS[method];
-                        if (!handler) throw new Error(`Unknown tool ${method}`);
-                        reply = { id, result: await handler(params) };
+                        const response = await fetch(`${MCP_BRIDGE_URL}/poll`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'text/plain' },
+                            // An empty board (no token yet) would overwrite the saved one.
+                            body: JSON.stringify({
+                                boot,
+                                after,
+                                board: allPRs.length > 0 ? boardSnapshot() : null,
+                            }),
+                            signal: mcpBridgePoll.signal,
+                        });
+                        const reply = await response.json();
+                        ({ boot, seq: after } = reply);
+                        reply.commands.forEach(runMCPCommand);
                     } catch (error) {
-                        reply = { id, error: error.message };
+                        // An abort means the board changed: poll again at once to send it.
+                        // Anything else (server down, not allowed) waits before retrying.
+                        if (error.name !== 'AbortError') {
+                            await new Promise((resolve) => setTimeout(resolve, 5000));
+                        }
                     }
-                    // text/plain keeps this a simple request, with no CORS preflight.
-                    fetch(`${MCP_BRIDGE_URL}/result`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'text/plain' },
-                        body: JSON.stringify(reply),
-                    });
-                };
+                }
+            }
+
+            // Called on every render, so the server's copy of the board stays current.
+            const resendBoardToMCPBridge = debounce(() => mcpBridgePoll?.abort(), 1000);
+
+            function setMCPBridge(enabled) {
+                mcpBridgeLoop++;
+                mcpBridgePoll?.abort();
+                if (enabled) pollMCPBridge(mcpBridgeLoop);
             }
 
             // Update PR branch with latest from base
@@ -4467,6 +4507,7 @@
             }
 
             function renderPRs() {
+                resendBoardToMCPBridge();
                 const prLabels = getLabels();
 
                 // Save scroll positions before re-rendering

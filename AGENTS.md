@@ -16,8 +16,10 @@ signing.
 
 `mcp/github-board.mjs` is the other exception: a dependency-free Node MCP server that lets Claude
 read and move cards on the `github.html` board. Board state lives in the browser, so the server
-relays each tool call to an open `github.html` tab over `127.0.0.1:8765` (server-sent events out,
-`POST /result` back). The page connects only when Settings → Preferences → "Connect to the local
+talks to open `github.html` tabs over `127.0.0.1:8765`: each tab long-polls `POST /poll` with a
+board snapshot and gets back queued write commands, then answers each with `POST /result`. Reads
+answer from the snapshot. Every Claude session runs a copy; the one holding the port serves it,
+and all copies send tool calls to `POST /call`. The page connects only when Settings → Preferences → "Connect to the local
 MCP bridge" is on. The port is set in two places (`PORT` in the server, `MCP_BRIDGE_URL` in
 `github.html`); change both together. The server accepts only the origins in `ALLOWED_ORIGINS`.
 If the `github-board` tools are loaded, `list_prs` is a quick way to read the live board.

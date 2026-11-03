@@ -267,9 +267,9 @@ python -m http.server 8000
 
 [`mcp/github-board.mjs`](mcp/github-board.mjs) is a local MCP server that lets Claude read the
 PR Dashboard's columns, move cards, and set notes and flags. Then you can say "rebase every PR in
-Blocked" or "move all my approved PRs to Ready". Columns live in your browser, so the dashboard
-must be open: the server relays each call to the tab on `127.0.0.1:8765`. It needs Node 18 or
-later and nothing else.
+Blocked" or "move all my approved PRs to Ready". Columns live in your browser, so each open
+dashboard tab polls the server on `127.0.0.1:8765` with a snapshot of its board and picks up
+Claude's changes. It needs Node 18 or later and nothing else.
 
 1. Register it with Claude Code:
 
@@ -284,9 +284,12 @@ Tools: `list_columns`, `list_prs` (optionally one column), `move_prs`, `set_note
 For GitHub actions (comment, review, merge), Claude uses `gh` with the `owner/repo#number` refs
 that `list_prs` returns. Only the deployed page and `localhost` may connect to the bridge.
 
-If several dashboard tabs are open, the newest one gets every call; when it closes, the next newest
-takes over. Only one Claude session can run the bridge at a time, because it needs port 8765. Tool
-calls in other sessions fail with an error that says so.
+- Reads answer from the newest snapshot, which is also saved to `~/.cache/github-board/board.json`,
+  so they work with no tab open and report how old the snapshot is.
+- Changes go to every open tab, so they need at least one. Tabs keep each other in sync.
+- Every Claude session can use it. The first session to start serves the port, and the others
+  send their calls to it. When that session ends, the next call from another session takes over.
+- A tab recovers on its own from a server restart or sleep, within about 5 seconds.
 
 ## Chrome Extension
 
