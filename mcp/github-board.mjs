@@ -78,9 +78,9 @@ const TOOLS = [
     },
 ];
 
-// Bridge to the page. The newest tab to connect gets every call, so two open tabs can't both
-// apply a move.
-let page = null;
+// Bridge to the page. The newest open tab gets every call, so two open tabs can't both apply a
+// move. When it closes, calls fall back to the next newest.
+const pages = [];
 let listenError = null;
 let nextCallId = 1;
 const pendingCalls = new Map();
@@ -89,6 +89,7 @@ function callPage(method, params) {
     if (listenError) {
         return Promise.reject(new Error(`The bridge can't listen on port ${PORT}: ${listenError}`));
     }
+    const page = pages.at(-1);
     if (!page) {
         return Promise.reject(
             new Error(
@@ -124,11 +125,9 @@ const server = http.createServer((req, res) => {
     } else if (req.method === 'GET' && req.url === '/events') {
         res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' });
         res.write(': connected\n\n');
-        page = res;
+        pages.push(res);
         console.error(`github.html connected from ${origin}`);
-        req.on('close', () => {
-            if (page === res) page = null;
-        });
+        req.on('close', () => pages.splice(pages.indexOf(res), 1));
     } else if (req.method === 'POST' && req.url === '/result') {
         let body = '';
         req.on('data', (chunk) => (body += chunk));
