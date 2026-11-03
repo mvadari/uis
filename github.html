@@ -6009,6 +6009,14 @@
                         currentPRItem = null;
                     }
                 });
+
+                // mouseout doesn't fire during a native drag, so hide the tooltip when one starts.
+                document.addEventListener('dragstart', () => {
+                    clearTimeout(tooltipTimeout);
+                    tooltipTimeout = null;
+                    tooltip.classList.remove('show');
+                    currentPRItem = null;
+                });
             }
 
             function showPRTooltip(tooltip, prItem, pr) {
