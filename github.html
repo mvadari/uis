@@ -2327,6 +2327,21 @@
                                 <input type="checkbox" id="autoRefreshSetting" checked />
                                 <label for="autoRefreshSetting">Auto-refresh every 5 minutes</label>
                             </div>
+                            <div
+                                class="auto-refresh-toggle"
+                                style="
+                                    margin-top: 8px;
+                                    padding: 12px;
+                                    background-color: #f6f8fa;
+                                    border-radius: 6px;
+                                "
+                            >
+                                <input type="checkbox" id="mcpBridgeSetting" />
+                                <label for="mcpBridgeSetting"
+                                    >Connect to the local MCP bridge, so Claude can read and move
+                                    cards (see the README)</label
+                                >
+                            </div>
                         </div>
 
                         <div class="preference-section">
@@ -2856,6 +2871,118 @@
                 }
                 localStorage.setItem(FLAGGED_KEY, JSON.stringify(flagged));
                 renderPRs();
+            }
+
+            // Local MCP bridge (mcp/github-board.mjs): the server relays Claude's tool calls
+            // here over server-sent events, and each answer goes back as a POST.
+            const MCP_BRIDGE_KEY = 'github_mcp_bridge';
+            const MCP_BRIDGE_URL = 'http://127.0.0.1:8765';
+            let mcpBridgeSource = null;
+
+            function findColumn(name) {
+                const wanted = String(name).trim().toLowerCase();
+                const column = LABELS.find(
+                    (label) =>
+                        label.id.toLowerCase() === wanted || label.name.toLowerCase() === wanted,
+                );
+                if (!column) {
+                    const names = LABELS.map((label) => label.name).join(', ');
+                    throw new Error(`No column "${name}". Columns: ${names}`);
+                }
+                return column;
+            }
+
+            function prRef(pr) {
+                return `${repoNameFromUrl(pr.repository_url)}#${pr.number}`;
+            }
+
+            // Accepts "owner/repo#123", a PR URL, or the board's numeric id.
+            function findPR(ref) {
+                const text = String(ref).trim();
+                const url = text.match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/);
+                const wanted = (url ? `${url[1]}#${url[2]}` : text).toLowerCase();
+                const pr = allPRs.find(
+                    (pr) => String(pr.id) === text || prRef(pr).toLowerCase() === wanted,
+                );
+                if (!pr) throw new Error(`No PR "${ref}" on the board`);
+                return pr;
+            }
+
+            function columnOf(pr) {
+                const labelId = normalizeLabelId(getLabels()[pr.id]);
+                return LABELS.find((label) => label.id === labelId) || findColumn('unlabeled');
+            }
+
+            const MCP_HANDLERS = {
+                list_columns: () =>
+                    LABELS.map((label) => ({
+                        id: label.id,
+                        name: label.name,
+                        count: allPRs.filter((pr) => columnOf(pr).id === label.id).length,
+                    })),
+                list_prs: ({ column }) => {
+                    const columnId = column ? findColumn(column).id : null;
+                    return allPRs
+                        .filter((pr) => !columnId || columnOf(pr).id === columnId)
+                        .map((pr) => ({
+                            id: pr.id,
+                            ref: prRef(pr),
+                            url: pr.html_url,
+                            title: pr.title,
+                            author: pr.user?.login,
+                            column: columnOf(pr).name,
+                            draft: Boolean(pr.draft),
+                            ci: pr.ciStatus,
+                            conflicts: Boolean(pr.hasConflicts),
+                            labels: (pr.labels || []).map((label) => label.name),
+                            milestone: pr.milestone?.title || null,
+                            note: getPRNote(pr.id),
+                            flagged: isPRFlagged(pr.id),
+                            updated: pr.updated_at,
+                        }));
+                },
+                move_prs: ({ prs, column }) => {
+                    const target = findColumn(column);
+                    const ids = prs.map((ref) => String(findPR(ref).id));
+                    movePRsToColumn(ids, target.id);
+                    return { moved: ids.length, column: target.name };
+                },
+                set_note: ({ pr, note }) => {
+                    const found = findPR(pr);
+                    savePRNote(found.id, note);
+                    renderPRs();
+                    return { ref: prRef(found), note };
+                },
+                set_flag: ({ pr, flagged }) => {
+                    const found = findPR(pr);
+                    if (isPRFlagged(found.id) !== flagged) togglePRFlag(found.id);
+                    return { ref: prRef(found), flagged };
+                },
+            };
+
+            // EventSource reconnects on its own when the server restarts.
+            function setMCPBridge(enabled) {
+                if (mcpBridgeSource) mcpBridgeSource.close();
+                mcpBridgeSource = null;
+                if (!enabled) return;
+                mcpBridgeSource = new EventSource(`${MCP_BRIDGE_URL}/events`);
+                mcpBridgeSource.onmessage = async (event) => {
+                    const { id, method, params } = JSON.parse(event.data);
+                    let reply;
+                    try {
+                        const handler = MCP_HANDLERS[method];
+                        if (!handler) throw new Error(`Unknown tool ${method}`);
+                        reply = { id, result: await handler(params) };
+                    } catch (error) {
+                        reply = { id, error: error.message };
+                    }
+                    // text/plain keeps this a simple request, with no CORS preflight.
+                    fetch(`${MCP_BRIDGE_URL}/result`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain' },
+                        body: JSON.stringify(reply),
+                    });
+                };
             }
 
             // Update PR branch with latest from base
@@ -5140,6 +5267,8 @@
                 const autoRefreshEnabled = localStorage.getItem('autoRefreshEnabled');
                 document.getElementById('autoRefreshSetting').checked =
                     autoRefreshEnabled !== 'false';
+                document.getElementById('mcpBridgeSetting').checked =
+                    localStorage.getItem(MCP_BRIDGE_KEY) === 'true';
 
                 // Render editors
                 renderQueryEditor();
@@ -5346,6 +5475,11 @@
                 const autoRefreshEnabled = document.getElementById('autoRefreshSetting').checked;
                 localStorage.setItem('autoRefreshEnabled', autoRefreshEnabled);
                 setupAutoRefresh();
+                const mcpBridgeEnabled = document.getElementById('mcpBridgeSetting').checked;
+                if (mcpBridgeEnabled !== (localStorage.getItem(MCP_BRIDGE_KEY) === 'true')) {
+                    localStorage.setItem(MCP_BRIDGE_KEY, mcpBridgeEnabled);
+                    setMCPBridge(mcpBridgeEnabled);
+                }
 
                 closeSettings();
                 showNotification('Settings saved successfully!', 'success');
@@ -5894,6 +6028,8 @@
                 // Initialize column state from localStorage (only once, then managed in memory)
                 minimizedColumns = getMinimizedColumns();
                 manuallyToggledColumns = getManuallyToggledColumns();
+
+                setMCPBridge(localStorage.getItem(MCP_BRIDGE_KEY) === 'true');
 
                 window.addEventListener('resize', checkKanbanScroll);
 

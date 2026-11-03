@@ -59,6 +59,7 @@ Kanban-style dashboard for managing GitHub pull requests.
   search requests per minute
 - Auto-refresh every 5 minutes
 - Update PR branches directly
+- Optional MCP server, so you can ask Claude to work on a column (see [Claude MCP](#claude-mcp))
 
 **Review Queue view** — the same cards, notes, flags and sort modes, bucketed by what is blocked
 on you instead of by label:
@@ -261,6 +262,27 @@ Alternatively, use a local server:
 python -m http.server 8000
 # Then visit http://localhost:8000
 ```
+
+## Claude MCP
+
+[`mcp/github-board.mjs`](mcp/github-board.mjs) is a local MCP server that lets Claude read the
+PR Dashboard's columns, move cards, and set notes and flags. Then you can say "rebase every PR in
+Blocked" or "move all my approved PRs to Ready". Columns live in your browser, so the dashboard
+must be open: the server relays each call to the tab on `127.0.0.1:8765`. It needs Node 18 or
+later and nothing else.
+
+1. Register it with Claude Code:
+
+    ```bash
+    claude mcp add --scope user github-board -- node /path/to/uis/mcp/github-board.mjs
+    ```
+
+2. In the dashboard, turn on Settings → Preferences → "Connect to the local MCP bridge". Chrome
+   asks once for permission to reach apps on your device.
+
+Tools: `list_columns`, `list_prs` (optionally one column), `move_prs`, `set_note`, `set_flag`.
+For GitHub actions (comment, review, merge), Claude uses `gh` with the `owner/repo#number` refs
+that `list_prs` returns. Only the deployed page and `localhost` may connect to the bridge.
 
 ## Chrome Extension
 
