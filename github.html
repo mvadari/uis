@@ -1484,6 +1484,36 @@
                 border: 1px solid transparent;
             }
 
+            .pr-tooltip-reviewers {
+                display: flex;
+                flex-direction: column;
+                color: var(--color-fg-default);
+            }
+
+            .pr-tooltip-reviewer-icon {
+                display: inline-block;
+                width: 14px;
+                text-align: center;
+                font-weight: 600;
+            }
+
+            .pr-tooltip-reviewer-icon.approved {
+                color: var(--color-success-fg);
+            }
+
+            .pr-tooltip-reviewer-icon.changes {
+                color: var(--color-danger-fg);
+            }
+
+            .pr-tooltip-reviewer-icon.requested {
+                color: var(--color-attention-fg);
+            }
+
+            .pr-tooltip-reviewer-icon.commented,
+            .pr-tooltip-reviewer-icon.dismissed {
+                color: var(--color-fg-muted);
+            }
+
             /* Context Menu Styles */
             .context-menu {
                 display: none;
@@ -3388,7 +3418,13 @@
                                 nodes { commit { committedDate statusCheckRollup { state } } }
                             }
                             reviewRequests(first: 25) {
-                                nodes { requestedReviewer { __typename ... on User { login } } }
+                                nodes {
+                                    requestedReviewer {
+                                        __typename
+                                        ... on User { login }
+                                        ... on Team { slug }
+                                    }
+                                }
                             }
                             reviews(last: 50) {
                                 nodes {
@@ -3446,6 +3482,26 @@
                 pr.additions = node.additions;
                 pr.deletions = node.deletions;
                 pr.changed_files = node.changedFiles;
+                pr.reviewers = reviewerStates(node);
+            }
+
+            // Each human reviewer's current state, as GitHub shows it in the PR sidebar: a
+            // COMMENTED review does not replace an earlier approval or change request, and an
+            // open review request (including a re-request) wins over any past review.
+            function reviewerStates(node) {
+                const states = new Map();
+                (node.reviews?.nodes || []).forEach((review) => {
+                    const login = review.author?.login;
+                    if (!login || isBotAuthor(review.author) || review.state === 'PENDING') return;
+                    if (review.state === 'COMMENTED' && states.has(login)) return;
+                    states.set(login, review.state);
+                });
+                (node.reviewRequests?.nodes || []).forEach((request) => {
+                    const reviewer = request.requestedReviewer;
+                    const name = reviewer?.login || (reviewer?.slug && `@${reviewer.slug}`);
+                    if (name) states.set(name, 'REQUESTED');
+                });
+                return [...states].map(([login, state]) => ({ login, state }));
             }
 
             function isBotAuthor(author) {
@@ -6196,6 +6252,16 @@
                 });
             }
 
+            // Keyed by the states reviewerStates produces; the order is the tooltip's sort order.
+            const REVIEW_STATE_INFO = {
+                CHANGES_REQUESTED: { icon: '✕', cls: 'changes', label: 'Changes requested' },
+                APPROVED: { icon: '✓', cls: 'approved', label: 'Approved' },
+                COMMENTED: { icon: '💬', cls: 'commented', label: 'Commented' },
+                REQUESTED: { icon: '●', cls: 'requested', label: 'Review requested' },
+                DISMISSED: { icon: '–', cls: 'dismissed', label: 'Review dismissed' },
+            };
+            const REVIEW_STATE_ORDER = Object.keys(REVIEW_STATE_INFO);
+
             function showPRTooltip(tooltip, prItem, pr) {
                 const createdDate = formatShortDate(pr.created_at);
                 const updatedDate = formatShortDate(pr.updated_at);
@@ -6254,6 +6320,29 @@
                 `
                         : '';
 
+                const reviewersHtml =
+                    Array.isArray(pr.reviewers) && pr.reviewers.length > 0
+                        ? `
+                    <div class="pr-tooltip-row">
+                        <span class="pr-tooltip-icon">👀</span>
+                        <span class="pr-tooltip-label">Reviews:</span>
+                        <span class="pr-tooltip-reviewers">
+                            ${[...pr.reviewers]
+                                .sort(
+                                    (a, b) =>
+                                        REVIEW_STATE_ORDER.indexOf(a.state) -
+                                        REVIEW_STATE_ORDER.indexOf(b.state),
+                                )
+                                .map(({ login, state }) => {
+                                    const info = REVIEW_STATE_INFO[state];
+                                    return `<span class="pr-tooltip-reviewer" title="${info.label}"><span class="pr-tooltip-reviewer-icon ${info.cls}">${info.icon}</span> ${escapeHtml(login)}</span>`;
+                                })
+                                .join('')}
+                        </span>
+                    </div>
+                `
+                        : '';
+
                 // Get matched query names
                 const querySettings = getQuerySettings();
                 const matchedQueries = (pr._sourceQueries || [])
@@ -6298,6 +6387,7 @@
                     <span class="pr-tooltip-label">Branch:</span>
                     <span class="pr-tooltip-value">${branchInfo}</span>
                 </div>
+                ${reviewersHtml}
                 ${labelsHtml}
                 ${diffStatsHtml}
                 ${queriesHtml}

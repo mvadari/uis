@@ -53,6 +53,7 @@ Kanban-style dashboard for managing GitHub pull requests.
 - Organize PRs with customizable Kanban columns
 - ⌘/Ctrl-click cards to select several, then drag or right-click one to move them all
 - Track CI status and merge conflicts
+- Hover a card to see each reviewer's status: approved, changes requested, commented or requested
 - Add notes and flags to PRs
 - Filter by repository, query, milestone, or draft state
 - Warns when your queries send many search requests or need extra pages, since GitHub allows 30
