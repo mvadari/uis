@@ -1,0 +1,901 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>GitHub Views</title>
+        <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+        <link rel="stylesheet" href="shared-styles.css" />
+        <style>
+            body {
+                background: var(--color-canvas-subtle);
+                color: var(--color-fg-default);
+            }
+
+            [hidden] {
+                display: none !important;
+            }
+
+            .container {
+                margin: 0 auto;
+                max-width: 1400px;
+                padding: 24px;
+            }
+
+            .header {
+                align-items: center;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 12px;
+                justify-content: space-between;
+                margin-bottom: 16px;
+            }
+
+            .header h1 {
+                font-size: 24px;
+                margin: 0;
+            }
+
+            .header-subtitle {
+                color: var(--color-fg-muted);
+                font-size: 14px;
+            }
+
+            .header-controls {
+                align-items: center;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .tabs {
+                border-bottom: 1px solid var(--color-border-default);
+                display: flex;
+                gap: 4px;
+                margin-bottom: 12px;
+            }
+
+            .tab {
+                background: none;
+                border: 0;
+                border-bottom: 2px solid transparent;
+                color: var(--color-fg-muted);
+                cursor: pointer;
+                font-size: 15px;
+                font-weight: 600;
+                margin-bottom: -1px;
+                padding: 8px 16px;
+            }
+
+            .tab:hover {
+                color: var(--color-fg-default);
+            }
+
+            .tab[aria-selected='true'] {
+                border-bottom-color: var(--color-accent-fg);
+                color: var(--color-fg-default);
+            }
+
+            .view-chips {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                margin-bottom: 12px;
+            }
+
+            .chip {
+                background: var(--color-canvas-default);
+                border: 1px solid var(--color-border-default);
+                border-radius: 999px;
+                color: var(--color-fg-default);
+                cursor: pointer;
+                font-size: 13px;
+                padding: 4px 12px;
+            }
+
+            .chip:hover {
+                border-color: var(--color-accent-fg);
+            }
+
+            .chip[aria-pressed='true'] {
+                background: var(--color-accent-subtle);
+                border-color: var(--color-accent-fg);
+                color: var(--color-accent-fg);
+                font-weight: 600;
+            }
+
+            .auto-refresh-toggle {
+                align-items: center;
+                display: inline-flex;
+                gap: 5px;
+                white-space: nowrap;
+            }
+
+            .error-banner {
+                background: var(--color-danger-subtle);
+                border: 1px solid var(--color-danger-fg);
+                border-radius: 6px;
+                color: var(--color-danger-fg);
+                font-size: 14px;
+                margin-bottom: 12px;
+                padding: 12px;
+            }
+
+            .query-line {
+                color: var(--color-fg-muted);
+                font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                font-size: 12px;
+                margin-bottom: 8px;
+                overflow-wrap: anywhere;
+            }
+
+            .table-wrap {
+                background: var(--color-canvas-default);
+                border: 1px solid var(--color-border-default);
+                border-radius: 6px;
+                overflow-x: auto;
+            }
+
+            table {
+                border-collapse: collapse;
+                font-size: 13px;
+                width: 100%;
+            }
+
+            th,
+            td {
+                border-bottom: 1px solid var(--color-border-muted);
+                padding: 8px 12px;
+                text-align: left;
+                vertical-align: top;
+            }
+
+            tbody tr:last-child td {
+                border-bottom: 0;
+            }
+
+            tbody tr:hover {
+                background: var(--color-canvas-subtle);
+            }
+
+            th {
+                background: var(--color-canvas-subtle);
+                white-space: nowrap;
+            }
+
+            th button {
+                background: none;
+                border: 0;
+                color: var(--color-fg-default);
+                cursor: pointer;
+                font: inherit;
+                font-weight: 600;
+                padding: 0;
+            }
+
+            th button:hover {
+                color: var(--color-accent-fg);
+            }
+
+            td a {
+                color: var(--color-accent-fg);
+                text-decoration: none;
+            }
+
+            td a:hover {
+                text-decoration: underline;
+            }
+
+            td.title-cell {
+                min-width: 260px;
+            }
+
+            .muted {
+                color: var(--color-fg-muted);
+            }
+
+            .nowrap {
+                white-space: nowrap;
+            }
+
+            .label-pill {
+                border: 1px solid var(--color-border-default);
+                border-radius: 999px;
+                display: inline-block;
+                font-size: 12px;
+                margin: 0 4px 2px 0;
+                padding: 0 8px;
+                white-space: nowrap;
+            }
+
+            .label-dot {
+                border-radius: 50%;
+                display: inline-block;
+                height: 8px;
+                margin-right: 4px;
+                width: 8px;
+            }
+
+            .state-open {
+                color: var(--color-success-fg);
+            }
+
+            .state-merged {
+                color: var(--color-done-fg);
+            }
+
+            .state-closed {
+                color: var(--color-danger-fg);
+            }
+
+            .state-draft {
+                color: var(--color-fg-muted);
+            }
+
+            .form-row {
+                margin-bottom: 16px;
+            }
+
+            .form-row input[type='text'],
+            .form-row textarea {
+                width: 100%;
+            }
+
+            .form-row textarea {
+                font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                min-height: 80px;
+            }
+
+            .column-grid {
+                display: grid;
+                gap: 6px 16px;
+                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            }
+
+            .column-grid label {
+                align-items: center;
+                display: flex;
+                gap: 6px;
+            }
+
+            .modal-footer {
+                display: flex;
+                gap: 8px;
+                justify-content: flex-end;
+            }
+
+            .modal-footer .spacer {
+                flex: 1;
+            }
+
+            @media (max-width: 600px) {
+                .container {
+                    padding: 16px;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <header class="header">
+                <div>
+                    <h1>GitHub Views</h1>
+                    <div class="header-subtitle">
+                        Saved GitHub search queries across repos, shown as sortable tables
+                    </div>
+                </div>
+                <div class="header-controls">
+                    <span id="tokenStatus" class="token-pill">Token not set</span>
+                    <button class="btn" id="tokenButton" type="button">Token</button>
+                    <button class="btn" id="exportButton" type="button">Export views</button>
+                    <button class="btn" id="importButton" type="button">Import views</button>
+                    <input type="file" id="importFile" accept="application/json" hidden />
+                </div>
+            </header>
+
+            <div class="tabs" role="tablist" id="tabs">
+                <button class="tab" role="tab" data-tab="prs" type="button">Pull requests</button>
+                <button class="tab" role="tab" data-tab="issues" type="button">Issues</button>
+            </div>
+
+            <div class="view-chips" id="viewChips"></div>
+
+            <div class="status-line">
+                <div id="status">Not loaded</div>
+                <div class="status-controls">
+                    <label class="auto-refresh-toggle" title="Reload every 5 minutes"
+                        ><input type="checkbox" id="autoRefresh" /> Auto-refresh</label
+                    >
+                    <button class="btn" id="editViewButton" type="button">Edit view</button>
+                    <button class="btn btn-primary" id="refreshButton" type="button">
+                        Refresh
+                    </button>
+                </div>
+            </div>
+
+            <div class="error-banner" id="errorBanner" role="alert" hidden></div>
+            <div class="query-line" id="queryLine"></div>
+            <div id="results"><div class="empty-state">No view selected.</div></div>
+        </div>
+
+        <div class="modal" id="tokenModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title">GitHub Token</h2>
+                    <button class="modal-close" id="closeTokenModal" type="button">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p class="muted">
+                        Uses the shared <code>github_token</code> key. Queries with
+                        <code>@me</code> need a token.
+                    </p>
+                    <input type="password" id="tokenInput" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" />
+                </div>
+                <div class="modal-footer">
+                    <button class="btn" id="clearTokenButton" type="button">Clear</button>
+                    <button class="btn btn-primary" id="saveTokenButton" type="button">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal" id="viewModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title" id="viewModalTitle">Edit view</h2>
+                    <button class="modal-close" id="closeViewModal" type="button">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-row">
+                        <label class="form-label" for="viewName">Name</label>
+                        <input type="text" id="viewName" />
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label" for="viewQuery">GitHub search query</label>
+                        <textarea
+                            id="viewQuery"
+                            spellcheck="false"
+                            placeholder="org:XRPLF label:bug state:open"
+                        ></textarea>
+                        <div class="muted" id="viewQueryHint"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-label">Columns</div>
+                        <div class="column-grid" id="columnGrid"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-danger" id="deleteViewButton" type="button">
+                        Delete
+                    </button>
+                    <span class="spacer"></span>
+                    <button class="btn" id="cancelViewButton" type="button">Cancel</button>
+                    <button class="btn btn-primary" id="saveViewButton" type="button">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <script src="shared-utils.js"></script>
+        <script>
+            const CONFIG_KEY = 'github_views_config';
+            const AUTO_REFRESH_KEY = 'github_views_auto_refresh';
+            const MAX_PAGES = 10; // The search API returns at most 1000 results.
+
+            const COLUMNS = {
+                repo: { label: 'Repo', sort: (r) => r.repo.toLowerCase(), render: renderRepo },
+                title: { label: 'Title', sort: (r) => r.title.toLowerCase(), render: renderTitle },
+                author: {
+                    label: 'Author',
+                    sort: (r) => r.author.toLowerCase(),
+                    render: renderAuthor,
+                },
+                labels: {
+                    label: 'Labels',
+                    sort: (r) =>
+                        r.labels
+                            .map((l) => l.name)
+                            .join(',')
+                            .toLowerCase(),
+                    render: renderLabels,
+                },
+                assignees: {
+                    label: 'Assignees',
+                    sort: (r) => r.assignees.join(',').toLowerCase(),
+                    render: (r) => escapeHtml(r.assignees.join(', ')),
+                },
+                comments: { label: 'Comments', sort: (r) => r.comments, render: (r) => r.comments },
+                created: {
+                    label: 'Created',
+                    sort: (r) => r.created,
+                    render: (r) =>
+                        `<span class="nowrap muted">${escapeHtml(timeAgoShort(r.created))}</span>`,
+                },
+                updated: {
+                    label: 'Updated',
+                    sort: (r) => r.updated,
+                    render: (r) =>
+                        `<span class="nowrap muted">${escapeHtml(timeAgoShort(r.updated))}</span>`,
+                },
+                state: {
+                    label: 'State',
+                    sort: (r) => r.state,
+                    render: (r) => `<span class="state-${r.state}">${r.state}</span>`,
+                },
+            };
+            const DEFAULT_COLUMNS = ['repo', 'title', 'author', 'labels', 'comments', 'updated'];
+
+            function makeView(id, name, query) {
+                return {
+                    id,
+                    name,
+                    query,
+                    columns: [...DEFAULT_COLUMNS],
+                    sort: { key: 'updated', dir: 'desc' },
+                };
+            }
+
+            const DEFAULT_CONFIG = {
+                prs: [
+                    makeView('mine', 'My open PRs', 'author:@me state:open'),
+                    makeView('review', 'Review requested', 'review-requested:@me state:open'),
+                ],
+                issues: [makeView('assigned', 'Assigned to me', 'assignee:@me state:open')],
+            };
+
+            const TAB_LABELS = { prs: 'pull requests', issues: 'issues' };
+
+            let config = loadConfig();
+            let activeTab = getQueryParam('tab') === 'issues' ? 'issues' : 'prs';
+            let activeViewId = getQueryParam('view');
+            let rows = [];
+            let total = 0;
+            let loadedAt = null;
+            let requestSeq = 0;
+            let editing = null; // { tab, view } or { tab, view: null } for a new view
+
+            const $ = (id) => document.getElementById(id);
+
+            function validView(v) {
+                return (
+                    v &&
+                    typeof v.id === 'string' &&
+                    typeof v.name === 'string' &&
+                    typeof v.query === 'string' &&
+                    Array.isArray(v.columns) &&
+                    v.sort &&
+                    typeof v.sort.key === 'string'
+                );
+            }
+
+            // Accepts an object from storage or an import. Returns null if it has the wrong shape.
+            function parseConfig(data) {
+                if (!data || !Array.isArray(data.prs) || !Array.isArray(data.issues)) return null;
+                const clean = (list) =>
+                    list.filter(validView).map((v) => ({
+                        ...v,
+                        columns: v.columns.filter((c) => COLUMNS[c]),
+                        sort: { key: v.sort.key, dir: v.sort.dir === 'asc' ? 'asc' : 'desc' },
+                    }));
+                return { prs: clean(data.prs), issues: clean(data.issues) };
+            }
+
+            function loadConfig() {
+                return parseConfig(Storage.get(CONFIG_KEY)) || structuredClone(DEFAULT_CONFIG);
+            }
+
+            function saveConfig() {
+                Storage.set(CONFIG_KEY, config);
+            }
+
+            function activeView() {
+                const views = config[activeTab];
+                return views.find((v) => v.id === activeViewId) || views[0] || null;
+            }
+
+            // Replaces @today, @today-Nd and @today+Nd with dates.
+            function expandDates(query) {
+                return query.replace(/@today([+-]\d+d)?/gi, (match, offset) => {
+                    const date = new Date();
+                    if (offset) {
+                        const sign = offset.charAt(0) === '-' ? -1 : 1;
+                        date.setDate(date.getDate() + sign * parseInt(offset.slice(1, -1), 10));
+                    }
+                    return date.toISOString().split('T')[0];
+                });
+            }
+
+            function fullQuery(tab, view) {
+                return `is:${tab === 'prs' ? 'pr' : 'issue'} ${expandDates(view.query.trim())}`;
+            }
+
+            // Returns { items, total }. Stops at the 1000-result search limit.
+            async function fetchAllPages(query) {
+                const items = [];
+                let totalCount = 0;
+                for (let page = 1; page <= MAX_PAGES; page++) {
+                    const url = `https://api.github.com/search/issues?q=${encodeURIComponent(query)}&per_page=100&page=${page}`;
+                    const response = await fetch(url, { headers: githubHeaders() });
+                    const data = await response.json();
+                    if (data.message) {
+                        const detail = (data.errors || []).map((e) => e.message).join('; ');
+                        let message = detail ? `${data.message}: ${detail}` : data.message;
+                        const reset = Number(response.headers.get('x-ratelimit-reset'));
+                        if ((response.status === 403 || response.status === 429) && reset) {
+                            message += ` (limit resets ${new Date(reset * 1000).toLocaleTimeString()})`;
+                        }
+                        throw new Error(message);
+                    }
+                    totalCount = data.total_count || 0;
+                    items.push(...(data.items || []));
+                    if (!data.items || data.items.length < 100) break;
+                }
+                return { items, total: totalCount };
+            }
+
+            function toRow(item) {
+                const isPr = Boolean(item.pull_request);
+                let state = item.state;
+                if (isPr && item.pull_request.merged_at) state = 'merged';
+                else if (isPr && item.draft && state === 'open') state = 'draft';
+                const repo = (item.repository_url || '').replace(
+                    'https://api.github.com/repos/',
+                    '',
+                );
+                return {
+                    id: item.id,
+                    number: item.number,
+                    title: item.title || '',
+                    url: item.html_url,
+                    repo,
+                    isPr,
+                    author: item.user ? item.user.login : '',
+                    authorUrl: item.user ? item.user.html_url : '',
+                    labels: (item.labels || []).map((l) => ({ name: l.name, color: l.color })),
+                    assignees: (item.assignees || []).map((a) => a.login),
+                    comments: item.comments || 0,
+                    created: new Date(item.created_at).getTime(),
+                    updated: new Date(item.updated_at).getTime(),
+                    state,
+                };
+            }
+
+            function renderRepo(r) {
+                return `<a href="https://github.com/${escapeHtml(r.repo)}">${escapeHtml(r.repo)}</a>`;
+            }
+
+            function renderTitle(r) {
+                const viewer = r.isPr
+                    ? ` <a class="muted" href="pr.html?pr=${escapeHtml(r.repo)}/${r.number}">[details]</a>`
+                    : '';
+                return `<a href="${escapeHtml(r.url)}">${escapeHtml(r.title)}</a> <span class="muted">#${r.number}</span>${viewer}`;
+            }
+
+            function renderAuthor(r) {
+                return r.authorUrl
+                    ? `<a href="${escapeHtml(r.authorUrl)}">${escapeHtml(r.author)}</a>`
+                    : escapeHtml(r.author);
+            }
+
+            function renderLabels(r) {
+                return r.labels
+                    .map((l) => {
+                        const color = /^[0-9a-f]{6}$/i.test(l.color) ? l.color : '888888';
+                        return `<span class="label-pill"><span class="label-dot" style="background:#${color}"></span>${escapeHtml(l.name)}</span>`;
+                    })
+                    .join('');
+            }
+
+            function sortedRows(view) {
+                const col = COLUMNS[view.sort.key];
+                if (!col) return rows;
+                const dir = view.sort.dir === 'asc' ? 1 : -1;
+                return [...rows].sort((a, b) => {
+                    const x = col.sort(a);
+                    const y = col.sort(b);
+                    return x < y ? -dir : x > y ? dir : 0;
+                });
+            }
+
+            function renderTabs() {
+                document.querySelectorAll('.tab').forEach((t) => {
+                    t.setAttribute('aria-selected', String(t.dataset.tab === activeTab));
+                });
+                const current = activeView();
+                $('viewChips').innerHTML =
+                    config[activeTab]
+                        .map(
+                            (v) =>
+                                `<button class="chip" type="button" data-view="${escapeHtml(v.id)}" aria-pressed="${current && current.id === v.id}">${escapeHtml(v.name)}</button>`,
+                        )
+                        .join('') +
+                    '<button class="chip" type="button" id="addViewButton">+ New view</button>';
+                $('editViewButton').hidden = !current;
+            }
+
+            function renderStatus() {
+                const parts = [];
+                if (loadedAt) {
+                    parts.push(
+                        total > rows.length
+                            ? `Showing ${rows.length} of ${total} results (search returns at most 1000)`
+                            : `${rows.length} result${rows.length === 1 ? '' : 's'}`,
+                    );
+                    parts.push(`updated ${timeAgoShort(loadedAt)}`);
+                }
+                $('status').textContent = parts.join(' · ') || 'Not loaded';
+            }
+
+            function renderTable() {
+                const view = activeView();
+                if (!view) {
+                    $('results').innerHTML =
+                        '<div class="empty-state">No views yet. Create one with “+ New view”.</div>';
+                    return;
+                }
+                if (!loadedAt) return;
+                if (!rows.length) {
+                    $('results').innerHTML = '<div class="empty-state">No results.</div>';
+                    return;
+                }
+                const cols = view.columns.filter((c) => COLUMNS[c]);
+                const head = cols
+                    .map((c) => {
+                        const active = view.sort.key === c;
+                        const arrow = active ? (view.sort.dir === 'asc' ? ' ▲' : ' ▼') : '';
+                        const aria = active
+                            ? view.sort.dir === 'asc'
+                                ? 'ascending'
+                                : 'descending'
+                            : 'none';
+                        return `<th aria-sort="${aria}"><button type="button" data-sort="${c}">${COLUMNS[c].label}${arrow}</button></th>`;
+                    })
+                    .join('');
+                const body = sortedRows(view)
+                    .map(
+                        (r) =>
+                            `<tr>${cols
+                                .map(
+                                    (c) =>
+                                        `<td${c === 'title' ? ' class="title-cell"' : ''}>${COLUMNS[c].render(r)}</td>`,
+                                )
+                                .join('')}</tr>`,
+                    )
+                    .join('');
+                $('results').innerHTML =
+                    `<div class="table-wrap"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+            }
+
+            function showError(message) {
+                $('errorBanner').textContent = message || '';
+                $('errorBanner').hidden = !message;
+            }
+
+            function render() {
+                renderTabs();
+                renderStatus();
+                renderTable();
+            }
+
+            function syncUrl() {
+                const url = new URL(window.location);
+                url.searchParams.set('tab', activeTab);
+                const view = activeView();
+                if (view) url.searchParams.set('view', view.id);
+                window.history.replaceState({}, '', url);
+            }
+
+            async function loadView() {
+                const view = activeView();
+                rows = [];
+                total = 0;
+                loadedAt = null;
+                showError('');
+                syncUrl();
+                render();
+                if (!view) {
+                    $('queryLine').textContent = '';
+                    return;
+                }
+                const query = fullQuery(activeTab, view);
+                $('queryLine').textContent = query;
+                if (!getGitHubToken() && /@me/i.test(query)) {
+                    showError('This view uses @me. Set a GitHub token first.');
+                    return;
+                }
+                const seq = ++requestSeq;
+                $('results').innerHTML =
+                    '<div class="loading-state"><div class="spinner"></div>Loading…</div>';
+                try {
+                    const result = await fetchAllPages(query);
+                    if (seq !== requestSeq) return; // The user switched views while this loaded.
+                    rows = result.items.map(toRow);
+                    total = result.total;
+                    loadedAt = Date.now();
+                } catch (error) {
+                    if (seq !== requestSeq) return;
+                    showError(`Could not load ${TAB_LABELS[activeTab]}: ${error.message}`);
+                    $('results').innerHTML = '';
+                    return;
+                }
+                render();
+            }
+
+            function selectTab(tab) {
+                activeTab = tab;
+                activeViewId = null;
+                loadView();
+            }
+
+            function selectView(id) {
+                activeViewId = id;
+                loadView();
+            }
+
+            function sortBy(key) {
+                const view = activeView();
+                if (!view) return;
+                view.sort =
+                    view.sort.key === key
+                        ? { key, dir: view.sort.dir === 'asc' ? 'desc' : 'asc' }
+                        : { key, dir: key === 'updated' || key === 'created' ? 'desc' : 'asc' };
+                saveConfig();
+                renderTable();
+            }
+
+            // ---- View editor ----
+
+            function openViewEditor(view) {
+                editing = { tab: activeTab, view };
+                $('viewModalTitle').textContent = view ? 'Edit view' : 'New view';
+                $('viewName').value = view ? view.name : '';
+                $('viewQuery').value = view ? view.query : '';
+                $('viewQueryHint').textContent =
+                    `The tool adds is:${activeTab === 'prs' ? 'pr' : 'issue'}. Use repo:, org:, label:, author:, @me, @today-7d.`;
+                const cols = view ? view.columns : DEFAULT_COLUMNS;
+                $('columnGrid').innerHTML = Object.entries(COLUMNS)
+                    .map(
+                        ([key, col]) =>
+                            `<label><input type="checkbox" value="${key}" ${cols.includes(key) ? 'checked' : ''} /> ${col.label}</label>`,
+                    )
+                    .join('');
+                $('deleteViewButton').hidden = !view;
+                Modal.open('viewModal');
+            }
+
+            function saveViewFromEditor() {
+                const name = $('viewName').value.trim();
+                const query = $('viewQuery').value.trim();
+                if (!name || !query) {
+                    showToast('Name and query are required', 'warning');
+                    return;
+                }
+                const columns = [...$('columnGrid').querySelectorAll('input:checked')].map(
+                    (i) => i.value,
+                );
+                if (!columns.length) {
+                    showToast('Pick at least one column', 'warning');
+                    return;
+                }
+                let view = editing.view;
+                if (view) {
+                    Object.assign(view, { name, query, columns });
+                } else {
+                    view = makeView(`v${Date.now().toString(36)}`, name, query);
+                    view.columns = columns;
+                    config[editing.tab].push(view);
+                }
+                saveConfig();
+                Modal.close('viewModal');
+                activeViewId = view.id;
+                loadView();
+            }
+
+            function deleteViewFromEditor() {
+                const view = editing.view;
+                if (!view || !confirm(`Delete view “${view.name}”?`)) return;
+                config[editing.tab] = config[editing.tab].filter((v) => v !== view);
+                saveConfig();
+                Modal.close('viewModal');
+                activeViewId = null;
+                loadView();
+            }
+
+            // ---- Token ----
+
+            function syncTokenState() {
+                const pill = $('tokenStatus');
+                const set = Boolean(getGitHubToken());
+                pill.textContent = set ? 'Token set' : 'Token not set';
+                pill.classList.toggle('set', set);
+            }
+
+            // ---- Export / import ----
+
+            function exportViews() {
+                const blob = new Blob([JSON.stringify(config, null, 2)], {
+                    type: 'application/json',
+                });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = 'github-views.json';
+                link.click();
+                URL.revokeObjectURL(link.href);
+            }
+
+            async function importViews(file) {
+                try {
+                    const parsed = parseConfig(JSON.parse(await file.text()));
+                    if (!parsed)
+                        throw new Error('Expected an object with "prs" and "issues" lists');
+                    config = parsed;
+                    saveConfig();
+                    activeViewId = null;
+                    showToast('Views imported', 'success');
+                    loadView();
+                } catch (error) {
+                    showToast(`Import failed: ${error.message}`, 'error', 5000);
+                }
+            }
+
+            // ---- Wiring ----
+
+            function refresh() {
+                loadView();
+            }
+
+            $('tabs').addEventListener('click', (e) => {
+                const tab = e.target.closest('.tab');
+                if (tab && tab.dataset.tab !== activeTab) selectTab(tab.dataset.tab);
+            });
+            $('viewChips').addEventListener('click', (e) => {
+                const chip = e.target.closest('.chip');
+                if (!chip) return;
+                if (chip.id === 'addViewButton') openViewEditor(null);
+                else selectView(chip.dataset.view);
+            });
+            $('results').addEventListener('click', (e) => {
+                const button = e.target.closest('[data-sort]');
+                if (button) sortBy(button.dataset.sort);
+            });
+            $('editViewButton').addEventListener('click', () => openViewEditor(activeView()));
+            $('refreshButton').addEventListener('click', refresh);
+            $('saveViewButton').addEventListener('click', saveViewFromEditor);
+            $('deleteViewButton').addEventListener('click', deleteViewFromEditor);
+            $('cancelViewButton').addEventListener('click', () => Modal.close('viewModal'));
+            $('closeViewModal').addEventListener('click', () => Modal.close('viewModal'));
+
+            $('tokenButton').addEventListener('click', () => {
+                $('tokenInput').value = getGitHubToken();
+                Modal.open('tokenModal');
+            });
+            $('closeTokenModal').addEventListener('click', () => Modal.close('tokenModal'));
+            $('saveTokenButton').addEventListener('click', () => {
+                setGitHubToken($('tokenInput').value);
+                syncTokenState();
+                Modal.close('tokenModal');
+                refresh();
+            });
+            $('clearTokenButton').addEventListener('click', () => {
+                setGitHubToken('');
+                $('tokenInput').value = '';
+                syncTokenState();
+            });
+
+            $('exportButton').addEventListener('click', exportViews);
+            $('importButton').addEventListener('click', () => $('importFile').click());
+            $('importFile').addEventListener('change', (e) => {
+                if (e.target.files[0]) importViews(e.target.files[0]);
+                e.target.value = '';
+            });
+
+            $('autoRefresh').checked = localStorage.getItem(AUTO_REFRESH_KEY) !== 'false';
+            $('autoRefresh').addEventListener('change', (e) => {
+                localStorage.setItem(AUTO_REFRESH_KEY, String(e.target.checked));
+                setAutoRefresh(e.target.checked, refresh);
+            });
+            setAutoRefresh($('autoRefresh').checked, refresh);
+
+            syncTokenState();
+            loadView();
+        </script>
+    </body>
+</html>

@@ -81,6 +81,26 @@ on you instead of by label:
 
 ---
 
+### 🔎 GitHub Views
+
+Saved GitHub search queries across repos, shown as sortable tables.
+
+**Features:**
+
+- Separate tabs for pull requests and issues; pull requests open first
+- Each view is a raw GitHub search query (`org:`, `repo:`, `label:`, `author:`, `@me`); the tool
+  adds `is:pr` or `is:issue`
+- `@today`, `@today-7d` and `@today+7d` expand to dates
+- Choose the columns and click a header to sort; each view remembers its sort
+- Views are saved in your browser; results are always fetched fresh
+- Export and import views as JSON
+- Auto-refresh every 5 minutes
+- Uses the shared GitHub token
+
+[**Launch GitHub Views →**](https://mvadari.github.io/uis/github-views.html)
+
+---
+
 ### 💬 PR Comments
 
 A clean, focused view of a single pull request's unresolved conversation.
