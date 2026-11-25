@@ -8,6 +8,11 @@
         <link rel="stylesheet" href="shared-styles.css" />
         <script src="https://cdn.jsdelivr.net/npm/marked@18.0.12/lib/marked.umd.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.7/dist/purify.min.js"></script>
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/katex@0.16.25/dist/katex.min.css"
+        />
+        <script src="https://cdn.jsdelivr.net/npm/katex@0.16.25/dist/katex.min.js"></script>
         <style>
             :root {
                 --color-diff-add-bg: #e6ffec;
@@ -1391,6 +1396,15 @@
             .md-rendered th {
                 background: var(--color-canvas-subtle);
             }
+            /* Wide display math scrolls on its own, like a wide table. */
+            .md-rendered .md-math {
+                margin: 0 0 12px;
+                overflow-x: auto;
+                overflow-y: hidden;
+            }
+            .md-rendered .md-math .katex-display {
+                margin: 0;
+            }
             .md-rendered hr {
                 background: var(--color-border-default);
                 border: 0;
@@ -2668,6 +2682,63 @@
                     node.setAttribute('target', '_blank');
                     node.setAttribute('rel', 'noopener noreferrer');
                 }
+            });
+
+            // LaTeX math, in the syntax GitHub accepts: $inline$, $$display$$ (inline or on its
+            // own lines), and ```math fences. If KaTeX failed to load, the TeX shows as code.
+            function renderMath(tex, display) {
+                if (typeof katex === 'undefined') {
+                    const code = `<code>${escapeHtml(tex)}</code>`;
+                    return display ? `<pre>${code}</pre>` : code;
+                }
+                const html = katex.renderToString(tex, {
+                    displayMode: display,
+                    throwOnError: false,
+                });
+                return display ? `<div class="md-math">${html}</div>` : html;
+            }
+
+            marked.use({
+                extensions: [
+                    {
+                        name: 'mathBlock',
+                        level: 'block',
+                        start: (src) => src.match(/^ {0,3}\$\$/m)?.index,
+                        tokenizer(src) {
+                            const m = /^ {0,3}\$\$((?:(?!\$\$)[\s\S])+)\$\$[ \t]*(?:\n|$)/.exec(
+                                src,
+                            );
+                            if (m) return { type: 'mathBlock', raw: m[0], text: m[1].trim() };
+                        },
+                        renderer: (token) => renderMath(token.text, true),
+                    },
+                    {
+                        name: 'mathInline',
+                        level: 'inline',
+                        start: (src) => src.indexOf('$'),
+                        tokenizer(src) {
+                            // A lone $ needs non-space just inside both ends and no digit after
+                            // the closing one, so prices like "$5 or $10" stay text.
+                            const m =
+                                /^\$\$((?:\\.|[^\\$])+?)\$\$/.exec(src) ||
+                                /^\$(?!\s)((?:\\.|[^\\$\n])+?)(?<!\s)\$(?!\d)/.exec(src);
+                            if (m) {
+                                return {
+                                    type: 'mathInline',
+                                    raw: m[0],
+                                    text: m[1],
+                                    display: m[0].startsWith('$$'),
+                                };
+                            }
+                        },
+                        renderer: (token) => renderMath(token.text, token.display),
+                    },
+                ],
+                renderer: {
+                    code(token) {
+                        return token.lang === 'math' ? renderMath(token.text, true) : false;
+                    },
+                },
             });
 
             function isMarkdownPath(path) {

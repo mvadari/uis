@@ -141,4 +141,4 @@ Clipboard writes fail in an unfocused browser pane (`Document is not focused`) â
   when adding a user-visible feature.
 - Keep tools dependency-free where possible. The only external scripts are CDN loads in the XRPL
   tools (`xrpl.js`, CodeMirror; `batch.html` loads `ripple-binary-codec` and `ripple-keypairs` from
-  esm.sh) and `marked` in `xrpld.html`.
+  esm.sh), `marked` in `xrpld.html`, and `marked`, DOMPurify and KaTeX in `pr.html`.
