@@ -114,7 +114,7 @@ A clean, focused view of a single pull request's unresolved conversation.
 - Reply to threads and mark them resolved/unresolved directly from the view
 - Add a new inline comment on any diff line from the Files tab, either published on its own (like GitHub's "Add single comment") or held in a pending review
 - Batch comments into a review: a floating bar tracks the pending count, then submit as Comment/Approve/Request changes with a summary, or discard the draft
-- Rich view for Markdown files: the source beside its rendered output — click any source line or rendered block to comment on it, the panes scroll in sync (toggleable), and hovering either one highlights the matching lines
+- Rich view for Markdown files: the source beside its rendered output — click any source line or rendered block to comment on it, the panes scroll in sync (toggleable), and hovering either one highlights the matching lines; the source pane shows removed lines in red where they were
 - LaTeX math in the rich view, in GitHub's syntax: `$inline$`, `$$display$$` and ` ```math ` blocks, rendered with KaTeX
 - Comment on a range of lines by dragging down the line-number gutter, or shift-clicking a second line, as on GitHub
 - Suggest a change: the Suggest button in a new comment inserts a `suggestion` block prefilled with the commented lines, and posted suggestions render as a diff

@@ -1207,7 +1207,8 @@
                 padding: 6px 0;
             }
 
-            .md-src-line {
+            .md-src-line,
+            .md-del-line {
                 display: flex;
                 font-family:
                     ui-monospace, SFMono-Regular, 'SF Mono', Consolas, 'Liberation Mono', Menlo,
@@ -1267,6 +1268,14 @@
 
             .md-src-line.md-add .md-src-num {
                 color: var(--color-diff-add-fg);
+            }
+
+            .md-del-line {
+                background: var(--color-diff-del-bg);
+            }
+
+            .md-del-line .md-src-num {
+                color: var(--color-diff-del-fg);
             }
 
             /* A translucent wash layered as a background *image* so the add/delete background
@@ -2765,6 +2774,9 @@
                 const commentable = new Set();
                 const added = new Set();
                 const text = new Map();
+                // Old-file lines the patch removes, keyed on the new-file line they sit above.
+                const removed = new Map();
+                let oldLn = 0;
                 let newLn = 0;
                 (f.patch || '')
                     .replace(/\n$/, '')
@@ -2772,18 +2784,27 @@
                     .forEach((line) => {
                         if (!line) return; // an absent patch splits to one empty line
                         if (line.startsWith('@@')) {
-                            const m = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
-                            if (m) newLn = parseInt(m[1], 10);
+                            const m = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+                            if (m) {
+                                oldLn = parseInt(m[1], 10);
+                                newLn = parseInt(m[2], 10);
+                            }
                             return;
                         }
                         const marker = line[0];
-                        if (marker === '\\' || marker === '-') return; // old side only
+                        if (marker === '\\') return;
+                        if (marker === '-') {
+                            if (!removed.has(newLn)) removed.set(newLn, []);
+                            removed.get(newLn).push({ num: oldLn++, text: line.slice(1) });
+                            return;
+                        }
                         if (marker === '+') added.add(newLn);
+                        else oldLn++;
                         commentable.add(newLn);
                         text.set(newLn, line.slice(1));
                         newLn++;
                     });
-                f._lineInfo = { commentable, added, text };
+                f._lineInfo = { commentable, added, text, removed };
                 return f._lineInfo;
             }
 
@@ -2926,8 +2947,25 @@
                 return (list || []).map(renderInlineThread).join('');
             }
 
+            // Removed lines use their own class, not .md-src-line: the hover, scroll-sync and
+            // selection code indexes .md-src-line by new-file line number.
+            function removedLinesHtml(list) {
+                return (list || [])
+                    .map(
+                        (r) =>
+                            `<div class="md-del-line" title="Removed (old line ${r.num})"><span class="md-src-num">${r.num}</span><span class="md-src-text">${escapeHtml(r.text) || '&nbsp;'}</span></div>`,
+                    )
+                    .join('');
+            }
+
             function renderMarkdownSource(f, placement) {
-                const { commentable, added } = patchLineInfo(f);
+                const { commentable, added, removed } = patchLineInfo(f);
+                const count = f.rich.lines.length;
+                // Lines removed from the end of the file sit below its last line.
+                const trailing = [];
+                removed.forEach((list, at) => {
+                    if (at > count) trailing.push(...list);
+                });
                 return f.rich.lines
                     .map((content, i) => {
                         const num = i + 1;
@@ -2936,11 +2974,12 @@
                             ? commentButtonHtml(f.path, num, `Comment on line ${num}`)
                             : '';
                         // The whole gutter is the click target, not just the small + button.
-                        return `<div class="md-src-line ${added.has(num) ? 'md-add' : ''}" data-line="${num}">
+                        return `${removedLinesHtml(removed.get(num))}<div class="md-src-line ${added.has(num) ? 'md-add' : ''}" data-line="${num}">
                         <span class="md-src-num ${canComment ? 'commentable' : ''}"${canComment ? ` title="Comment on line ${num}"` : ''}>${btn}${num}</span><span class="md-src-text">${escapeHtml(content) || '&nbsp;'}</span>
                     </div>${inlineThreadsHtml(placement.byLine.get(num))}`;
                     })
-                    .join('');
+                    .join('')
+                    .concat(removedLinesHtml(trailing));
             }
 
             function renderMarkdownBlocks(f, placement) {
