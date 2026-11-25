@@ -4787,6 +4787,24 @@
                         if (column.classList.contains('minimized')) {
                             column.classList.remove('minimized');
                             minimizedColumns.delete(label);
+                            // Bring the widened column fully into view once it has finished
+                            // growing, so an edge column doesn't end up half off-screen.
+                            Promise.all(column.getAnimations().map((anim) => anim.finished))
+                                .catch(() => {})
+                                .then(() => {
+                                    const view = column.closest('.kanban-view');
+                                    if (!view || column.classList.contains('minimized')) return;
+                                    const colRect = column.getBoundingClientRect();
+                                    const viewRect = view.getBoundingClientRect();
+                                    let delta = 0;
+                                    if (colRect.right > viewRect.right) {
+                                        delta = colRect.right - viewRect.right;
+                                    }
+                                    if (colRect.left - delta < viewRect.left) {
+                                        delta = colRect.left - viewRect.left;
+                                    }
+                                    if (delta) view.scrollBy({ left: delta, behavior: 'smooth' });
+                                });
                         } else {
                             column.classList.add('minimized');
                             minimizedColumns.add(label);
